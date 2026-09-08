@@ -81,11 +81,11 @@ function setSendButtonState(generating) {
   if (generating) {
     sendBtn.style.display = 'none';
     stopBtn.style.display = '';
-    document.title = 'Generating… — Nexus';
+    document.title = 'Generating… — Sangam';
   } else {
     sendBtn.style.display = '';
     stopBtn.style.display = 'none';
-    document.title = 'Nexus — Universal AI Chat Platform';
+    document.title = 'Sangam — Universal AI Chat Platform';
   }
 }
 

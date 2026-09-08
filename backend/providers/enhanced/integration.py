@@ -7,7 +7,7 @@ import time
 from typing import AsyncGenerator, Optional, Dict, Any, List, Tuple
 from collections.abc import AsyncGenerator as AsyncGenType
 
-# Import existing Nexus components
+# Import existing Sangam components
 from backend.providers import (
     PROVIDERS, 
     resolve_api_key, 

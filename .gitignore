@@ -88,6 +88,7 @@ test-results/
 screenshots/
 *.trace.zip
 playwright-report/
+graphify-out/
 
 # --- Package lock files (if not using npm) ---
 package-lock.json

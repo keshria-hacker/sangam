@@ -29,10 +29,10 @@ let _contextMenuEl = null;
 
 // Pinned chat IDs persisted in localStorage
 function getPinnedIds() {
-  try { return JSON.parse(localStorage.getItem('nexus-pinned-chats') || '[]'); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('sangam-pinned-chats') || '[]'); } catch { return []; }
 }
 function setPinnedIds(ids) {
-  localStorage.setItem('nexus-pinned-chats', JSON.stringify(ids));
+  localStorage.setItem('sangam-pinned-chats', JSON.stringify(ids));
 }
 
 export function initElements() {

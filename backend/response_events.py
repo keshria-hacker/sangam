@@ -1,4 +1,4 @@
-"""Canonical Nexus response event protocol.
+"""Canonical Sangam response event protocol.
 
 This module is intentionally provider-independent. Provider adapters may still
 parse provider-specific chunks internally, but application transport and UI code

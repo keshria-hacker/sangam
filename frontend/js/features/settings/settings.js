@@ -73,7 +73,7 @@ export function applySettings() {
   const codeTheme = effectiveTheme === 'dark' ? (s.codeThemeDark || 'github-dark') : (s.codeThemeLight || 'github');
   setCodeTheme(codeTheme);
 
-  localStorage.setItem('nexus-settings', JSON.stringify(s));
+  localStorage.setItem('sangam-settings', JSON.stringify(s));
 }
 
 /**
@@ -92,7 +92,7 @@ export function setCodeTheme(theme) {
  */
 export function loadSettings() {
   try {
-    const saved = localStorage.getItem('nexus-settings');
+    const saved = localStorage.getItem('sangam-settings');
     if (saved) {
       const parsed = JSON.parse(saved);
       // Migrate old single codeTheme to dual preferences

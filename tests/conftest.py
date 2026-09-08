@@ -1,5 +1,5 @@
 """
-Reusable test fixtures for Nexus backend tests.
+Reusable test fixtures for Sangam backend tests.
 
 Provides async app client, test database, auth token, and mock HTTP fixtures
 for integration tests against the FastAPI application.
@@ -96,7 +96,7 @@ async def auth_headers(client: AsyncClient) -> dict[str, str]:
     # Extract CSRF token from response cookies
     csrf_token = ""
     for cookie in resp.cookies:
-        if cookie.name == "nexus_csrf":
+        if cookie.name == "sangam_csrf":
             csrf_token = cookie.value
             break
 
@@ -118,7 +118,7 @@ async def registered_user(client: AsyncClient) -> dict:
     data = resp.json()
     csrf_token = ""
     for cookie in resp.cookies:
-        if cookie.name == "nexus_csrf":
+        if cookie.name == "sangam_csrf":
             csrf_token = cookie.value
             break
     return {

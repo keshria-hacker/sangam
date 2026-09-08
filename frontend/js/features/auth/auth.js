@@ -350,7 +350,7 @@ export async function initializeAuth() {
   elements.authLoading.classList.add('hidden');
   elements.authLoadingRetry.classList.add('hidden');
   const registering = status.registration_open;
-  elements.authTitle.textContent = registering ? 'Create your Nexus account' : 'Sign in to Nexus';
+  elements.authTitle.textContent = registering ? 'Create your Sangam account' : 'Sign in to Sangam';
   elements.authDescription.textContent = registering
     ? 'Create the local account that protects your providers and conversations.'
     : 'Use your local account to access your providers and conversations.';

@@ -2,7 +2,7 @@
 # Dockerfile.all — UniversalAI Backend + Frontend in ONE container
 #
 # Runs both uvicorn (backend :8001) and python http.server (frontend :5500)
-# via supervisord. Build with: docker build -f Dockerfile.all -t nexus-all .
+# via supervisord. Build with: docker build -f Dockerfile.all -t sangam-all .
 # =============================================================================
 
 # ── Build stage ─────────────────────────────────────────────────────────────
@@ -34,8 +34,8 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=8001
 
 # Create non-root user
-RUN groupadd --system nexus && \
-    useradd --system --gid nexus --create-home --shell /bin/bash nexus
+RUN groupadd --system sangam && \
+    useradd --system --gid sangam --create-home --shell /bin/bash sangam
 
 WORKDIR /app
 
@@ -47,12 +47,12 @@ COPY frontend/ /app/frontend/
 
 # Create data directories
 RUN mkdir -p /app/uploads /app/history /app/logs /app/.chromadb && \
-    chown -R nexus:nexus /app
+    chown -R sangam:sangam /app
 
 # Copy supervisord config
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-USER nexus
+USER sangam
 
 EXPOSE 8001 5500
 

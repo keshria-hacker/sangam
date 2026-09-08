@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "universal-ai-chat-platform"
+name = "sangam"
 version = "1.1.0"
-description = "Universal AI Chat Platform — multi-provider chat with security hardening"
+description = "sangam — multi-provider chat with security hardening"
 requires-python = ">=3.11,<3.15"
 
 [tool.ruff]

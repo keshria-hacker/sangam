@@ -124,7 +124,7 @@ export const [getTemperature, setTemperature] = createSignal(0.7);
 // Settings state (persisted to localStorage)
 let _savedSettings = null;
 try {
-  const saved = localStorage.getItem('nexus-settings');
+  const saved = localStorage.getItem('sangam-settings');
   _savedSettings = saved ? JSON.parse(saved) : null;
 } catch {
   _savedSettings = null;
@@ -138,7 +138,7 @@ const [getSettings, setSettings, subscribeSettings] = createSignal({
 // Persist settings changes
 subscribeSettings((newSettings) => {
   try {
-    localStorage.setItem('nexus-settings', JSON.stringify(newSettings));
+    localStorage.setItem('sangam-settings', JSON.stringify(newSettings));
   } catch (e) {
     console.warn('Failed to persist settings:', e);
   }

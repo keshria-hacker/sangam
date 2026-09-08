@@ -22,9 +22,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Point at an isolated throwaway database BEFORE importing any backend module.
 # database.py builds its engine at import time from settings.DATABASE_URL, whose
-# default is the real history/nexus.db. Without this override these tests would
+# default is the real history/sangam.db. Without this override these tests would
 # wipe the developer's actual account, chats, and stored provider keys.
-TEST_DB_PATH = Path(tempfile.gettempdir()) / "nexus_test_api.db"
+TEST_DB_PATH = Path(tempfile.gettempdir()) / "sangam_test_api.db"
 if TEST_DB_PATH.exists():
     TEST_DB_PATH.unlink()
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB_PATH}"

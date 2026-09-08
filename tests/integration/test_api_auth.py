@@ -22,9 +22,9 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 # Point at an isolated throwaway database BEFORE importing any backend module.
 # database.py builds its engine at import time from settings.DATABASE_URL, whose
-# default is the real history/nexus.db. Without this override these tests would
+# default is the real history/sangam.db. Without this override these tests would
 # wipe the developer's actual account, chats, and stored provider keys.
-TEST_DB_PATH = Path(tempfile.gettempdir()) / "nexus_test_integration_auth.db"
+TEST_DB_PATH = Path(tempfile.gettempdir()) / "sangam_test_integration_auth.db"
 if TEST_DB_PATH.exists():
     TEST_DB_PATH.unlink()
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
@@ -60,7 +60,7 @@ class AuthIntegrationTests(unittest.IsolatedAsyncioTestCase):
         cls._csrf = None
         # The isolated temp database is configured at import time above; each
         # test then gets clean tables via reset_db(). Never touch the real
-        # history/nexus.db here.
+        # history/sangam.db here.
         reset_settings()
 
     async def asyncSetUp(self):
@@ -184,12 +184,12 @@ class AuthIntegrationTests(unittest.IsolatedAsyncioTestCase):
     # --- CSRF cookie tests ---
 
     async def test_csrf_cookie_set_on_login(self):
-        """Login response sets the nexus_csrf cookie."""
+        """Login response sets the sangam_csrf cookie."""
         await self._create_user_and_login()
         resp = await self.client.post(f"{self.ROUTE}/login", json={
             "username": self.USERNAME, "password": self.PASSWORD,
         })
-        csrf_value = resp.cookies.get("nexus_csrf", "")
+        csrf_value = resp.cookies.get("sangam_csrf", "")
         self.assertTrue(len(csrf_value) > 8)
 
     # --- Logout ---

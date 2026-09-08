@@ -441,7 +441,7 @@ async def stream_response_events(
     message_id: str | None = None,
     request_id: str | None = None,
 ) -> AsyncGenerator[ResponseEvent]:
-    """Stream canonical Nexus response events with tool execution support."""
+    """Stream canonical Sangam response events with tool execution support."""
     _ensure_initialized()
     provider_id, litellm_id = _resolve_model(model_id)
     api_key = await resolve_api_key(provider_id, db)

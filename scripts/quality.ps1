@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Quality checks for Nexus — run before commit
+    Quality checks for Sangam — run before commit
 .DESCRIPTION
     Runs Ruff, MyPy, Bandit, ESLint, Prettier, and optional checks
 .EXAMPLE

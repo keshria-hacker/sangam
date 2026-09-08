@@ -318,7 +318,7 @@ class CSRFMiddlewareTests(unittest.TestCase):
         mock_request = MagicMock(spec=Request)
         mock_request.method = "POST"
         mock_request.url.path = "/api/models"
-        mock_request.cookies = {"nexus_csrf": "test_token"}
+        mock_request.cookies = {"sangam_csrf": "test_token"}
         mock_request.headers = {}
 
         async def test():

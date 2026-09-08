@@ -1,4 +1,4 @@
-# Nexus — Architecture & Implementation Guide
+# Sangam — Architecture & Implementation Guide
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@
 
 ## 1. Project Overview
 
-**Nexus** is a privacy-first, universal AI chat platform that unifies multiple Large Language Models (LLMs) into a single interface. It connects to cloud provider APIs (OpenAI, Anthropic, Gemini, etc.) and local models (Ollama) simultaneously, allowing users to switch between providers mid-conversation.
+**Sangam** is a privacy-first, universal AI chat platform that unifies multiple Large Language Models (LLMs) into a single interface. It connects to cloud provider APIs (OpenAI, Anthropic, Gemini, etc.) and local models (Ollama) simultaneously, allowing users to switch between providers mid-conversation.
 
 **Core Philosophy:** One interface, any model. No lock-in, no simulated responses — every chat is a real API call to a real provider.
 
@@ -101,7 +101,7 @@ Universal-Ai-Chat-Platform/
 │   │       ├── skills/skills.js        # Skills modal browser & execution
 │   │       └── sidebar/sidebar.js      # Chat history sidebar (bucketed by date)
 │   └── assets/
-│       └── logo.svg            # Nexus brand logo
+│       └── logo.svg            # Sangam brand logo
 ├── config/
 │   ├── providers.yaml          # Reference provider registry (documentation only)
 │   └── skills/                 # Skill definitions (SKILL.md files)
@@ -233,7 +233,7 @@ The frontend now uses a **feature-based module structure** under `frontend/js/fe
 
 | Module | Responsibility |
 |--------|----------------|
-| `core/state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings (persisted to `localStorage` as `nexus-settings`), etc. |
+| `core/state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings (persisted to `localStorage` as `sangam-settings`), etc. |
 | `shared/constants.js` | `DEFAULT_SETTINGS`, `CHAT_BUCKETS`, provider color/label maps |
 | `shared/http.js` | `apiFetch`, `apiPost`, `apiDelete`, `streamChat` — authenticated requests + SSE |
 | `shared/markdown.js` | Streaming-safe markdown → HTML rendering (marked + highlight.js) |
@@ -248,7 +248,7 @@ The frontend now uses a **feature-based module structure** under `frontend/js/fe
 
 **Boot sequence (`app.js`):**
 1. Initialize global state (`state.js`)
-2. Load persisted settings from `localStorage` (`state.js` → `nexus-settings`, applied by `settings.js`)
+2. Load persisted settings from `localStorage` (`state.js` → `sangam-settings`, applied by `settings.js`)
 3. Initialize feature modules in dependency order: auth → settings → sidebar → models → chat → skills
 4. Call `initGlobalListeners()` for topbar controls (temperature, tokens, reasoning, web search, shortcuts)
 
@@ -298,7 +298,7 @@ Components subscribe to signals they care about — when state changes, only dep
 
 ### 4.5 Design System
 
-Nexus uses a **Paper / Ink** design language — a monochrome "premium electronic paper" chrome for a high-end desktop productivity tool. Two themes are applied via the `data-theme` attribute on `<html>` (`light` / `dark`, or `system` resolved at runtime). The chrome is intentionally monochrome: `--accent` is *ink*, not a brand hue, and there are **no user-selectable accent swatches**.
+Sangam uses a **Paper / Ink** design language — a monochrome "premium electronic paper" chrome for a high-end desktop productivity tool. Two themes are applied via the `data-theme` attribute on `<html>` (`light` / `dark`, or `system` resolved at runtime). The chrome is intentionally monochrome: `--accent` is *ink*, not a brand hue, and there are **no user-selectable accent swatches**.
 
 | Token | INK (dark) | PAPER (light) |
 |-------|------------|---------------|
@@ -1076,7 +1076,7 @@ The `start.py` launcher:
 │  ┌──────────┐  ┌──────────┴──────────┐  ┌───────────────────────────┐  │
 │  │ SQLite   │  │ Document Extraction  │  │ Web Search                │  │
 │  │ (history │  │ (document.py)        │  │ (websearch.py)            │  │
-│  │ /nexus   │  │ PDF  DOCX  XLSX     │  │ DuckDuckGo  Tavily  Brave │  │
+│  │ /sangam   │  │ PDF  DOCX  XLSX     │  │ DuckDuckGo  Tavily  Brave │  │
 │  │  .db)    │  │ CSV  PPTX  Code     │  │                           │  │
 │  └──────────┘  └─────────────────────┘  └───────────────────────────┘  │
 │                            │                                            │

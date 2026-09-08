@@ -32,7 +32,7 @@ _test_key = Fernet.generate_key().decode()
 os.environ["MASTER_KEY"] = _test_key
 # Use file-based test database in the OS temp dir so the repo root stays clean
 # (an earlier version wrote test_auth.db into the project root).
-test_db_path = Path(tempfile.gettempdir()) / "nexus_test_auth.db"
+test_db_path = Path(tempfile.gettempdir()) / "sangam_test_auth.db"
 if test_db_path.exists():
     test_db_path.unlink()
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{test_db_path}"
@@ -267,13 +267,13 @@ class AuthUnitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_response.set_cookie.call_count, 2)
 
         auth_cookie_call = mock_response.set_cookie.call_args_list[0]
-        self.assertEqual(auth_cookie_call.kwargs["key"], "nexus_session")
+        self.assertEqual(auth_cookie_call.kwargs["key"], "sangam_session")
         self.assertEqual(auth_cookie_call.kwargs["value"], token_out.access_token)
         self.assertTrue(auth_cookie_call.kwargs["httponly"])
         self.assertEqual(auth_cookie_call.kwargs["samesite"], "lax")
 
         csrf_cookie_call = mock_response.set_cookie.call_args_list[1]
-        self.assertEqual(csrf_cookie_call.kwargs["key"], "nexus_csrf")
+        self.assertEqual(csrf_cookie_call.kwargs["key"], "sangam_csrf")
         self.assertEqual(csrf_cookie_call.kwargs["value"], token_out.csrf_token)
         self.assertFalse(csrf_cookie_call.kwargs["httponly"])
         self.assertEqual(csrf_cookie_call.kwargs["samesite"], "strict")
@@ -863,7 +863,7 @@ class SessionManagementTests(unittest.IsolatedAsyncioTestCase):
         await self.session.commit()
 
         mock_request = MagicMock()
-        mock_request.cookies = {"nexus_session": token}
+        mock_request.cookies = {"sangam_session": token}
         mock_request.headers = {}
 
         with self.assertRaises(Exception) as ctx:
@@ -933,7 +933,7 @@ class CSRFProtectionTests(unittest.IsolatedAsyncioTestCase):
         mock_request = MagicMock()
         mock_request.method = "POST"
         mock_request.headers = {}
-        mock_request.cookies = {"nexus_csrf": "some_token"}
+        mock_request.cookies = {"sangam_csrf": "some_token"}
         mock_request.url.path = "/api/some-endpoint"
 
         with self.assertRaises(Exception) as ctx:

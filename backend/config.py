@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # --- Database ---
     DATABASE_URL: str = Field(
-        default=f"sqlite+aiosqlite:///{BASE_DIR.as_posix()}/history/nexus.db",
+        default=f"sqlite+aiosqlite:///{BASE_DIR.as_posix()}/history/sangam.db",
         description="Database URL — override with env var (e.g. sqlite+aiosqlite:// for in-memory testing)",
     )
 

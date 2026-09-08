@@ -1,5 +1,5 @@
 /**
- * Canonical Nexus response event boundary.
+ * Canonical Sangam response event boundary.
  *
  * Network SSE frames enter here and are normalized before chat UI state mutates.
  * Legacy token SSE frames are still supported for backward compatibility, but

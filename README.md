@@ -1,6 +1,6 @@
 <div align="center">
 
-# Nexus
+# Sangam
 
 ### Universal AI Chat Platform
 
@@ -18,15 +18,15 @@ A privacy-first AI workspace for chatting with cloud and local LLMs from a singl
 
 ---
 
-## ✨ Meet Nexus
+## ✨ Meet Sangam
 
-Nexus is an open-source, privacy-first AI chat platform that brings multiple Large Language Models into one unified workspace.
+Sangam is an open-source, privacy-first AI chat platform that brings multiple Large Language Models into one unified workspace.
 
 Connect cloud providers such as **OpenAI, Anthropic, Gemini, NVIDIA NIM, Groq, Mistral, DeepSeek, OpenRouter** and more — or run models locally through **Ollama**.
 
 Switch models, upload documents, use RAG, search the web, manage provider keys, and keep your conversations in one place.
 
-> **Nexus v1.1 is under active development.** Features and APIs may evolve as the project grows.
+> **Sangam v1.1 is under active development.** Features and APIs may evolve as the project grows.
 
 ---
 
@@ -34,8 +34,8 @@ Switch models, upload documents, use RAG, search the web, manage provider keys, 
 
 <p align="center">
   <img
-    src="docs/screenshots/nexus-chat.png"
-    alt="Nexus Universal AI Chat Platform"
+    src="docs/screenshots/sangam-chat.png"
+    alt="Sangam Universal AI Chat Platform"
     width="100%"
   />
 </p>
@@ -58,13 +58,13 @@ Responses are streamed token-by-token for a fast and responsive conversational e
 
 ### 🦙 Local AI with Ollama
 
-Use locally installed Ollama models directly inside Nexus while keeping inference on your machine.
+Use locally installed Ollama models directly inside Sangam while keeping inference on your machine.
 
 ### 📚 Document Chat + RAG
 
 Upload documents and ask questions about their contents.
 
-Nexus chunks documents, generates embeddings, retrieves relevant sections, and sends only the most useful context to the model.
+Sangam chunks documents, generates embeddings, retrieves relevant sections, and sends only the most useful context to the model.
 
 ### 🌐 Web Search
 
@@ -104,7 +104,7 @@ Local authentication, encrypted provider keys, secure password hashing, and loca
 | Ollama | 🖥️ Local | Not required |
 | OmniRoute | 🖥️ Local | Required |
 
-The provider registry is extensible, making it possible to add additional providers as Nexus evolves.
+The provider registry is extensible, making it possible to add additional providers as Sangam evolves.
 
 ---
 
@@ -118,7 +118,7 @@ Before starting, make sure you have:
 - Git
 - Ollama *(optional — only required for local models)*
 
-### 1. Clone Nexus
+### 1. Clone Sangam
 
 ```bash
 git clone https://github.com/keshria-hacker/Universal-Ai-Chat-Platform.git
@@ -150,7 +150,7 @@ API keys can also be managed later from:
 
 **Settings → Provider API Keys**
 
-### 3. Start Nexus
+### 3. Start Sangam
 
 #### Windows
 
@@ -172,13 +172,13 @@ python start.py
 ./start.sh
 ```
 
-### 4. Open Nexus
+### 4. Open Sangam
 
 Once the servers are running:
 
 | Service | Address |
 |---|---|
-| Nexus | `http://127.0.0.1:5500` |
+| Sangam | `http://127.0.0.1:5500` |
 | Backend API | `http://127.0.0.1:8001` |
 | Swagger API Docs | `http://127.0.0.1:8001/docs` |
 
@@ -186,12 +186,12 @@ Once the servers are running:
 
 ## 🐳 Docker
 
-Nexus can also run using Docker.
+Sangam can also run using Docker.
 
 ### Build
 
 ```bash
-docker build -f Dockerfile.all -t nexus-all .
+docker build -f Dockerfile.all -t sangam-all .
 ```
 
 ### Configure
@@ -209,7 +209,7 @@ docker run -d \
   -p 8001:8001 \
   -p 5500:5500 \
   --env-file .env \
-  nexus-all
+  sangam-all
 ```
 
 ### Docker Compose
@@ -222,7 +222,7 @@ docker compose -f docker-compose.all.yml up -d
 
 ## 🦙 Using Ollama
 
-Nexus automatically detects available Ollama models.
+Sangam automatically detects available Ollama models.
 
 Install or pull a model:
 
@@ -236,7 +236,7 @@ Start Ollama:
 ollama serve
 ```
 
-Downloaded models will automatically appear inside the Nexus model selector.
+Downloaded models will automatically appear inside the Sangam model selector.
 
 To use another Ollama server:
 
@@ -250,7 +250,7 @@ OLLAMA_BASE_URL=http://your-ollama-host:11434
 
 ## 📂 Document Support
 
-Nexus can extract and work with multiple document and source-code formats.
+Sangam can extract and work with multiple document and source-code formats.
 
 | Format | Support |
 |---|:---:|
@@ -276,7 +276,7 @@ Only the most relevant document sections are sent to the selected model, helping
 
 ## 🌐 Web Search
 
-Enable **Web Search** directly from the Nexus composer to provide the model with current web information.
+Enable **Web Search** directly from the Sangam composer to provide the model with current web information.
 
 Supported search backends include:
 
@@ -288,7 +288,7 @@ Supported search backends include:
 
 ## 🧩 Skills
 
-Nexus includes an extensible Skills system for reusable AI workflows.
+Sangam includes an extensible Skills system for reusable AI workflows.
 
 Current built-in skills include:
 
@@ -320,7 +320,7 @@ Custom skills can be created using `SKILL.md` files.
 
 ## 🔐 Security & Privacy
 
-Nexus is currently designed as a **local, single-user application**.
+Sangam is currently designed as a **local, single-user application**.
 
 Security features include:
 
@@ -331,7 +331,7 @@ Security features include:
 - 🚫 Debug mode disabled by default
 - 💾 Local conversation storage
 
-> **Important:** Nexus is not currently intended to be exposed directly to the public internet without additional production security configuration.
+> **Important:** Sangam is not currently intended to be exposed directly to the public internet without additional production security configuration.
 
 See [`SECURITY.md`](SECURITY.md) for security and vulnerability reporting information.
 
@@ -351,7 +351,7 @@ Tests cover core functionality including authentication, document processing, mo
 
 ## 🗺️ Roadmap
 
-Nexus is actively evolving toward a more complete universal AI workspace.
+Sangam is actively evolving toward a more complete universal AI workspace.
 
 - [x] Multi-provider AI chat
 - [x] Local Ollama support
@@ -390,7 +390,7 @@ When contributing, please keep changes focused and follow the existing project s
 
 ## 📄 License
 
-Nexus is released under the **MIT License**.
+Sangam is released under the **MIT License**.
 
 See [`LICENSE`](LICENSE) for details.
 
@@ -398,12 +398,12 @@ See [`LICENSE`](LICENSE) for details.
 
 <div align="center">
 
-### Nexus
+### Sangam
 
 **One interface. Every model. Your workflow.**
 
 Built with ❤️ for the open-source AI community.
 
-⭐ **If you find Nexus useful, consider giving the project a star.**
+⭐ **If you find Sangam useful, consider giving the project a star.**
 
 </div>

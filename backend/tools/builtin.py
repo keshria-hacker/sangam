@@ -43,7 +43,7 @@ async def web_search_handler(query: str, max_results: int = 5) -> dict[str, Any]
     
     url = "https://html.duckduckgo.com/html/"
     params = {"q": query}
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; NexusBot/1.0)"}
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; SangamBot/1.0)"}
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(url, data=params, headers=headers)

@@ -19,9 +19,9 @@ sys.path.insert(0, str(ROOT))
 
 # Point at an isolated throwaway database BEFORE importing any backend module.
 # database.py builds its engine at import time from settings.DATABASE_URL, whose
-# default is the real history/nexus.db. Without this override these tests would
+# default is the real history/sangam.db. Without this override these tests would
 # wipe the developer's actual account, chats, and stored provider keys.
-TEST_DB_PATH = Path(tempfile.gettempdir()) / "nexus_test_integration_models.db"
+TEST_DB_PATH = Path(tempfile.gettempdir()) / "sangam_test_integration_models.db"
 if TEST_DB_PATH.exists():
     TEST_DB_PATH.unlink()
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
@@ -47,7 +47,7 @@ class ProviderModelIntegrationTests(unittest.IsolatedAsyncioTestCase):
     def setUpClass(cls):
         # The isolated temp database is configured at import time above; each
         # test then gets clean tables via reset_db(). Never touch the real
-        # history/nexus.db here.
+        # history/sangam.db here.
         reset_settings()
 
     async def asyncSetUp(self):

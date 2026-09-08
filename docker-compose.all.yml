@@ -3,12 +3,12 @@
 # =============================================================================
 
 services:
-  nexus-all:
+  sangam-all:
     build:
       context: .
       dockerfile: Dockerfile.all
-    image: nexus-all:latest
-    container_name: nexus-all
+    image: sangam-all:latest
+    container_name: sangam-all
     ports:
       - "8001:8001"   # Backend API
       - "5500:5500"   # Frontend
@@ -19,10 +19,10 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     volumes:
       # Persist data across container restarts
-      - nexus_history:/app/history
-      - nexus_uploads:/app/uploads
-      - nexus_chromadb:/app/.chromadb
-      - nexus_logs:/app/logs
+      - sangam_history:/app/history
+      - sangam_uploads:/app/uploads
+      - sangam_chromadb:/app/.chromadb
+      - sangam_logs:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
@@ -31,29 +31,29 @@ services:
       retries: 3
       start_period: 20s
     networks:
-      - nexus_net
+      - sangam_net
 
   # Optional Redis for distributed rate limiting
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: sangam-redis
     ports:
       - "6379:6379"
     volumes:
-      - nexus_redis:/data
+      - sangam_redis:/data
     restart: unless-stopped
     profiles:
       - redis
     networks:
-      - nexus_net
+      - sangam_net
 
 volumes:
-  nexus_history:
-  nexus_uploads:
-  nexus_chromadb:
-  nexus_logs:
-  nexus_redis:
+  sangam_history:
+  sangam_uploads:
+  sangam_chromadb:
+  sangam_logs:
+  sangam_redis:
 
 networks:
-  nexus_net:
+  sangam_net:
     driver: bridge

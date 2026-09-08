@@ -1,5 +1,5 @@
 /**
- * Nexus - Universal AI Chat Platform
+ * Sangam - Universal AI Chat Platform
  * Main entry point - bootstraps all feature modules.
  */
 
@@ -314,7 +314,7 @@ function initGlobalListeners() {
  * This is needed for backward compatibility with HTML event handlers.
  */
 function setupGlobalNamespace() {
-  window.nexusApp = {
+  window.sangamApp = {
     // Chat
     handleSend,
     regenerate,

@@ -46,7 +46,7 @@ export function buildAuthHeaders() {
   // CSRF token from cookie (for cookie-based sessions)
   const csrf = document.cookie
     .split('; ')
-    .find((row) => row.startsWith('nexus_csrf='))
+    .find((row) => row.startsWith('sangam_csrf='))
     ?.split('=')[1];
   if (csrf) {
     headers['X-CSRF-Token'] = csrf;

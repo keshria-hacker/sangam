@@ -130,7 +130,7 @@ function checkLibraries() {
  * Configure marked.js 15+ with GFM options and custom renderers.
  */
 function configureMarked() {
-  if (!_marked || _marked.__nexusConfigured) return;
+  if (!_marked || _marked.__sangamConfigured) return;
 
   // marked.js 15+ uses marked.use() for configuration
   _marked.use({
@@ -225,7 +225,7 @@ function configureMarked() {
     },
   });
 
-  _marked.__nexusConfigured = true;
+  _marked.__sangamConfigured = true;
 }
 
 /**

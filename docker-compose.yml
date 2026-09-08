@@ -19,8 +19,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: nexus-backend:latest
-    container_name: nexus-backend
+    image: sangam-backend:latest
+    container_name: sangam-backend
     ports:
       - "8001:8001"
     env_file:
@@ -32,9 +32,9 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     volumes:
       # Persist data across container restarts.
-      - nexus_history:/app/history
-      - nexus_uploads:/app/uploads
-      - nexus_chromadb:/app/.chromadb
+      - sangam_history:/app/history
+      - sangam_uploads:/app/uploads
+      - sangam_chromadb:/app/.chromadb
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
@@ -43,7 +43,7 @@ services:
       retries: 3
       start_period: 15s
     networks:
-      - nexus_net
+      - sangam_net
 
   # ── Frontend (optional — dev server) ─────────────────────────────────────
   # Serves the static frontend files.  The default API_BASE in the JS
@@ -52,7 +52,7 @@ services:
   # for local development.
   frontend:
     image: python:3.13-slim
-    container_name: nexus-frontend
+    container_name: sangam-frontend
     ports:
       - "5500:5500"
     volumes:
@@ -63,30 +63,30 @@ services:
     profiles:
       - frontend          # opt-in: docker compose --profile frontend up
     networks:
-      - nexus_net
+      - sangam_net
 
   # ── Redis (optional — rate limiting) ─────────────────────────────────────
   # Start with:  docker compose --profile redis up
   # Set REDIS_URL=redis://redis:6379/0 in .env to enable.
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: sangam-redis
     ports:
       - "6379:6379"
     volumes:
-      - nexus_redis:/data
+      - sangam_redis:/data
     restart: unless-stopped
     profiles:
       - redis
     networks:
-      - nexus_net
+      - sangam_net
 
 volumes:
-  nexus_history:
-  nexus_uploads:
-  nexus_chromadb:
-  nexus_redis:
+  sangam_history:
+  sangam_uploads:
+  sangam_chromadb:
+  sangam_redis:
 
 networks:
-  nexus_net:
+  sangam_net:
     driver: bridge

@@ -90,9 +90,9 @@ export const NON_CHAT_MARKERS = [
 
 // Storage keys
 export const STORAGE_KEYS = {
-  API_BASE: 'nexus-api-base',
-  ACCESS_TOKEN: 'nexus-access-token',
-  SETTINGS: 'nexus-settings',
+  API_BASE: 'sangam-api-base',
+  ACCESS_TOKEN: 'sangam-access-token',
+  SETTINGS: 'sangam-settings',
 };
 
 // Auth settings

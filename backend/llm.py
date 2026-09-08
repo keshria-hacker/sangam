@@ -162,7 +162,7 @@ async def stream_response_events(  # noqa: PLR0917
     message_id: str = None,
     request_id: str = None,
 ) -> AsyncGenerator[Any]:
-    """Stream canonical Nexus response events from providers."""
+    """Stream canonical Sangam response events from providers."""
     # Note: The enhanced version is now imported above and overrides this.
     # This docstring is kept for backward compatibility.
     from backend.providers import stream_response_events as _stream_response_events
@@ -269,6 +269,7 @@ async def fetch_models_from_provider(  # noqa: PLR0917
         litellm_prefix=f"{provider_id}/",
         name_field=name_field,
         description_field=description_field,
+        query_key=query_key,
     )
 
     # Call the new function

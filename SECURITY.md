@@ -10,7 +10,7 @@ Do not open a public issue for a security concern. Contact the repository mainta
 
 ## Deployment note
 
-Nexus v1.1 is a local, single-user application. It uses a locally stored account session with **scrypt** password hashing (N=16384, r=8, p=1). Provider API keys added from Settings → Providers are **encrypted at rest** using **Fernet (AES-128-CBC with HMAC-SHA256)** with a `MASTER_KEY` from the environment. Sessions use **Bearer tokens** + **HTTP-only cookies** with **CSRF double-submit cookie protection**.
+Sangam v1.1 is a local, single-user application. It uses a locally stored account session with **scrypt** password hashing (N=16384, r=8, p=1). Provider API keys added from Settings → Providers are **encrypted at rest** using **Fernet (AES-128-CBC with HMAC-SHA256)** with a `MASTER_KEY` from the environment. Sessions use **Bearer tokens** + **HTTP-only cookies** with **CSRF double-submit cookie protection**.
 
 ### Do not expose this instance to the public internet without:
 - Setting `ENV=production`

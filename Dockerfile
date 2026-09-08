@@ -40,14 +40,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy installed Python packages from the builder stage — install to /usr/local
 # so they are accessible system-wide by any user (including the unprivileged
-# nexus user we create below).
+# sangam user we create below).
 COPY --from=builder /root/.local /usr/local
 ENV PYTHONUNBUFFERED=1 \
     PORT=8001
 
 # Create the non-root user so the app doesn't run as root.
-RUN groupadd --system nexus && \
-    useradd --system --gid nexus --create-home --shell /bin/bash nexus
+RUN groupadd --system sangam && \
+    useradd --system --gid sangam --create-home --shell /bin/bash sangam
 
 WORKDIR /app/backend
 COPY backend/ .
@@ -55,9 +55,9 @@ COPY backend/ .
 # Ensure the parent data directories exist on first startup.
 # (These are bind-mounted as volumes in production; the mkdir is a safety net.)
 RUN mkdir -p /app/uploads /app/history /app/logs /app/.chromadb && \
-    chown -R nexus:nexus /app
+    chown -R sangam:sangam /app
 
-USER nexus
+USER sangam
 
 EXPOSE 8001
 

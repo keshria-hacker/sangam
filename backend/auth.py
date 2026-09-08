@@ -1,4 +1,4 @@
-"""Local, single-user authentication for the Nexus v1 application.
+"""Local, single-user authentication for the Sangam v1 application.
 
 Supports both Bearer token (Authorization header) and HTTP-only cookie
 based auth.  When a cookie is present both are checked — the cookie takes
@@ -38,9 +38,9 @@ MAX_LOGIN_ATTEMPTS = 5
 LOGIN_LOCKOUT_SECONDS = 900
 
 # Cookie name for HTTP-only session token
-AUTH_COOKIE_NAME = "nexus_session"
+AUTH_COOKIE_NAME = "sangam_session"
 # CSRF cookie name (double-submit cookie pattern)
-CSRF_COOKIE_NAME = "nexus_csrf"
+CSRF_COOKIE_NAME = "sangam_csrf"
 # Header name for CSRF token
 CSRF_HEADER_NAME = "X-CSRF-Token"
 

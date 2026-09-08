@@ -1,5 +1,5 @@
 #!/bin/bash
-# Quality checks for Nexus — run before commit
+# Quality checks for Sangam — run before commit
 # Usage: ./scripts/quality.sh
 
 set -euo pipefail

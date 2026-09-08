@@ -370,7 +370,7 @@ class CSRFMiddlewareTests(unittest.TestCase):
         # Test 4: POST with cookie but no header should raise 403
         mock_request.method = "POST"
         mock_request.url.path = "/api/models"
-        mock_request.cookies = {"nexus_csrf": "test_token"}
+        mock_request.cookies = {"sangam_csrf": "test_token"}
         mock_request.headers = {}
 
         async def test_post_cookie_no_header():
