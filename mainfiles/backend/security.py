@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from backend.config import settings
+from .config import settings
 
 
 class EncryptionError(Exception):

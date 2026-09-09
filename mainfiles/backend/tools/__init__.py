@@ -1,7 +1,7 @@
 """Tools package - Tool execution infrastructure."""
 from __future__ import annotations
 
-from backend.tools.schemas import (
+from .schemas import (
     ToolDefinition,
     ToolCall,
     ToolResult,
@@ -9,9 +9,9 @@ from backend.tools.schemas import (
     tool_definition_to_openai_function,
     tool_definition_to_anthropic_tool,
 )
-from backend.tools.registry import ToolRegistry, registry
-from backend.tools.executor import ToolExecutor, ToolExecutionError, ToolTimeoutError, ToolValidationError, executor
-from backend.tools.builtin import register_builtin_tools
+from .registry import ToolRegistry, registry
+from .executor import ToolExecutor, ToolExecutionError, ToolTimeoutError, ToolValidationError, executor
+from .builtin import register_builtin_tools
 
 __all__ = [
     # Schemas

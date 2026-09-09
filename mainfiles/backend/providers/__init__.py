@@ -27,13 +27,13 @@ from .model_discovery import (
     fetch_ollama_models,
 )
 from .registry import init_provider_registry, registry
-from backend.tools import (
+from ..tools import (
     ToolCall,
     ToolResult,
     executor,
     registry as tool_registry,
 )
-from backend.response_events import (
+from ..response_events import (
     FinishReason,
     ResponseEvent,
     ResponseEventBuilder,
@@ -666,3 +666,5 @@ __all__ = [
     # Response events
     stream_response_events,
 ]
+
+

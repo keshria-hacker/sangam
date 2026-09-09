@@ -10,7 +10,7 @@ import httpx
 
 from .base import NON_CHAT_MARKERS, ModelInfo, ProviderConfig
 from .inaccessible import is_inaccessible
-from backend.response_events import ModelCapabilities
+from ..response_events import ModelCapabilities
 
 logger = logging.getLogger(__name__)
 

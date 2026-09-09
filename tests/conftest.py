@@ -16,7 +16,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles" / "backend"))
 
 # Pre-mock OCR dependencies BEFORE any test imports the document module.
 # This ensures OCR_AVAILABLE = True and allows patching of pytesseract/PIL

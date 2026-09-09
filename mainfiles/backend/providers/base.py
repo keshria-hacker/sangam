@@ -7,14 +7,14 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Any
 
-from backend.response_events import (
+from ..response_events import (
     FinishReason,
     ModelCapabilities,
     UsageInfo,
     normalize_finish_reason,
     normalize_usage,
 )
-from backend.response_events import ResponseEventType
+from ..response_events import ResponseEventType
 
 
 @dataclass
@@ -260,3 +260,4 @@ NON_CHAT_MARKERS = (
     "whisper", "dall-e", "dall_e", "tts", "embedding", "embed",
     "moderation", "rerank", "reranker",
 )
+

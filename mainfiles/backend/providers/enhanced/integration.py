@@ -9,8 +9,8 @@ from collections.abc import AsyncGenerator as AsyncGenType
 
 # Import existing Sangam components
 from backend.providers import (
-    PROVIDERS, 
-    resolve_api_key, 
+    PROVIDERS,
+    resolve_api_key,
     _resolve_model,
     stream_completion as original_stream_completion,
     list_models,
@@ -18,8 +18,8 @@ from backend.providers import (
 )
 from backend.providers.base import ProviderStreamChunk, ModelInfo
 from backend.providers.enhanced.strategies import (
-    EnhancedRouter, 
-    RoutingContext, 
+    EnhancedRouter,
+    RoutingContext,
     ProviderCandidate,
     create_example_candidates
 )

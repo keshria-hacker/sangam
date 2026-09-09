@@ -11,19 +11,19 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from backend import llm
-from backend import websearch
-from backend.context_manager import create_context_manager
-from backend.database import AsyncSessionLocal, get_db
-from backend.document import extract_text, truncate_preview
+from . import llm
+from . import websearch
+from .context_manager import create_context_manager
+from .database import AsyncSessionLocal, get_db
+from .document import extract_text, truncate_preview
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from backend.models import Chat, Message, ProviderKey, UploadedFile
-from backend.rag import TOP_K as RAG_TOP_K
-from backend.rag import index_document, retrieve_relevant_chunks
-from backend.response_events import ResponseEvent, ResponseEventBuilder, ResponseEventType, normalize_error
-from backend.response_intelligence import analyze_request, build_system_prompt_additions, config as ri_config
-from backend.schemas import (
+from .models import Chat, Message, ProviderKey, UploadedFile
+from .rag import TOP_K as RAG_TOP_K
+from .rag import index_document, retrieve_relevant_chunks
+from .response_events import ResponseEvent, ResponseEventBuilder, ResponseEventType, normalize_error
+from .response_intelligence import analyze_request, build_system_prompt_additions, config as ri_config
+from .schemas import (
     ChatDetailOut,
     ChatOut,
     ChatStreamRequest,
@@ -39,7 +39,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.config import settings
+from .config import settings
 
 router = APIRouter()
 public_router = APIRouter()
@@ -187,7 +187,7 @@ async def list_provider_keys(db: AsyncSession = Depends(get_db)):
             masked = f"{db_key[:6]}···{db_key[-4:]}" if len(db_key) > 10 else "···"
             out.append(ProviderKeyOut(provider_id=pid, label=meta["label"], linked=True, masked_key=masked))
         elif meta["env_key_set"]:
-            out.append(ProviderKeyOut(provider_id=pid, label=meta["label"], linked=True, masked_key="(from backend.env)"))
+            out.append(ProviderKeyOut(provider_id=pid, label=meta["label"], linked=True, masked_key="(from .env)"))
         else:
             out.append(ProviderKeyOut(provider_id=pid, label=meta["label"], linked=False, masked_key=None))
     return out

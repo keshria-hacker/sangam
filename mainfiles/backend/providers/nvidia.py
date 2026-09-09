@@ -5,9 +5,9 @@ import json
 from typing import Any
 
 import httpx
-from backend.response_events import normalize_finish_reason, normalize_usage
+from ..response_events import normalize_finish_reason, normalize_usage
 
-from backend.config import settings
+from ..config import settings
 
 from .base import BaseProvider, ModelInfo, ProviderStreamChunk
 from .inaccessible import track_inaccessible

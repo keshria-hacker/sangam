@@ -18,7 +18,7 @@ _test_key = Fernet.generate_key().decode()
 os.environ["MASTER_KEY"] = _test_key
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Point at an isolated throwaway database BEFORE importing any backend module.
 # database.py builds its engine at import time from settings.DATABASE_URL, whose
@@ -30,19 +30,19 @@ if TEST_DB_PATH.exists():
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
 
 # Now import backend modules - the DATABASE_URL is set before they import settings
-from backend.config import reset_settings, settings as config_settings
+from mainfiles.backend.config import reset_settings, settings as config_settings
 reset_settings()
 config_settings.DATABASE_URL = os.environ["DATABASE_URL"]
 
 # Import database and initialize - must come AFTER settings are configured
-from backend.database import init_db, reset_db
-from backend.ratelimit_redis import reset_rate_limit_store_for_testing
+from mainfiles.backend.database import init_db, reset_db
+from mainfiles.backend.ratelimit_redis import reset_rate_limit_store_for_testing
 import asyncio
 asyncio.run(init_db())
 
 # Import and create app AFTER database is initialized with test settings
 from httpx import ASGITransport, AsyncClient
-from backend.main import create_app
+from mainfiles.backend.main import create_app
 
 app = create_app()
 

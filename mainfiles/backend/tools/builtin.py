@@ -10,9 +10,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from backend.config import settings
-from backend.tools.registry import registry
-from backend.tools.schemas import ToolDefinition
+from ..config import settings
+from .registry import registry
+from .schemas import ToolDefinition
 
 
 def _get_workspace_root() -> Path:

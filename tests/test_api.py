@@ -39,19 +39,19 @@ _test_key = Fernet.generate_key().decode()
 os.environ["MASTER_KEY"] = _test_key
 
 # Now import backend modules - they will see the test DATABASE_URL
-from backend.config import reset_settings, settings as config_settings
+from mainfiles.backend.config import reset_settings, settings as config_settings
 reset_settings()
 config_settings.DATABASE_URL = os.environ["DATABASE_URL"]
 
-from backend.database import reset_engine_for_testing, reset_db, AsyncSessionLocal
+from mainfiles.backend.database import reset_engine_for_testing, reset_db, AsyncSessionLocal
 reset_engine_for_testing()
 
-import api
-from api import sse_event, MAGIC_AVAILABLE
-from prompt_injection import validate_messages
-from ratelimit import EXEMPT_PATHS, ENDPOINT_LIMITS
-from schemas import ChatStreamRequest
-from providers.base import ProviderConfig
+from mainfiles.backend import api
+from mainfiles.backend.api import sse_event, MAGIC_AVAILABLE
+from mainfiles.backend.prompt_injection import validate_messages
+from mainfiles.backend.ratelimit import EXEMPT_PATHS, ENDPOINT_LIMITS
+from mainfiles.backend.schemas import ChatStreamRequest
+from mainfiles.backend.providers.base import ProviderConfig
 
 
 class SseEventTests(unittest.TestCase):
@@ -125,7 +125,7 @@ class ModelEndpointTests(unittest.IsolatedAsyncioTestCase):
 
         # We can't easily test the FastAPI route without TestClient,
         # but we can verify the function signature and delegation
-        from api import get_models
+        from mainfiles.backend.api import get_models
         # The function exists and is importable
         self.assertTrue(callable(get_models))
 
@@ -134,7 +134,7 @@ class ModelEndpointTests(unittest.IsolatedAsyncioTestCase):
         """GET /providers delegates to llm.list_provider_status."""
         mock_list_providers.return_value = [{"id": "test", "status": "ok"}]
 
-        from api import get_providers
+        from mainfiles.backend.api import get_providers
         self.assertTrue(callable(get_providers))
 
 
@@ -156,7 +156,7 @@ class ProviderKeyManagementTests(unittest.IsolatedAsyncioTestCase):
             "openai": {"local": False, "label": "OpenAI", "env_key_set": False},
         }
 
-        from api import list_provider_keys
+        from mainfiles.backend.api import list_provider_keys
         import llm
 
         # Verify the function exists and is callable
@@ -180,7 +180,7 @@ class ProviderKeyManagementTests(unittest.IsolatedAsyncioTestCase):
         }
         mock_get_db_keys.return_value = {"openai": "sk-test1234567890"}
 
-        from api import list_provider_keys
+        from mainfiles.backend.api import list_provider_keys
         # Function is importable and properly structured
         self.assertTrue(callable(list_provider_keys))
 
@@ -218,7 +218,7 @@ class FileUploadTests(unittest.IsolatedAsyncioTestCase):
         """Upload rejects unsupported extensions."""
         mock_extract.return_value = "extracted text"
 
-        from api import upload_file
+        from mainfiles.backend.api import upload_file
         from fastapi import UploadFile
 
         # Mock request with content-length
@@ -250,7 +250,7 @@ class ChatStreamTests(unittest.IsolatedAsyncioTestCase):
 
     def test_validate_model_exists(self):
         """Chat stream should validate model exists before streaming."""
-        from api import chat_stream
+        from mainfiles.backend.api import chat_stream
         from backend.schemas import ChatStreamRequest as BackendChatStreamRequest
         # Function exists and accepts correct parameters
         import inspect
@@ -264,7 +264,7 @@ class ChatStreamTests(unittest.IsolatedAsyncioTestCase):
         """Unknown model should raise 400."""
         mock_resolve.return_value = None
 
-        from api import chat_stream
+        from mainfiles.backend.api import chat_stream
         from fastapi import HTTPException
 
         payload = ChatStreamRequest(
@@ -286,7 +286,7 @@ class ChatStreamTests(unittest.IsolatedAsyncioTestCase):
         mock_resolve.return_value = MagicMock(provider_id="test", model_id="test-model")
         mock_web_search.return_value = [MagicMock(title="Test", url="http://test.com", snippet="Test snippet")]
 
-        from api import chat_stream
+        from mainfiles.backend.api import chat_stream
         import inspect
 
         payload = ChatStreamRequest(
@@ -316,17 +316,17 @@ class ChatHistoryTests(unittest.IsolatedAsyncioTestCase):
 
     def test_list_chats_exists(self):
         """GET /chats endpoint function exists."""
-        from api import list_chats
+        from mainfiles.backend.api import list_chats
         self.assertTrue(callable(list_chats))
 
     def test_get_chat_exists(self):
         """GET /chats/{chat_id} endpoint function exists."""
-        from api import get_chat
+        from mainfiles.backend.api import get_chat
         self.assertTrue(callable(get_chat))
 
     def test_delete_chat_exists(self):
         """DELETE /chats/{chat_id} endpoint function exists."""
-        from api import delete_chat
+        from mainfiles.backend.api import delete_chat
         self.assertTrue(callable(delete_chat))
 
 
@@ -345,7 +345,7 @@ class RefreshModelsTests(unittest.IsolatedAsyncioTestCase):
         """Unknown provider returns 404."""
         mock_get_config.return_value = None
 
-        from api import refresh_provider_models
+        from mainfiles.backend.api import refresh_provider_models
         from fastapi import HTTPException
 
         with self.assertRaises(HTTPException) as cm:
@@ -360,7 +360,7 @@ class RefreshModelsTests(unittest.IsolatedAsyncioTestCase):
         mock_config.label = "Ollama"
         mock_get_config.return_value = mock_config
 
-        from api import refresh_provider_models
+        from mainfiles.backend.api import refresh_provider_models
         from fastapi import HTTPException
 
         with self.assertRaises(HTTPException) as cm:
@@ -387,7 +387,7 @@ class RefreshModelsTests(unittest.IsolatedAsyncioTestCase):
 
         mock_resolve_key.return_value = None
 
-        from api import refresh_provider_models
+        from mainfiles.backend.api import refresh_provider_models
         from fastapi import HTTPException
 
         with self.assertRaises(HTTPException) as cm:
@@ -413,7 +413,7 @@ class WebSearchEndpointTests(unittest.IsolatedAsyncioTestCase):
             MagicMock(title="Test", url="http://test.com", snippet="Test snippet")
         ]
 
-        from api import get_websearch
+        from mainfiles.backend.api import get_websearch
 
         # We can't easily test FastAPI route without TestClient,
         # but we verify the function exists
@@ -422,7 +422,7 @@ class WebSearchEndpointTests(unittest.IsolatedAsyncioTestCase):
     @patch("api.websearch.web_search")
     async def test_get_websearch_empty_query_422(self, mock_web_search):
         """Empty query returns 422."""
-        from api import get_websearch
+        from mainfiles.backend.api import get_websearch
         from fastapi import HTTPException
 
         with self.assertRaises(HTTPException) as cm:
@@ -433,7 +433,7 @@ class WebSearchEndpointTests(unittest.IsolatedAsyncioTestCase):
     @patch("api.websearch.web_search")
     async def test_get_websearch_missing_query_422(self, mock_web_search):
         """Whitespace-only query returns 422."""
-        from api import get_websearch
+        from mainfiles.backend.api import get_websearch
         from fastapi import HTTPException
 
         with self.assertRaises(HTTPException) as cm:
@@ -559,7 +559,7 @@ class ProviderKeyDeletionTests(unittest.IsolatedAsyncioTestCase):
         """Deleting unknown provider returns 404."""
         mock_list_providers.return_value = {}
 
-        from api import delete_provider_key
+        from mainfiles.backend.api import delete_provider_key
         from fastapi import HTTPException
 
         with self.assertRaises(HTTPException) as cm:
@@ -572,7 +572,7 @@ class ProviderKeyDeletionTests(unittest.IsolatedAsyncioTestCase):
         """Deleting linked key removes from DB."""
         mock_list_providers.return_value = {"openai": {"local": False}}
 
-        from api import delete_provider_key
+        from mainfiles.backend.api import delete_provider_key
         from backend.models import ProviderKey
 
         # Add a key to DB
@@ -595,13 +595,13 @@ class SettingsClearInaccessibleTests(unittest.IsolatedAsyncioTestCase):
 
     def test_clear_inaccessible_models_exists(self):
         """Function exists and calls llm.clear_inaccessible_models."""
-        from api import clear_inaccessible_models
+        from mainfiles.backend.api import clear_inaccessible_models
         self.assertTrue(callable(clear_inaccessible_models))
 
     @patch("api.llm.clear_inaccessible_models")
     async def test_clear_calls_llm_function(self, mock_clear):
         """Clear calls the llm module function."""
-        from api import clear_inaccessible_models
+        from mainfiles.backend.api import clear_inaccessible_models
 
         await clear_inaccessible_models()
         mock_clear.assert_called_once()

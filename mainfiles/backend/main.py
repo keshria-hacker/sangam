@@ -8,23 +8,23 @@ import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 
-from mainfiles.backend.api import public_router
-from mainfiles.backend.api import router as api_router
-from mainfiles.backend.auth import get_current_user, verify_csrf
-from mainfiles.backend.auth import router as auth_router
-from mainfiles.backend.database import init_db
+from backend.api import public_router
+from backend.api import router as api_router
+from backend.auth import get_current_user, verify_csrf
+from backend.auth import router as auth_router
+from backend.database import init_db
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # --- Structured Logging (loguru) ---
 from loguru import logger
-from mainfiles.backend.middleware.request_id import RequestIDMiddleware
-from mainfiles.backend.ratelimit import RateLimitMiddleware
-from mainfiles.backend.skills.api_skills import router as skills_router
+from backend.middleware.request_id import RequestIDMiddleware
+from backend.ratelimit import RateLimitMiddleware
+from backend.skills.api_skills import router as skills_router
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from mainfiles.backend.config import BASE_DIR, settings
+from backend.config import BASE_DIR, settings
 
 # Configure loguru for production-ready structured logs
 logger.remove()

@@ -6,8 +6,8 @@ import logging
 import time
 from typing import Any
 
-from backend.tools.registry import ToolRegistry, registry
-from backend.tools.schemas import ToolCall, ToolResult
+from .registry import ToolRegistry, registry
+from .schemas import ToolCall, ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ class ToolExecutor:
         return final_results
 
     def _validate_arguments(self, tool_def, arguments):
-        from backend.tools.schemas import validate_tool_arguments
+        from .schemas import validate_tool_arguments
         return validate_tool_arguments(tool_def, arguments)
 
     async def _execute_with_timeout(self, handler, arguments, timeout=None):
