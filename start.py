@@ -51,8 +51,8 @@ BACKEND_PORT = 8001
 FRONTEND_PORT = 5500
 
 ROOT = Path(__file__).resolve().parent
-BACKEND_DIR = ROOT / "backend"
-FRONTEND_DIR = ROOT / "frontend"
+BACKEND_DIR = ROOT / "mainfiles" / "backend"
+FRONTEND_DIR = ROOT / "mainfiles" / "frontend"
 VENV_DIR = ROOT / "venv"
 REQ_FILE = ROOT / "requirements.txt"
 ENV_FILE = ROOT / ".env"
@@ -170,7 +170,7 @@ def ensure_env_file() -> None:
     print("Generated a new MASTER_KEY in .env (used to encrypt provider API keys at rest).")
 
 def build_commands(python_exe: str):
-    backend_cmd = [python_exe, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", str(BACKEND_PORT)]
+    backend_cmd = [python_exe, "-m", "uvicorn", "mainfiles.backend.main:app", "--host", "127.0.0.1", "--port", str(BACKEND_PORT)]
     frontend_cmd = [python_exe, "-m", "http.server", str(FRONTEND_PORT)]
     return backend_cmd, frontend_cmd
 
