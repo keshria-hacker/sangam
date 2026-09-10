@@ -1,8 +1,12 @@
 <div align="center">
 
-# Sangam
-
-### Universal AI Chat Platform
+<p align="center">
+  <img
+    src="docs/header.png"
+    alt="Sangam Universal AI Chat Platform"
+    width="100%"
+  />
+</p>
 
 **One interface. Every model. Your workflow.**
 
@@ -22,11 +26,11 @@ A privacy-first AI workspace for chatting with cloud and local LLMs from a singl
 
 Sangam is an open-source, privacy-first AI chat platform that brings multiple Large Language Models into one unified workspace.
 
-Connect cloud providers such as **OpenAI, Anthropic, Gemini, NVIDIA NIM, Groq, Mistral, DeepSeek, OpenRouter** and more — or run models locally through **Ollama**.
+Connect cloud providers such as **OpenAI, Anthropic, Gemini, NVIDIA NIM, Groq, Mistral, DeepSeek, OpenRouter** and more — or run models locally through **Ollama**,**omniroute**.
 
 Switch models, upload documents, use RAG, search the web, manage provider keys, and keep your conversations in one place.
 
-> **Sangam v1.1 is under active development.** Features and APIs may evolve as the project grows.
+> **Sangam v1.0 is under active development.** Features and APIs may evolve as the project grows.
 
 ---
 
@@ -34,7 +38,7 @@ Switch models, upload documents, use RAG, search the web, manage provider keys, 
 
 <p align="center">
   <img
-    src="docs/screenshots/sangam-chat.png"
+    src="docs/interface.png"
     alt="Sangam Universal AI Chat Platform"
     width="100%"
   />
@@ -102,7 +106,9 @@ Local authentication, encrypted provider keys, secure password hashing, and loca
 | Mistral AI | ☁️ Cloud | Required |
 | Google Gemini | ☁️ Cloud | Required |
 | Ollama | 🖥️ Local | Not required |
-| OmniRoute | 🖥️ Local | Required |
+| OmniRoute | 🖥️ Local | Not required |
+
+**NOTE - USE OMNIROUTE TO ACCESS ALL PROVIDERS**
 
 The provider registry is extensible, making it possible to add additional providers as Sangam evolves.
 
@@ -121,11 +127,11 @@ Before starting, make sure you have:
 ### 1. Clone Sangam
 
 ```bash
-git clone https://github.com/keshria-hacker/Universal-Ai-Chat-Platform.git
-cd Universal-Ai-Chat-Platform
+git clone https://github.com/keshria-hacker/sangam.git
+cd sangam
 ```
 
-### 2. Configure Environment
+### 2. Configure Environment (manually optional)
 
 Copy the example environment file:
 
@@ -274,35 +280,6 @@ Only the most relevant document sections are sent to the selected model, helping
 
 ---
 
-## 🌐 Web Search
-
-Enable **Web Search** directly from the Sangam composer to provide the model with current web information.
-
-Supported search backends include:
-
-- **DuckDuckGo Lite** — default, no API key required
-- **Tavily** — optional
-- **Brave Search** — optional
-
----
-
-## 🧩 Skills
-
-Sangam includes an extensible Skills system for reusable AI workflows.
-
-Current built-in skills include:
-
-| Skill | Purpose |
-|---|---|
-| API Design Assistant | Design REST / GraphQL APIs |
-| Coding Standards Review | Review code quality and standards |
-| Debugging Assistant | Structured debugging workflows |
-| Web Search Assistant | Enhance responses with live search |
-
-Custom skills can be created using `SKILL.md` files.
-
----
-
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
@@ -368,6 +345,7 @@ Sangam is actively evolving toward a more complete universal AI workspace.
 - [ ] Multi-user workspaces
 - [ ] Desktop application
 - [ ] Plugin marketplace
+- **AND MORE SOON** 
 
 ---
 
@@ -378,8 +356,8 @@ Contributions, bug reports, feature requests, and improvements are welcome.
 ### Development Setup
 
 ```bash
-git clone https://github.com/keshria-hacker/Universal-Ai-Chat-Platform-.git
-cd Universal-Ai-Chat-Platform--
+git clone https://github.com/keshria-hacker/sangam.git
+cd sangam
 cp .env.example .env
 python start.py
 ```
