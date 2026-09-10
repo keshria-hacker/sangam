@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Optional, Dict, Any, List, Tuple
 from collections.abc import AsyncGenerator as AsyncGenType
 
 # Import existing Sangam components
-from backend.providers import (
+from .. import (
     PROVIDERS,
     resolve_api_key,
     _resolve_model,
@@ -16,28 +16,28 @@ from backend.providers import (
     list_models,
     registry
 )
-from backend.providers.base import ProviderStreamChunk, ModelInfo
-from backend.providers.enhanced.strategies import (
+from ..base import ProviderStreamChunk, ModelInfo
+from .strategies import (
     EnhancedRouter,
     RoutingContext,
     ProviderCandidate,
     create_example_candidates
 )
-from backend.providers.enhanced.resilience import (
+from .resilience import (
     ResilienceManager,
     CircuitBreakerConfig,
     ConnectionPoolConfig,
     ModelLockoutConfig
 )
-from backend.providers.enhanced.config import get_routing_config, RoutingStrategy
-from backend.response_events import (
+from .config import get_routing_config, RoutingStrategy
+from ...response_events import (
     ResponseEvent,
     ResponseEventBuilder,
     ResponseEventType,
     FinishReason
 )
-from backend.response_intelligence import analyze_request, capability_decide
-from backend.tools import ToolCall, ToolResult, executor, registry as tool_registry
+from ...response_intelligence import analyze_request, capability_decide
+from ...tools import ToolCall, ToolResult, executor, registry as tool_registry
 
 MAX_TOOL_ROUNDS = 10
 DEFAULT_TOOL_TIMEOUT = 30.0
@@ -158,7 +158,7 @@ async def enhanced_stream_completion(
         provider_class = registry.get_provider_class(selected_provider_id)
         if not provider_class:
             # Fall back to LiteLLM provider
-            from backend.providers.litellm_fallback import LiteLLMProvider
+            from ..providers.litellm_fallback import LiteLLMProvider
             provider = LiteLLMProvider(selected_config or ProviderConfig(
                 provider_id=selected_provider_id, 
                 label=selected_provider_id, 
@@ -204,7 +204,7 @@ async def enhanced_stream_completion(
 
 def _create_routing_context_from_guidance(guidance: Any, model_id: str, messages: list[dict]) -> 'RoutingContext':
     """Create routing context from request analysis guidance"""
-    from backend.providers.enhanced.strategies import RoutingContext
+    from .strategies import RoutingContext
     
     # Extract relevant information from guidance
     complexity = getattr(guidance, 'complexity', 0.5)
@@ -233,7 +233,7 @@ def _create_routing_context_from_guidance(guidance: Any, model_id: str, messages
 
 async def _get_available_providers_for_model(model_id: str, db: Any) -> List[Tuple[str, Any, bool]]:
     """Get list of providers that can handle the given model"""
-    from backend.providers import PROVIDERS, resolve_api_key
+    from .. import PROVIDERS, resolve_api_key
     
     available = []
     
@@ -295,7 +295,7 @@ async def enhanced_stream_response_events(
     if not config.enabled:
         # Fallback to original implementation if enhanced routing is disabled
         # We need to import and call the original function
-        from backend.providers import stream_response_events as original_stream_response_events
+        from .. import stream_response_events as original_stream_response_events
         async for event in original_stream_response_events(
             model_id, messages, db, temperature, max_tokens, reasoning_effort, message_id, request_id
         ):
@@ -307,7 +307,7 @@ async def enhanced_stream_response_events(
         provider_id, litellm_id = _resolve_model(model_id)
     except ValueError:
         # Fall back to original
-        from backend.providers import stream_response_events as original_stream_response_events
+        from .. import stream_response_events as original_stream_response_events
         async for event in original_stream_response_events(
             model_id, messages, db, temperature, max_tokens, reasoning_effort, message_id, request_id
         ):
@@ -316,7 +316,7 @@ async def enhanced_stream_response_events(
     
     api_key = await resolve_api_key(provider_id, db)
     if not api_key:
-        from backend.providers import stream_response_events as original_stream_response_events
+        from .. import stream_response_events as original_stream_response_events
         async for event in original_stream_response_events(
             model_id, messages, db, temperature, max_tokens, reasoning_effort, message_id, request_id
         ):
@@ -347,7 +347,7 @@ async def enhanced_stream_response_events(
     available_providers = await _get_available_providers_for_model(model_id, db)
     
     if not available_providers:
-        from backend.providers import stream_response_events as original_stream_response_events
+        from .. import stream_response_events as original_stream_response_events
         async for event in original_stream_response_events(
             model_id, messages, db, temperature, max_tokens, reasoning_effort, message_id, request_id
         ):
@@ -390,7 +390,7 @@ async def enhanced_stream_response_events(
         
         provider_class = registry.get_provider_class(selected_provider_id)
         if not provider_class:
-            from backend.providers.litellm_fallback import LiteLLMProvider
+            from ..providers.litellm_fallback import LiteLLMProvider
             provider = LiteLLMProvider(selected_config or ProviderConfig(
                 provider_id=selected_provider_id, 
                 label=selected_provider_id, 
@@ -424,7 +424,7 @@ async def enhanced_stream_response_events(
                 yield event
         else:
             # Fall back to streaming completion and converting to events
-            from backend.response_events import ResponseEventBuilder, ResponseEventType
+            from ....response_events import ResponseEventBuilder, ResponseEventType
             
             builder = ResponseEventBuilder(
                 provider=selected_provider_id,
@@ -461,7 +461,7 @@ async def enhanced_stream_response_events(
             
     except Exception:
         # Fall back to original implementation on any error
-        from backend.providers import stream_response_events as original_stream_response_events
+        from .. import stream_response_events as original_stream_response_events
         async for event in original_stream_response_events(
             model_id, messages, db, temperature, max_tokens, reasoning_effort, message_id, request_id
         ):

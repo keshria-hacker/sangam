@@ -15,7 +15,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 if TYPE_CHECKING:
-    from backend.ratelimit_redis import MemoryStore, RedisStore
+    from .ratelimit_redis import MemoryStore, RedisStore
 
 
 @dataclass
@@ -84,7 +84,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         """Lazy-init the store on first request (avoids startup Redis probe)."""
         if self.store is not None:
             return self.store
-        from backend.ratelimit_redis import get_rate_limit_store
+        from .ratelimit_redis import get_rate_limit_store
 
         self.store = await get_rate_limit_store()
         return self.store

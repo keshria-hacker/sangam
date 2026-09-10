@@ -8,23 +8,23 @@ import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 
-from backend.api import public_router
-from backend.api import router as api_router
-from backend.auth import get_current_user, verify_csrf
-from backend.auth import router as auth_router
-from backend.database import init_db
+from .api import public_router
+from .api import router as api_router
+from .auth import get_current_user, verify_csrf
+from .auth import router as auth_router
+from .database import init_db
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # --- Structured Logging (loguru) ---
 from loguru import logger
-from backend.middleware.request_id import RequestIDMiddleware
-from backend.ratelimit import RateLimitMiddleware
-from backend.skills.api_skills import router as skills_router
+from .middleware.request_id import RequestIDMiddleware
+from .ratelimit import RateLimitMiddleware
+from .skills.api_skills import router as skills_router
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from backend.config import BASE_DIR, settings
+from .config import BASE_DIR, settings
 
 # Configure loguru for production-ready structured logs
 logger.remove()
@@ -112,10 +112,10 @@ def create_app() -> FastAPI:
         logger.info("Application startup complete")
         yield
         # Cleanup auto-started Ollama process (if any)
-        from backend.llm import _cleanup_ollama
+        from .llm import _cleanup_ollama
         _cleanup_ollama()
         # Close the rate-limit store (Redis connection, if any)
-        from backend.ratelimit_redis import close_rate_limit_store
+        from .ratelimit_redis import close_rate_limit_store
         await close_rate_limit_store()
         logger.info("Application shutdown")
 
@@ -206,7 +206,7 @@ def create_app() -> FastAPI:
     async def health_check():
         """Comprehensive health check with dependency status."""
         import httpx
-        from backend.database import engine
+        from .database import engine
         from sqlalchemy import text
 
         checks = {

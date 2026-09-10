@@ -17,24 +17,24 @@ Public API:
     CapabilityDecision         # Phase 7: Capability decision result
 """
 
-from backend.response_intelligence.classification import (
+from .classification import (
     analyze_request,
     build_conversation_profile,
     classify_query_mode,
     detect_intent_signals,
 )
-from backend.response_intelligence.config import config, get_trigger_patterns
-from backend.response_intelligence.prompt_injector import (
+from .config import config, get_trigger_patterns
+from .prompt_injector import (
     build_system_prompt_additions,
     format_guidance_for_debug,
 )
-from backend.response_intelligence.schema import (
+from .schema import (
     ConversationProfile,
     IntentSignal,
     QueryMode,
     ResponseGuidance,
 )
-from backend.capability_orchestration import (
+from ..capability_orchestration import (
     capability_decide,
     CapabilityDecision,
 )

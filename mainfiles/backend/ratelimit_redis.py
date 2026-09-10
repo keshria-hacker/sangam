@@ -18,7 +18,7 @@ from collections import defaultdict
 from contextlib import suppress
 from dataclasses import dataclass
 
-from backend.config import settings
+from .config import settings
 
 # ---------------------------------------------------------------------------
 # Abstract interface (duck-typed — same signatures as SlidingWindowStore)

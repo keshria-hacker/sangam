@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from backend.response_events import ModelCapabilities
+from .response_events import ModelCapabilities
 
 
 

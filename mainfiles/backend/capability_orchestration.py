@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.tools.schemas import ToolDefinition
+from .tools.schemas import ToolDefinition
 
 
 @dataclass

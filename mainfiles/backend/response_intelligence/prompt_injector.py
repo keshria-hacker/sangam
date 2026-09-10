@@ -5,7 +5,7 @@ Provider-neutral: works with all providers that support system messages.
 """
 from __future__ import annotations
 
-from backend.response_intelligence.schema import ResponseGuidance, QueryMode
+from .schema import ResponseGuidance, QueryMode
 
 
 def build_system_prompt_additions(guidance: ResponseGuidance) -> list[str]:

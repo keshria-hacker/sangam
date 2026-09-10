@@ -19,8 +19,8 @@ from typing import Any
 
 import tiktoken
 
-from backend.providers.base import ModelInfo
-from backend.response_events import ModelCapabilities
+from .providers.base import ModelInfo
+from .response_events import ModelCapabilities
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,8 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from backend.response_intelligence.config import config, get_trigger_patterns
-from backend.response_intelligence.schema import (
+from .config import config, get_trigger_patterns
+from .schema import (
     ConversationProfile,
     IntentSignal,
     QueryMode,
@@ -594,7 +594,7 @@ async def analyze_request(
         )
 
     # Build system prompt additions
-    from backend.response_intelligence.prompt_injector import build_system_prompt_additions
+    from .prompt_injector import build_system_prompt_additions
     guidance.system_prompt_additions = build_system_prompt_additions(guidance)
 
     # Add constraints based on signals
