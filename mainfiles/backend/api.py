@@ -13,12 +13,13 @@ from pathlib import Path
 
 from . import llm
 from . import websearch
+from .auth import get_current_user
 from .context_manager import create_context_manager
 from .database import AsyncSessionLocal, get_db
 from .document import extract_text, truncate_preview
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from .models import Chat, Message, ProviderKey, UploadedFile
+from .models import Chat, Message, ProviderKey, UploadedFile, UserPreference
 from .rag import TOP_K as RAG_TOP_K
 from .rag import index_document, retrieve_relevant_chunks
 from .capability_orchestration import derive_interpretations, should_clarify
@@ -37,6 +38,8 @@ from .schemas import (
     ProviderModelEntry,
     ProviderStatus,
     RefreshModelsOut,
+    UserPreferenceIn,
+    UserPreferenceOut,
 )
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -320,6 +323,49 @@ async def delete_chat(chat_id: str, db: AsyncSession = Depends(get_db)):
 # Message feedback
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# User preferences (Phase 4)
+# ---------------------------------------------------------------------------
+
+@router.get("/user/preferences", response_model=UserPreferenceOut)
+async def get_preferences(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return the caller's stored response-style preferences (defaults if unset)."""
+    pref = await db.get(UserPreference, user.id)
+    if pref is None:
+        # Return explicit defaults — an unpersisted ORM instance would serialize
+        # None for every field and fail response validation.
+        return UserPreferenceOut(
+            user_id=user.id,
+            response_style="balanced",
+            formality="neutral",
+            expertise_level="general",
+            updated_at=datetime.now(UTC),
+        )
+    return pref
+
+
+@router.put("/user/preferences", response_model=UserPreferenceOut)
+async def update_preferences(
+    body: UserPreferenceIn,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Create-or-update the caller's response-style preferences (upsert)."""
+    pref = await db.get(UserPreference, user.id)
+    if pref is None:
+        pref = UserPreference(user_id=user.id)
+        db.add(pref)
+    pref.response_style = body.response_style
+    pref.formality = body.formality
+    pref.expertise_level = body.expertise_level
+    await db.commit()
+    await db.refresh(pref)
+    return pref
+
+
 @router.post("/messages/{message_id}/feedback")
 async def submit_feedback(
     message_id: str,
@@ -441,7 +487,8 @@ SSE_HEARTBEAT_INTERVAL = 15
 async def chat_stream(  # noqa: PLR0912
     payload: ChatStreamRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     # Validate the model exists before allocating any resources — a fast 400
     # is much better than failing mid-stream after the chat has been created.
@@ -514,6 +561,32 @@ async def chat_stream(  # noqa: PLR0912
                 chat_id=payload.chat_id,
                 db=db,  # Use outer request-scoped db for history lookup
             )
+
+            # Phase 4: stored user preferences OVERRIDE detected style signals.
+            # Applied BEFORE build_system_prompt_additions so the injected
+            # instructions reflect the user's explicit choice.
+            try:
+                pref = await db.get(UserPreference, current_user.id)
+                if pref is not None and guidance.profile is not None:
+                    if pref.response_style == "concise":
+                        guidance.profile.user_prefers_concise = True
+                        guidance.profile.user_prefers_detailed = False
+                        guidance.intent.wants_concise = True
+                        guidance.intent.wants_detailed = False
+                    elif pref.response_style == "detailed":
+                        guidance.profile.user_prefers_concise = False
+                        guidance.profile.user_prefers_detailed = True
+                        guidance.intent.wants_concise = False
+                        guidance.intent.wants_detailed = True
+                    if pref.formality != "neutral":
+                        guidance.intent.tone = pref.formality
+                    if pref.expertise_level == "beginner":
+                        guidance.intent.technical_depth = "low"
+                    elif pref.expertise_level == "expert":
+                        guidance.intent.technical_depth = "high"
+            except Exception as exc:  # noqa: BLE001 — prefs must never break chat
+                logger.warning("User preference override failed: %s", exc)
+
             system_additions = build_system_prompt_additions(guidance)
             if system_additions:
                 system_content = "\n\n".join(system_additions)

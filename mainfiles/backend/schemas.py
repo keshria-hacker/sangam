@@ -162,3 +162,18 @@ class FeedbackIn(BaseModel):
 
     value: Literal["up", "down"]
     note: str | None = Field(default=None, max_length=2000)
+
+
+class UserPreferenceIn(BaseModel):
+    """Per-user response style preferences (Phase 4)."""
+
+    response_style: Literal["concise", "balanced", "detailed"] = "balanced"
+    formality: Literal["casual", "neutral", "formal"] = "neutral"
+    expertise_level: Literal["beginner", "general", "expert"] = "general"
+
+
+class UserPreferenceOut(UserPreferenceIn):
+    """Wire shape for GET /user/preferences (adds server metadata)."""
+
+    user_id: str
+    updated_at: datetime

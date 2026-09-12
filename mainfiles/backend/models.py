@@ -98,6 +98,32 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
 
+    preferences: Mapped["UserPreference | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class UserPreference(Base):
+    """Per-user response style preferences (Implementation Plan Phase 4).
+
+    Stored values OVERRIDE the Response Intelligence layer's detected
+    user_prefers_concise/user_prefers_detailed signals in chat_stream.
+    """
+
+    __tablename__ = "user_preferences"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    response_style: Mapped[str] = mapped_column(String(16), default="balanced")  # concise|balanced|detailed
+    formality: Mapped[str] = mapped_column(String(16), default="neutral")        # casual|neutral|formal
+    expertise_level: Mapped[str] = mapped_column(String(16), default="general")  # beginner|general|expert
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC)
+    )
+
+    user: Mapped["User"] = relationship(back_populates="preferences")
+
 
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
