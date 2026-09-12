@@ -164,6 +164,81 @@ def detect_capability_signals(
     return signals
 
 
+# ---------------------------------------------------------------------------
+# Clarification gate helpers (Phase 2)
+# ---------------------------------------------------------------------------
+
+def should_clarify(user_message: str, guidance: Any) -> bool:
+    """Decide whether to intercept with a clarification request.
+
+    Conservative trigger: the request must be BOTH flagged ambiguous by the
+    Phase 6 analyzer AND short enough that it plausibly lacks context. Long,
+    detailed messages are answered directly even when mildly ambiguous.
+    """
+    from .response_intelligence.config import config as ri_config
+    if not ri_config.CLARIFICATION_ENABLED:
+        return False
+    intent = getattr(guidance, "intent", None)
+    if intent is None or not getattr(intent, "is_ambiguous", False):
+        return False
+    return len(user_message.strip()) <= ri_config.CLARIFICATION_MAX_CHARS
+
+
+def derive_interpretations(user_message: str, guidance: Any) -> list[str]:
+    """Derive 2-3 candidate interpretations for an ambiguous request.
+
+    Heuristic only (no second LLM call), consistent with the project's
+    local-heuristics philosophy. Falls back to a generic open question
+    when no specific interpretation patterns match.
+    """
+    from .response_intelligence.schema import QueryMode
+    msg = user_message.strip()
+    msg_lower = msg.lower()
+    mode = _mode_str(getattr(guidance, "mode", None))
+
+    # Pronoun-only follow-ups ("it?", "explain that", "why?") — reference
+    # the previous topic when history exists.
+    pronouns = {"it", "that", "this", "them", "those", "he", "she", "they"}
+    words = set(msg_lower.split())
+    if words & pronouns:
+        return [
+            "Explain it in more depth",
+            "Show a practical example",
+            "Summarize the key points",
+        ]
+
+    # Mode-flavored defaults
+    if mode == "coding":
+        return [
+            f"Debug or fix code related to: {msg}",
+            f"Explain how {msg} works",
+            f"Write new code for: {msg}",
+        ]
+    if mode == "factual":
+        return [
+            f"A quick factual answer about: {msg}",
+            f"A detailed explanation of: {msg}",
+            "Compare different perspectives on it",
+        ]
+    if mode == "creative":
+        return [
+            f"Write a story or poem about: {msg}",
+            f"Brainstorm ideas around: {msg}",
+        ]
+    if mode == "instructional":
+        return [
+            f"Step-by-step tutorial for: {msg}",
+            f"Quick start guide for: {msg}",
+        ]
+
+    # Generic fallback
+    return [
+        f"A concise answer about: {msg}",
+        f"A detailed explanation of: {msg}",
+        "Something else — I'll type it myself",
+    ]
+
+
 def capability_decide(
     user_message: str,
     enabled_tools: list[ToolDefinition],
@@ -189,6 +264,18 @@ def capability_decide(
     mode = getattr(guidance, "mode", None)
     intent = getattr(guidance, "intent", None)
     mode_str = _mode_str(mode)
+
+    # CLARIFY GATE (Phase 2): ambiguous short requests -> ask before answering.
+    # Runs before tool routing so we never execute tools on an unclear request.
+    if should_clarify(user_message, guidance):
+        return CapabilityDecision(
+            capability_required="none",
+            tool_requirement="none",
+            action_mode="clarify",
+            confidence="medium",
+            filtered_tools=[],
+            reasoning="Ambiguous short request - clarify before answering",
+        )
 
     # Detect capability signals
     signals = detect_capability_signals(msg_lower, intent, mode)

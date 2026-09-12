@@ -28,6 +28,7 @@ class ResponseEventType(StrEnum):
     TOOL_END = "tool_end"
     TOOL_RESULT = "tool_result"
     CITATION = "citation"
+    CLARIFICATION_REQUEST = "clarification_request"
     ARTIFACT_START = "artifact_start"
     ARTIFACT_DELTA = "artifact_delta"
     ARTIFACT_END = "artifact_end"

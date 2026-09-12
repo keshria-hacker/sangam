@@ -157,6 +157,20 @@ class ResponseIntelligenceConfig(BaseModel):
     MAX_PARAGRAPHS_CONCISE: int = 2
     MAX_TOKENS_URGENCY: int = 500
 
+    # --- Clarification gate (Phase 2) ---
+    # When True, ambiguous short requests may be intercepted BEFORE generation
+    # with a clarification_request event offering interpretation options.
+    CLARIFICATION_ENABLED: bool = True
+    # Only gate short requests — long, detailed requests carry enough context
+    # to answer directly even when mildly ambiguous.
+    CLARIFICATION_MAX_CHARS: int = 60
+
+    # --- Uncertainty post-processing (Phase 3) ---
+    # When True, responses produced under high ambiguity in factual/analysis
+    # modes get a calibrated uncertainty hedge at persistence time (never in
+    # the live stream).
+    UNCERTAINTY_HEDGING_ENABLED: bool = True
+
 
 # Global config instance
 config = ResponseIntelligenceConfig()

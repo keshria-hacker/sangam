@@ -449,6 +449,44 @@ if (location.protocol === 'file:') {
             </label>
           </div>
         </section>
+
+        <!-- Response style (Phase 4 — persisted server-side per user) -->
+        <section class="settings-section">
+          <h3>Response style</h3>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Answer length</span>
+              <small>Saved to your account — applies to every chat</small>
+            </div>
+            <div class="segmented" id="responseStyleSegmented">
+              <button data-style="concise">Concise</button>
+              <button data-style="balanced" class="active">Balanced</button>
+              <button data-style="detailed">Detailed</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Tone</span>
+              <small>How formal replies should read</small>
+            </div>
+            <div class="segmented" id="formalitySegmented">
+              <button data-tone="casual">Casual</button>
+              <button data-tone="neutral" class="active">Neutral</button>
+              <button data-tone="formal">Formal</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Technical depth</span>
+              <small>Match answers to your expertise</small>
+            </div>
+            <div class="segmented" id="expertiseSegmented">
+              <button data-expertise="beginner">Beginner</button>
+              <button data-expertise="general" class="active">General</button>
+              <button data-expertise="expert">Expert</button>
+            </div>
+          </div>
+        </section>
       </div>
 
       <!-- Providers tabpanel (Status + API Keys) -->

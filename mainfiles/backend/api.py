@@ -13,20 +13,26 @@ from pathlib import Path
 
 from . import llm
 from . import websearch
+from .auth import get_current_user
+from .memory import retrieve_memories
+from .summarizer import should_summarize, summarize_chat
 from .context_manager import create_context_manager
 from .database import AsyncSessionLocal, get_db
 from .document import extract_text, truncate_preview
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from .models import Chat, Message, ProviderKey, UploadedFile
+from .models import Chat, Message, ProviderKey, UploadedFile, UserPreference
 from .rag import TOP_K as RAG_TOP_K
 from .rag import index_document, retrieve_relevant_chunks
-from .response_events import ResponseEvent, ResponseEventBuilder, ResponseEventType, normalize_error
+from .capability_orchestration import derive_interpretations, should_clarify
+from .response_postprocessor import post_process_response
+from .response_events import FinishReason, ResponseEvent, ResponseEventBuilder, ResponseEventType, normalize_error
 from .response_intelligence import analyze_request, build_system_prompt_additions, config as ri_config
 from .schemas import (
     ChatDetailOut,
     ChatOut,
     ChatStreamRequest,
+    FeedbackIn,
     FileUploadOut,
     ModelInfo,
     ProviderKeyIn,
@@ -34,6 +40,8 @@ from .schemas import (
     ProviderModelEntry,
     ProviderStatus,
     RefreshModelsOut,
+    UserPreferenceIn,
+    UserPreferenceOut,
 )
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,6 +53,10 @@ router = APIRouter()
 public_router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+# Phase 5: strong references to fire-and-forget tasks so the event loop
+# doesn't garbage-collect them mid-flight.
+_background_tasks: set[asyncio.Task] = set()
 
 # Magic byte validator for file uploads
 # Maps extension to expected MIME types (using python-magic)
@@ -314,6 +326,94 @@ async def delete_chat(chat_id: str, db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# Message feedback
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# User preferences (Phase 4)
+# ---------------------------------------------------------------------------
+
+@router.get("/user/preferences", response_model=UserPreferenceOut)
+async def get_preferences(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Return the caller's stored response-style preferences (defaults if unset)."""
+    pref = await db.get(UserPreference, user.id)
+    if pref is None:
+        # Return explicit defaults — an unpersisted ORM instance would serialize
+        # None for every field and fail response validation.
+        return UserPreferenceOut(
+            user_id=user.id,
+            response_style="balanced",
+            formality="neutral",
+            expertise_level="general",
+            updated_at=datetime.now(UTC),
+        )
+    return pref
+
+
+@router.put("/user/preferences", response_model=UserPreferenceOut)
+async def update_preferences(
+    body: UserPreferenceIn,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Create-or-update the caller's response-style preferences (upsert)."""
+    pref = await db.get(UserPreference, user.id)
+    if pref is None:
+        pref = UserPreference(user_id=user.id)
+        db.add(pref)
+    pref.response_style = body.response_style
+    pref.formality = body.formality
+    pref.expertise_level = body.expertise_level
+    await db.commit()
+    await db.refresh(pref)
+    return pref
+
+
+@router.get("/chats/{chat_id}/summary")
+async def get_chat_summary(chat_id: str, db: AsyncSession = Depends(get_db)):
+    """Return the chat's rolling summary and key topics (Phase 5)."""
+    chat = await db.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {
+        "chat_id": chat.id,
+        "summary": chat.summary,
+        "key_topics": [t for t in (chat.key_topics or "").split(",") if t],
+        "summarized_at": chat.summarized_at,
+    }
+
+
+@router.post("/messages/{message_id}/feedback")
+async def submit_feedback(
+    message_id: str,
+    body: FeedbackIn,
+    db: AsyncSession = Depends(get_db),
+):
+    """Record user quality feedback (thumbs up/down) on an assistant message.
+
+    Sending the same value again clears the feedback (toggle-off undo), so a
+    mis-click is recoverable. A note is optional free-text context.
+    """
+    msg = await db.get(Message, message_id)
+    if msg is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if msg.feedback == body.value:
+        # Toggle-off: same value twice clears the feedback.
+        msg.feedback = None
+        msg.feedback_note = None
+    else:
+        msg.feedback = body.value
+        if body.note is not None:
+            msg.feedback_note = body.note
+    await db.commit()
+    return {"status": "ok", "feedback": msg.feedback}
+
+
+# ---------------------------------------------------------------------------
 # File upload
 # ---------------------------------------------------------------------------
 
@@ -407,7 +507,8 @@ SSE_HEARTBEAT_INTERVAL = 15
 async def chat_stream(  # noqa: PLR0912
     payload: ChatStreamRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     # Validate the model exists before allocating any resources — a fast 400
     # is much better than failing mid-stream after the chat has been created.
@@ -470,6 +571,7 @@ async def chat_stream(  # noqa: PLR0912
     # --- Phase 6: Response Intelligence ---
     # Analyze request and inject guidance as system prompt additions.
     # This runs BEFORE streaming starts, so it doesn't affect the event pipeline.
+    guidance = None
     if ri_config.ENABLED:
         try:
             guidance = await analyze_request(
@@ -479,6 +581,32 @@ async def chat_stream(  # noqa: PLR0912
                 chat_id=payload.chat_id,
                 db=db,  # Use outer request-scoped db for history lookup
             )
+
+            # Phase 4: stored user preferences OVERRIDE detected style signals.
+            # Applied BEFORE build_system_prompt_additions so the injected
+            # instructions reflect the user's explicit choice.
+            try:
+                pref = await db.get(UserPreference, current_user.id)
+                if pref is not None and guidance.profile is not None:
+                    if pref.response_style == "concise":
+                        guidance.profile.user_prefers_concise = True
+                        guidance.profile.user_prefers_detailed = False
+                        guidance.intent.wants_concise = True
+                        guidance.intent.wants_detailed = False
+                    elif pref.response_style == "detailed":
+                        guidance.profile.user_prefers_concise = False
+                        guidance.profile.user_prefers_detailed = True
+                        guidance.intent.wants_concise = False
+                        guidance.intent.wants_detailed = True
+                    if pref.formality != "neutral":
+                        guidance.intent.tone = pref.formality
+                    if pref.expertise_level == "beginner":
+                        guidance.intent.technical_depth = "low"
+                    elif pref.expertise_level == "expert":
+                        guidance.intent.technical_depth = "high"
+            except Exception as exc:  # noqa: BLE001 — prefs must never break chat
+                logger.warning("User preference override failed: %s", exc)
+
             system_additions = build_system_prompt_additions(guidance)
             if system_additions:
                 system_content = "\n\n".join(system_additions)
@@ -491,6 +619,78 @@ async def chat_stream(  # noqa: PLR0912
                 logger.debug("Injected %d response intelligence guidance additions", len(system_additions))
         except Exception as exc:  # noqa: BLE001 — never break chat for guidance errors
             logger.warning("Response intelligence analysis failed: %s", exc)
+
+    # --- Phase 2: Clarification gate ---
+    # Ambiguous short requests are intercepted BEFORE generation: we persist the
+    # user turn and return a clarification_request event with interpretation
+    # options instead of calling the provider. The client renders option buttons
+    # that re-send the chosen interpretation as a new user message.
+    if guidance is not None and should_clarify(payload.messages[-1].content, guidance):
+        async def clarification_generator():
+            request_id = getattr(request.state, "request_id", uuid.uuid4().hex[:12])
+            builder = ResponseEventBuilder(
+                provider=model_info.provider_id,
+                model=payload.model,
+                request_id=request_id,
+            )
+            options = derive_interpretations(payload.messages[-1].content, guidance)
+            async with AsyncSessionLocal() as clarify_db:
+                try:
+                    yield sse_event(chat.id, event="chat_id")
+                    if not payload.regenerate:
+                        clarify_db.add(Message(
+                            chat_id=chat.id,
+                            role="user",
+                            content=payload.messages[-1].content,
+                            file_ids=",".join(payload.file_ids) or None,
+                        ))
+                        await clarify_db.commit()
+                    # Lifecycle: message_start must precede any content event
+                    # (the event builder and the client controller both enforce it).
+                    yield sse_response_event(builder.message_start())
+                    ev = builder.event(
+                        ResponseEventType.CLARIFICATION_REQUEST,
+                        content="Your request could mean a few different things. Which did you mean?",
+                        metadata={"options": options},
+                    )
+                    yield sse_response_event(ev)
+                    yield sse_response_event(builder.message_end(finish_reason=FinishReason.STOP))
+                    yield sse_event("[DONE]")
+                except (GeneratorExit, asyncio.CancelledError):
+                    await clarify_db.rollback()
+                    if not payload.chat_id:
+                        await clarify_db.execute(delete(Chat).where(Chat.id == chat.id))
+                        await clarify_db.commit()
+                    return
+                except Exception as exc:  # noqa: BLE001
+                    await clarify_db.rollback()
+                    logger.warning("Clarification stream failed: %s", exc)
+                    yield sse_event("Could not start the clarification prompt.", event="error")
+                    return
+        return StreamingResponse(clarification_generator(), media_type="text/event-stream")
+
+    # --- Phase 5: Cross-session memory ---
+    # Retrieve relevant past-conversation summaries and inject as provider
+    # context. Placed AFTER response-intelligence analysis and the
+    # clarification gate: injecting earlier would pollute the conversation
+    # history that the ambiguity heuristic reads (a system message at index 0
+    # makes history non-empty, disabling the no-context branch) and the
+    # clarification path never calls the provider so it needs no memory.
+    # Degrades to no-op on any ChromaDB error (retrieve_memories never raises).
+    if not payload.regenerate:
+        try:
+            last_user_content = payload.messages[-1].content
+            memories = await retrieve_memories(last_user_content, top_k=2)
+            memories = [m for m in memories if (chat.summary or "") not in (m, )] if chat.summary else memories
+            if memories:
+                memory_context = "\n".join(f"- {m}" for m in memories)
+                messages.insert(0, {
+                    "role": "system",
+                    "content": f"[Long-term memory — relevant past conversations]\n{memory_context}",
+                })
+                logger.debug("Injected %d long-term memories", len(memories))
+        except Exception as exc:  # noqa: BLE001 — memory must never break chat
+            logger.warning("Memory retrieval failed: %s", exc)
 
     # --- Phase 9 P0: Safe Context Truncation ---
     # Apply token budgeting and safe context truncation after Phase 6 intelligence injection
@@ -568,6 +768,16 @@ async def chat_stream(  # noqa: PLR0912
 
                 response_time = time.monotonic() - stream_started_at
 
+                # Phase 3: uncertainty post-processing — hedge low-confidence
+                # factual/analysis answers at PERSISTENCE time only. The live
+                # stream the user watched is never mutated; the stored text
+                # (and what reloads from history) carries the hedge.
+                if guidance is not None and ri_config.UNCERTAINTY_HEDGING_ENABLED:
+                    try:
+                        collected = post_process_response(collected, guidance)
+                    except Exception as exc:  # noqa: BLE001 — never break persistence
+                        logger.warning("Uncertainty post-processing failed: %s", exc)
+
                 if not payload.regenerate:
                     stream_db.add(Message(chat_id=chat.id, role="user",
                                    content=payload.messages[-1].content,
@@ -580,6 +790,19 @@ async def chat_stream(  # noqa: PLR0912
                 chat.updated_at = datetime.now(UTC)
                 await stream_db.merge(chat)
                 await stream_db.commit()
+
+                # Phase 5: fire-and-forget rolling summarization. Checked every
+                # threshold crossing; failures are logged inside summarize_chat.
+                try:
+                    if await should_summarize(chat.id, stream_db):
+                        summary_task = asyncio.create_task(
+                            summarize_chat(chat.id, payload.model, stream_db)
+                        )
+                        _background_tasks.add(summary_task)
+                        summary_task.add_done_callback(_background_tasks.discard)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Summarize trigger failed: %s", exc)
+
                 yield sse_event("[DONE]")
             except (GeneratorExit, asyncio.CancelledError):
                 await stream_db.rollback()

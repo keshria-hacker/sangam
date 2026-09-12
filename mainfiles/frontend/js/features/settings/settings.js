@@ -44,6 +44,9 @@ export function initElements() {
     confirmCancel: $('#confirmCancel'),
     backendUrlInput: $('#backendUrlInput'),
     testBackendBtn: $('#testBackendBtn'),
+    responseStyleSegmented: $('#responseStyleSegmented'),
+    formalitySegmented: $('#formalitySegmented'),
+    expertiseSegmented: $('#expertiseSegmented'),
     logoutBtn: $('#logoutBtn'),
     profileAvatar: $('#profileAvatar'),
     profileName: $('#profileName'),
@@ -127,10 +130,49 @@ export function syncSettingsUI() {
 /**
  * Open settings modal.
  */
+/**
+ * Phase 4: server-persisted response style preferences.
+ * Loaded when settings open, saved on segment click.
+ */
+export async function loadUserPreferences() {
+  try {
+    const pref = await apiGet('/user/preferences');
+    setActiveSegment(elements.responseStyleSegmented, pref.response_style || 'balanced', 'style');
+    setActiveSegment(elements.formalitySegmented, pref.formality || 'neutral', 'tone');
+    setActiveSegment(elements.expertiseSegmented, pref.expertise_level || 'general', 'expertise');
+  } catch (err) {
+    console.warn('Could not load preferences:', err.message);
+  }
+}
+
+function setActiveSegment(container, value, attr) {
+  if (!container) return;
+  container.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.dataset[attr] === value);
+  });
+}
+
+async function saveUserPreference(patch) {
+  try {
+    // The PUT accepts the full object; send current selections + the change.
+    const body = {
+      response_style: elements.responseStyleSegmented?.querySelector('button.active')?.dataset.style || 'balanced',
+      formality: elements.formalitySegmented?.querySelector('button.active')?.dataset.tone || 'neutral',
+      expertise_level: elements.expertiseSegmented?.querySelector('button.active')?.dataset.expertise || 'general',
+      ...patch,
+    };
+    await apiPut('/user/preferences', body);
+    showToast({ type: 'success', title: 'Response style saved' });
+  } catch (err) {
+    showToast({ type: 'error', title: 'Could not save preference', message: err.message });
+  }
+}
+
 export function openSettings() {
   elements.settingsTrigger = document.activeElement;
   syncSettingsUI();
   loadAndRenderProviderKeys();
+  loadUserPreferences();
   elements.settingsOverlay?.classList.remove('hidden');
   updateBodyScrollLock();
   setTimeout(() => elements.closeSettings?.focus(), 0);
@@ -351,6 +393,26 @@ export function initSettings() {
     setSettings({ ...getSettings(), chatWidth: b.dataset.width });
     syncSettingsUI();
     applySettings();
+  });
+
+  // Phase 4: response style preferences (server-persisted)
+  elements.responseStyleSegmented?.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    setActiveSegment(elements.responseStyleSegmented, b.dataset.style, 'style');
+    saveUserPreference({ response_style: b.dataset.style });
+  });
+  elements.formalitySegmented?.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    setActiveSegment(elements.formalitySegmented, b.dataset.tone, 'tone');
+    saveUserPreference({ formality: b.dataset.tone });
+  });
+  elements.expertiseSegmented?.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    setActiveSegment(elements.expertiseSegmented, b.dataset.expertise, 'expertise');
+    saveUserPreference({ expertise_level: b.dataset.expertise });
   });
 
   // Code theme

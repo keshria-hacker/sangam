@@ -22,6 +22,10 @@ class Chat(Base):
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     title: Mapped[str] = mapped_column(String(255), default="New chat")
     model: Mapped[str] = mapped_column(String(64), default="")
+    # Phase 5: rolling conversation summary + topics for cross-session memory.
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_topics: Mapped[str | None] = mapped_column(String(500), nullable=True)  # comma-separated
+    summarized_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
@@ -40,6 +44,10 @@ class Message(Base):
     model: Mapped[str | None] = mapped_column(String(64), nullable=True)
     file_ids: Mapped[str | None] = mapped_column(String(255), nullable=True)  # comma-separated
     response_time: Mapped[float | None] = mapped_column(nullable=True)  # seconds
+    # User quality feedback on assistant messages: "up" | "down" | None.
+    # feedback_note holds an optional free-text reason accompanying "down".
+    feedback: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    feedback_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")
@@ -93,6 +101,32 @@ class User(Base):
     password_salt: Mapped[str] = mapped_column(String(64))
     password_hash: Mapped[str] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
+
+    preferences: Mapped["UserPreference | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class UserPreference(Base):
+    """Per-user response style preferences (Implementation Plan Phase 4).
+
+    Stored values OVERRIDE the Response Intelligence layer's detected
+    user_prefers_concise/user_prefers_detailed signals in chat_stream.
+    """
+
+    __tablename__ = "user_preferences"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    response_style: Mapped[str] = mapped_column(String(16), default="balanced")  # concise|balanced|detailed
+    formality: Mapped[str] = mapped_column(String(16), default="neutral")        # casual|neutral|formal
+    expertise_level: Mapped[str] = mapped_column(String(16), default="general")  # beginner|general|expert
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC)
+    )
+
+    user: Mapped["User"] = relationship(back_populates="preferences")
 
 
 class AuthSession(Base):

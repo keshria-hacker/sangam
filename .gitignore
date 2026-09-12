@@ -97,3 +97,8 @@ package.json
 # --- Cookies ---
 cookies.txt
 
+# --- Local DB + recovery artifacts (never commit: contains user data, and
+# rebuild_db.py embeds recovered credential material) ---
+mainfiles/history/
+history/
+
