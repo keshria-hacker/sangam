@@ -22,6 +22,10 @@ class Chat(Base):
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     title: Mapped[str] = mapped_column(String(255), default="New chat")
     model: Mapped[str] = mapped_column(String(64), default="")
+    # Phase 5: rolling conversation summary + topics for cross-session memory.
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_topics: Mapped[str | None] = mapped_column(String(500), nullable=True)  # comma-separated
+    summarized_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 

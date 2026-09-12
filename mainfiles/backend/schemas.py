@@ -61,6 +61,7 @@ class ChatOut(BaseModel):
     id: str
     title: str
     model: str
+    summary: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -343,6 +343,7 @@ button:active, .model-option:active, .suggestion-card:active,
 .sidebar.collapsed .brand-name,
 .sidebar.collapsed .chat-history-label,
 .sidebar.collapsed .chat-item span,
+.sidebar.collapsed .chat-item-summary,
 .sidebar.collapsed .sidebar-footer-btn span,
 .sidebar.collapsed .kbd-hint,
 .sidebar.collapsed .profile-meta,
@@ -1114,6 +1115,18 @@ button:active, .model-option:active, .suggestion-card:active,
 .msg-action-btn.copied{color:var(--success);}
 .msg-action-btn.feedback-active{color:var(--accent);}
 .msg-action-btn.feedback-active:hover{color:var(--accent);}
+
+/* Sidebar rolling-summary subtitle (Phase 5) */
+.chat-item-summary{
+  display:block;
+  font-size:0.72rem;
+  color:var(--text-secondary);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
+  margin-left:26px;
+}
 
 /* Clarification card (Phase 2) — pre-response ambiguity prompt */
 .clarification-card{

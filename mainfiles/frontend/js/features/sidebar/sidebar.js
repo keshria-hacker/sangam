@@ -233,9 +233,14 @@ function buildChatItem(chat, isPinned) {
   item.setAttribute('aria-label', 'Open chat: ' + chat.title);
 
   var iconClass = isPinned ? 'fa-solid fa-thumbtack' : 'fa-regular fa-message';
+  // Phase 5: show the rolling summary as a subtitle when available.
+  var summaryHtml = chat.summary
+    ? '<span class="chat-item-summary">' + escapeHtml(chat.summary.slice(0, 80)) + (chat.summary.length > 80 ? '…' : '') + '</span>'
+    : '';
   item.innerHTML = [
     '<i class="' + iconClass + ' chat-icon"></i>',
     '<span>' + escapeHtml(chat.title) + '</span>',
+    summaryHtml,
     '<span class="chat-item-pin"><i class="fa-solid fa-thumbtack"></i></span>',
     '<button class="chat-item-menu-btn" title="More actions" aria-label="More actions"><i class="fa-solid fa-ellipsis"></i></button>'
   ].join('');

@@ -14,6 +14,8 @@ from pathlib import Path
 from . import llm
 from . import websearch
 from .auth import get_current_user
+from .memory import retrieve_memories
+from .summarizer import should_summarize, summarize_chat
 from .context_manager import create_context_manager
 from .database import AsyncSessionLocal, get_db
 from .document import extract_text, truncate_preview
@@ -51,6 +53,10 @@ router = APIRouter()
 public_router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+# Phase 5: strong references to fire-and-forget tasks so the event loop
+# doesn't garbage-collect them mid-flight.
+_background_tasks: set[asyncio.Task] = set()
 
 # Magic byte validator for file uploads
 # Maps extension to expected MIME types (using python-magic)
@@ -366,6 +372,20 @@ async def update_preferences(
     return pref
 
 
+@router.get("/chats/{chat_id}/summary")
+async def get_chat_summary(chat_id: str, db: AsyncSession = Depends(get_db)):
+    """Return the chat's rolling summary and key topics (Phase 5)."""
+    chat = await db.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {
+        "chat_id": chat.id,
+        "summary": chat.summary,
+        "key_topics": [t for t in (chat.key_topics or "").split(",") if t],
+        "summarized_at": chat.summarized_at,
+    }
+
+
 @router.post("/messages/{message_id}/feedback")
 async def submit_feedback(
     message_id: str,
@@ -649,6 +669,29 @@ async def chat_stream(  # noqa: PLR0912
                     return
         return StreamingResponse(clarification_generator(), media_type="text/event-stream")
 
+    # --- Phase 5: Cross-session memory ---
+    # Retrieve relevant past-conversation summaries and inject as provider
+    # context. Placed AFTER response-intelligence analysis and the
+    # clarification gate: injecting earlier would pollute the conversation
+    # history that the ambiguity heuristic reads (a system message at index 0
+    # makes history non-empty, disabling the no-context branch) and the
+    # clarification path never calls the provider so it needs no memory.
+    # Degrades to no-op on any ChromaDB error (retrieve_memories never raises).
+    if not payload.regenerate:
+        try:
+            last_user_content = payload.messages[-1].content
+            memories = await retrieve_memories(last_user_content, top_k=2)
+            memories = [m for m in memories if (chat.summary or "") not in (m, )] if chat.summary else memories
+            if memories:
+                memory_context = "\n".join(f"- {m}" for m in memories)
+                messages.insert(0, {
+                    "role": "system",
+                    "content": f"[Long-term memory — relevant past conversations]\n{memory_context}",
+                })
+                logger.debug("Injected %d long-term memories", len(memories))
+        except Exception as exc:  # noqa: BLE001 — memory must never break chat
+            logger.warning("Memory retrieval failed: %s", exc)
+
     # --- Phase 9 P0: Safe Context Truncation ---
     # Apply token budgeting and safe context truncation after Phase 6 intelligence injection
     # but before provider routing and content compression
@@ -747,6 +790,19 @@ async def chat_stream(  # noqa: PLR0912
                 chat.updated_at = datetime.now(UTC)
                 await stream_db.merge(chat)
                 await stream_db.commit()
+
+                # Phase 5: fire-and-forget rolling summarization. Checked every
+                # threshold crossing; failures are logged inside summarize_chat.
+                try:
+                    if await should_summarize(chat.id, stream_db):
+                        summary_task = asyncio.create_task(
+                            summarize_chat(chat.id, payload.model, stream_db)
+                        )
+                        _background_tasks.add(summary_task)
+                        summary_task.add_done_callback(_background_tasks.discard)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Summarize trigger failed: %s", exc)
+
                 yield sse_event("[DONE]")
             except (GeneratorExit, asyncio.CancelledError):
                 await stream_db.rollback()
