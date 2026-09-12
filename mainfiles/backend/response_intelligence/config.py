@@ -165,6 +165,12 @@ class ResponseIntelligenceConfig(BaseModel):
     # to answer directly even when mildly ambiguous.
     CLARIFICATION_MAX_CHARS: int = 60
 
+    # --- Uncertainty post-processing (Phase 3) ---
+    # When True, responses produced under high ambiguity in factual/analysis
+    # modes get a calibrated uncertainty hedge at persistence time (never in
+    # the live stream).
+    UNCERTAINTY_HEDGING_ENABLED: bool = True
+
 
 # Global config instance
 config = ResponseIntelligenceConfig()

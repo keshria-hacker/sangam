@@ -22,6 +22,7 @@ from .models import Chat, Message, ProviderKey, UploadedFile
 from .rag import TOP_K as RAG_TOP_K
 from .rag import index_document, retrieve_relevant_chunks
 from .capability_orchestration import derive_interpretations, should_clarify
+from .response_postprocessor import post_process_response
 from .response_events import FinishReason, ResponseEvent, ResponseEventBuilder, ResponseEventType, normalize_error
 from .response_intelligence import analyze_request, build_system_prompt_additions, config as ri_config
 from .schemas import (
@@ -650,6 +651,16 @@ async def chat_stream(  # noqa: PLR0912
                     yield f": heartbeat {int(time.monotonic())}\n\n"
 
                 response_time = time.monotonic() - stream_started_at
+
+                # Phase 3: uncertainty post-processing — hedge low-confidence
+                # factual/analysis answers at PERSISTENCE time only. The live
+                # stream the user watched is never mutated; the stored text
+                # (and what reloads from history) carries the hedge.
+                if guidance is not None and ri_config.UNCERTAINTY_HEDGING_ENABLED:
+                    try:
+                        collected = post_process_response(collected, guidance)
+                    except Exception as exc:  # noqa: BLE001 — never break persistence
+                        logger.warning("Uncertainty post-processing failed: %s", exc)
 
                 if not payload.regenerate:
                     stream_db.add(Message(chat_id=chat.id, role="user",
