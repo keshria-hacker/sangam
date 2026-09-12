@@ -326,29 +326,6 @@ Tests cover core functionality including authentication, document processing, mo
 
 ---
 
-## 🗺️ Roadmap
-
-Sangam is actively evolving toward a more complete universal AI workspace.
-
-- [x] Multi-provider AI chat
-- [x] Local Ollama support
-- [x] Streaming responses
-- [x] Document processing
-- [x] RAG / Vector Search
-- [x] Web Search
-- [x] Skills system
-- [x] Docker support
-- [ ] Automatic Ollama startup
-- [ ] Function Calling / Tools
-- [ ] Vision & image understanding
-- [ ] MCP integration
-- [ ] Multi-user workspaces
-- [ ] Desktop application
-- [ ] Plugin marketplace
-- **AND MORE SOON** 
-
----
-
 ## 🤝 Contributing
 
 Contributions, bug reports, feature requests, and improvements are welcome.

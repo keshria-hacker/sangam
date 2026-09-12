@@ -28,8 +28,8 @@ except OSError as e:
         print("  The code is fine — the OS is preventing pandas DLLs from loading here.", file=sys.stderr)
         print("", file=sys.stderr)
         print("  SOLUTION: Clone/run from a NON-RESTRICTED path:", file=sys.stderr)
-        print("    git clone https://github.com/keshria-hacker/Universal-Ai-Chat-Platform.git", file=sys.stderr)
-        print("    cd Universal-Ai-Chat-Platform", file=sys.stderr)
+        print("    git clone https://github.com/keshria-hacker/sangam.git", file=sys.stderr)
+        print("    cd sangam", file=sys.stderr)
         print("    python start.py", file=sys.stderr)
         print("", file=sys.stderr)
         print("  Or ask IT to whitelist this path in AppLocker.", file=sys.stderr)
@@ -186,7 +186,7 @@ def main() -> None:
 
     backend_cmd, frontend_cmd = build_commands(python_exe)
 
-    print("=== UniversalAI — starting ===")
+    print("=== sangam — starting ===")
     print(f"-> Backend: http://127.0.0.1:{BACKEND_PORT}/docs")
     print(f"-> Frontend: http://127.0.0.1:{FRONTEND_PORT}")
     print("-> Provider keys can be added from Settings -> Provider API Keys")
