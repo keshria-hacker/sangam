@@ -5,6 +5,8 @@ format can evolve independently.
 """
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .response_events import ModelCapabilities
@@ -48,6 +50,8 @@ class MessageOut(BaseModel):
     content: str
     model: str | None = None
     response_time: float | None = None
+    feedback: str | None = None
+    feedback_note: str | None = None
     created_at: datetime
 
 
@@ -148,3 +152,13 @@ class ForgotPasswordOut(BaseModel):
 class ResetPasswordIn(BaseModel):
     reset_token: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=10, max_length=256)
+
+
+class FeedbackIn(BaseModel):
+    """User quality feedback on an assistant message.
+
+    Sending the same value again clears the feedback (toggle-off undo).
+    """
+
+    value: Literal["up", "down"]
+    note: str | None = Field(default=None, max_length=2000)

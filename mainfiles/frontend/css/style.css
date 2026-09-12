@@ -1112,6 +1112,46 @@ button:active, .model-option:active, .suggestion-card:active,
 }
 .msg-action-btn:hover{background:var(--bg-hover); color:var(--text-primary);}
 .msg-action-btn.copied{color:var(--success);}
+.msg-action-btn.feedback-active{color:var(--accent);}
+.msg-action-btn.feedback-active:hover{color:var(--accent);}
+
+/* Clarification card (Phase 2) — pre-response ambiguity prompt */
+.clarification-card{
+  margin:0.5rem 0 0.25rem;
+  padding:0.9rem 1rem;
+  border:1px solid var(--border);
+  border-left:3px solid var(--accent);
+  border-radius:10px;
+  background:var(--bg-hover);
+}
+.clarification-card .clarify-prompt{
+  margin:0 0 0.6rem;
+  font-size:0.92rem;
+  color:var(--text-secondary);
+}
+.clarification-card .clarify-options{
+  display:flex;
+  flex-wrap:wrap;
+  gap:0.5rem;
+}
+.clarification-card .clarify-btn{
+  padding:0.45rem 0.85rem;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:transparent;
+  color:var(--text-primary);
+  font-size:0.88rem;
+  cursor:pointer;
+  transition:background 0.15s ease, border-color 0.15s ease;
+}
+.clarification-card .clarify-btn:hover:not(:disabled){
+  background:var(--accent);
+  border-color:var(--accent);
+}
+.clarification-card .clarify-btn:disabled{
+  opacity:0.55;
+  cursor:default;
+}
 
 /* User message edit */
 .msg.user .msg-edit-btn{

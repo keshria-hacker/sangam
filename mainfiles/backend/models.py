@@ -40,6 +40,10 @@ class Message(Base):
     model: Mapped[str | None] = mapped_column(String(64), nullable=True)
     file_ids: Mapped[str | None] = mapped_column(String(255), nullable=True)  # comma-separated
     response_time: Mapped[float | None] = mapped_column(nullable=True)  # seconds
+    # User quality feedback on assistant messages: "up" | "down" | None.
+    # feedback_note holds an optional free-text reason accompanying "down".
+    feedback: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    feedback_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")

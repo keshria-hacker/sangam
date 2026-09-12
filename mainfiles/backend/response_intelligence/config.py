@@ -157,6 +157,14 @@ class ResponseIntelligenceConfig(BaseModel):
     MAX_PARAGRAPHS_CONCISE: int = 2
     MAX_TOKENS_URGENCY: int = 500
 
+    # --- Clarification gate (Phase 2) ---
+    # When True, ambiguous short requests may be intercepted BEFORE generation
+    # with a clarification_request event offering interpretation options.
+    CLARIFICATION_ENABLED: bool = True
+    # Only gate short requests — long, detailed requests carry enough context
+    # to answer directly even when mildly ambiguous.
+    CLARIFICATION_MAX_CHARS: int = 60
+
 
 # Global config instance
 config = ResponseIntelligenceConfig()

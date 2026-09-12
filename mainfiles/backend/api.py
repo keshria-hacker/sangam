@@ -21,12 +21,14 @@ from fastapi.responses import StreamingResponse
 from .models import Chat, Message, ProviderKey, UploadedFile
 from .rag import TOP_K as RAG_TOP_K
 from .rag import index_document, retrieve_relevant_chunks
-from .response_events import ResponseEvent, ResponseEventBuilder, ResponseEventType, normalize_error
+from .capability_orchestration import derive_interpretations, should_clarify
+from .response_events import FinishReason, ResponseEvent, ResponseEventBuilder, ResponseEventType, normalize_error
 from .response_intelligence import analyze_request, build_system_prompt_additions, config as ri_config
 from .schemas import (
     ChatDetailOut,
     ChatOut,
     ChatStreamRequest,
+    FeedbackIn,
     FileUploadOut,
     ModelInfo,
     ProviderKeyIn,
@@ -314,6 +316,37 @@ async def delete_chat(chat_id: str, db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# Message feedback
+# ---------------------------------------------------------------------------
+
+@router.post("/messages/{message_id}/feedback")
+async def submit_feedback(
+    message_id: str,
+    body: FeedbackIn,
+    db: AsyncSession = Depends(get_db),
+):
+    """Record user quality feedback (thumbs up/down) on an assistant message.
+
+    Sending the same value again clears the feedback (toggle-off undo), so a
+    mis-click is recoverable. A note is optional free-text context.
+    """
+    msg = await db.get(Message, message_id)
+    if msg is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if msg.feedback == body.value:
+        # Toggle-off: same value twice clears the feedback.
+        msg.feedback = None
+        msg.feedback_note = None
+    else:
+        msg.feedback = body.value
+        if body.note is not None:
+            msg.feedback_note = body.note
+    await db.commit()
+    return {"status": "ok", "feedback": msg.feedback}
+
+
+# ---------------------------------------------------------------------------
 # File upload
 # ---------------------------------------------------------------------------
 
@@ -470,6 +503,7 @@ async def chat_stream(  # noqa: PLR0912
     # --- Phase 6: Response Intelligence ---
     # Analyze request and inject guidance as system prompt additions.
     # This runs BEFORE streaming starts, so it doesn't affect the event pipeline.
+    guidance = None
     if ri_config.ENABLED:
         try:
             guidance = await analyze_request(
@@ -491,6 +525,55 @@ async def chat_stream(  # noqa: PLR0912
                 logger.debug("Injected %d response intelligence guidance additions", len(system_additions))
         except Exception as exc:  # noqa: BLE001 — never break chat for guidance errors
             logger.warning("Response intelligence analysis failed: %s", exc)
+
+    # --- Phase 2: Clarification gate ---
+    # Ambiguous short requests are intercepted BEFORE generation: we persist the
+    # user turn and return a clarification_request event with interpretation
+    # options instead of calling the provider. The client renders option buttons
+    # that re-send the chosen interpretation as a new user message.
+    if guidance is not None and should_clarify(payload.messages[-1].content, guidance):
+        async def clarification_generator():
+            request_id = getattr(request.state, "request_id", uuid.uuid4().hex[:12])
+            builder = ResponseEventBuilder(
+                provider=model_info.provider_id,
+                model=payload.model,
+                request_id=request_id,
+            )
+            options = derive_interpretations(payload.messages[-1].content, guidance)
+            async with AsyncSessionLocal() as clarify_db:
+                try:
+                    yield sse_event(chat.id, event="chat_id")
+                    if not payload.regenerate:
+                        clarify_db.add(Message(
+                            chat_id=chat.id,
+                            role="user",
+                            content=payload.messages[-1].content,
+                            file_ids=",".join(payload.file_ids) or None,
+                        ))
+                        await clarify_db.commit()
+                    # Lifecycle: message_start must precede any content event
+                    # (the event builder and the client controller both enforce it).
+                    yield sse_response_event(builder.message_start())
+                    ev = builder.event(
+                        ResponseEventType.CLARIFICATION_REQUEST,
+                        content="Your request could mean a few different things. Which did you mean?",
+                        metadata={"options": options},
+                    )
+                    yield sse_response_event(ev)
+                    yield sse_response_event(builder.message_end(finish_reason=FinishReason.STOP))
+                    yield sse_event("[DONE]")
+                except (GeneratorExit, asyncio.CancelledError):
+                    await clarify_db.rollback()
+                    if not payload.chat_id:
+                        await clarify_db.execute(delete(Chat).where(Chat.id == chat.id))
+                        await clarify_db.commit()
+                    return
+                except Exception as exc:  # noqa: BLE001
+                    await clarify_db.rollback()
+                    logger.warning("Clarification stream failed: %s", exc)
+                    yield sse_event("Could not start the clarification prompt.", event="error")
+                    return
+        return StreamingResponse(clarification_generator(), media_type="text/event-stream")
 
     # --- Phase 9 P0: Safe Context Truncation ---
     # Apply token budgeting and safe context truncation after Phase 6 intelligence injection

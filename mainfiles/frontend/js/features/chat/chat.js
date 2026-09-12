@@ -433,8 +433,8 @@ export function buildMessageNode(msg) {
       <div class="msg-actions always-visible" role="group" aria-label="Message actions">
         <button class="msg-action-btn copy-msg-btn" aria-label="Copy message"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy</button>
         <button class="msg-action-btn regenerate-btn" aria-label="Regenerate response"><i class="fa-solid fa-arrow-rotate-right" aria-hidden="true"></i> Regenerate</button>
-        <button class="msg-action-btn" aria-label="Thumbs up"><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
-        <button class="msg-action-btn" aria-label="Thumbs down"><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
+        <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
+        <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
       </div>
     </div>`; // Copy button
   const copyBtn = node.querySelector('.copy-msg-btn');
@@ -452,6 +452,50 @@ export function buildMessageNode(msg) {
   // Regenerate button
   const regenBtn = node.querySelector('.regenerate-btn');
   regenBtn.addEventListener('click', () => regenerate());
+
+  // Feedback buttons (thumbs up/down) — persisted via the messages API.
+  // Clicking the active thumb again clears the feedback (toggle-off undo).
+  node.querySelectorAll('.feedback-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const value = btn.dataset.value;                 // "up" | "down"
+      const wasActive = btn.classList.contains('feedback-active');
+      // Server clears feedback when the same value is re-sent (toggle-off undo),
+      // so the client always sends the clicked value as-is.
+      // Optimistic UI: flip active state immediately, revert on failure.
+      node.querySelectorAll('.feedback-btn').forEach((b) => {
+        b.classList.remove('feedback-active');
+        b.removeAttribute('aria-pressed');
+      });
+      if (!wasActive) {
+        btn.classList.add('feedback-active');
+        btn.setAttribute('aria-pressed', 'true');
+      }
+      try {
+        await apiFetch(`/messages/${msg.id}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value }),
+        });
+        msg.feedback = wasActive ? null : value;   // keep local state in sync for re-renders
+        showToast(wasActive
+          ? { type: 'info', title: 'Feedback cleared' }
+          : { type: 'success', title: 'Thanks!', message: 'Feedback saved.' });
+      } catch (err) {
+        // Revert optimistic update on failure.
+        node.querySelectorAll('.feedback-btn').forEach((b) => {
+          b.classList.remove('feedback-active');
+          b.removeAttribute('aria-pressed');
+        });
+        const saved = msg.feedback;
+        if (saved) {
+          const activeBtn = node.querySelector(`.feedback-btn[data-value="${saved}"]`);
+          activeBtn?.classList.add('feedback-active');
+          activeBtn?.setAttribute('aria-pressed', 'true');
+        }
+        showToast({ type: 'error', title: 'Failed to save feedback', message: err.message || 'Please try again.' });
+      }
+    });
+  });
 
   return node;
 }
@@ -902,6 +946,40 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         }
         const idx = artifacts.findIndex(a => a.id === artifact.id);
         if (idx >= 0) artifacts[idx] = artifact;
+      },
+      clarification: (event) => {
+        // Phase 2: pre-response clarification card. Replaces the typing
+        // indicator — no provider generation happened for this turn.
+        const options = event.metadata?.options || [];
+        const promptText = event.content || 'Which did you mean?';
+        const indicatorEl = typingNode.querySelector('.typing-indicator');
+        if (indicatorEl) indicatorEl.outerHTML = '';
+        const responseEl = typingNode.querySelector('.assistant-response');
+        if (responseEl) responseEl.removeAttribute('aria-busy');
+        setThinkingPhase(typingNode, 'done');
+        if (_thinkTimer) { clearInterval(_thinkTimer); _thinkTimer = null; }
+        const card = document.createElement('div');
+        card.className = 'clarification-card';
+        card.innerHTML = `
+          <p class="clarify-prompt">${escapeHtml(promptText)}</p>
+          <div class="clarify-options">
+            ${options.map(opt => `<button type="button" class="clarify-btn" data-text="${escapeHtml(opt)}">${escapeHtml(opt)}</button>`).join('')}
+          </div>`;
+        responseEl?.replaceWith(card);
+        // Option click => re-send that interpretation as a brand-new user turn.
+        card.querySelectorAll('.clarify-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const text = btn.dataset.text;
+            if (!text || getIsGenerating()) return;
+            card.querySelectorAll('.clarify-btn').forEach((b) => (b.disabled = true));
+            const userMsg = { role: 'user', content: text, created_at: new Date().toISOString() };
+            setMessages([...getMessages(), userMsg]);
+            elements.messages?.appendChild(buildMessageNode(userMsg));
+            setLastUserText(text);
+            scrollToBottom(true);
+            runGeneration({ content: text, fileIds: [], regenerate: false });
+          });
+        });
       },
       error: (err) => {
         streamError = err || { category: 'unknown', message: 'Provider request failed' };

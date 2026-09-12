@@ -31,6 +31,7 @@ export const RESPONSE_EVENT_TYPES = Object.freeze({
   TOOL_END: "tool_end",
   TOOL_RESULT: "tool_result",
   CITATION: "citation",
+  CLARIFICATION_REQUEST: "clarification_request",
   ARTIFACT_START: "artifact_start",
   ARTIFACT_DELTA: "artifact_delta",
   ARTIFACT_END: "artifact_end",
@@ -331,6 +332,9 @@ export function createResponseController(handlers = {}, options = {}) {
         break;
       case RESPONSE_EVENT_TYPES.CITATION:
         emit("citation", event);
+        break;
+      case RESPONSE_EVENT_TYPES.CLARIFICATION_REQUEST:
+        emit("clarification", event);
         break;
       case RESPONSE_EVENT_TYPES.ARTIFACT_START:
         emit("artifactStart", event);
