@@ -16,7 +16,7 @@ A privacy-first AI workspace for chatting with cloud and local LLMs from a singl
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-orange)]()
-[![Version](https://img.shields.io/badge/Version-v1.1-3A342B)]()
+[![Version](https://img.shields.io/badge/Version-v1.0.0-3A342B)]()
 
 </div>
 
@@ -30,7 +30,7 @@ Connect cloud providers such as **OpenAI, Anthropic, Gemini, NVIDIA NIM, Groq, M
 
 Switch models, upload documents, use RAG, search the web, manage provider keys, and keep your conversations in one place.
 
-> **Sangam v1.0 is under active development.** Features and APIs may evolve as the project grows.
+> **Sangam v1.0.0 is the current release.** Features and APIs are stable in this version.
 
 ---
 

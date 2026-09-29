@@ -706,7 +706,7 @@ The skills modal (`features/skills/skills.js`) provides:
 - **Detail panel** — parameters with validation, dependencies, execute button, copy command
 - **Execution** — runs `/api/skills/execute`, shows result in modal
 
-**Fixed Issues (v1.1):**
+**Fixed Issues (v1.0.0):**
 - CSS completely rewritten to match actual HTML structure (`.skills-layout`, `.skills-sidebar`, `.skills-search-wrap`, `.skills-categories`, `.skills-invocations`, `.skills-list`, `.skills-detail`)
 - `loadSkills()` moved from `init()` to `openSkillsModal()` so it runs after authentication (fixes 401 on first load)
 - Category filter buttons now match backend `SkillCategory` enum values

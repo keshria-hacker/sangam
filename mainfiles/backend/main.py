@@ -212,7 +212,7 @@ def create_app() -> FastAPI:
         checks = {
             "status": "healthy",
             "app": settings.APP_NAME,
-            "version": "1.1.0",
+            "version": "1.0.0",
             "database": "unknown",
             "ollama": "unknown",
         }
