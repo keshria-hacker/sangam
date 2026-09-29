@@ -32,8 +32,11 @@ history/*.tmp
 !history/.gitkeep
 
 # --- Uploaded user files ---
+# (anchored so the rules also cover mainfiles/uploads after the layout move)
 uploads/*
 !uploads/.gitkeep
+mainfiles/uploads/*
+!mainfiles/uploads/.gitkeep
 
 # --- Debug / temporary files ---
 *.log
