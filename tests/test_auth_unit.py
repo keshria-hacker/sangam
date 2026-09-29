@@ -22,7 +22,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Enable test mode with file-based database BEFORE importing ANY backend modules
 # Using in-memory DB causes issues because each connection gets a different DB
@@ -38,7 +38,7 @@ if test_db_path.exists():
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{test_db_path}"
 
 # Reset settings cache BEFORE importing config
-from config import reset_settings, settings as config_settings
+from backend.config import reset_settings, settings as config_settings
 reset_settings()
 config_settings.DATABASE_URL = os.environ["DATABASE_URL"]
 
@@ -52,7 +52,7 @@ TestAsyncSessionLocal = db_module.AsyncSessionLocal
 from backend.database import Base  # Use the same Base from the patched module
 
 # Now import backend modules - they will use the same database module
-import auth
+import backend.auth as auth
 from backend import models  # Import models to register them with Base.metadata
 
 
@@ -803,7 +803,7 @@ class PasswordSecurityTests(unittest.TestCase):
 
     def test_password_verification_uses_hmac_compare_digest(self):
         """Password comparison should use constant-time comparison."""
-        import auth
+        import backend.auth as auth
         import inspect
         source = inspect.getsource(auth.login)
         self.assertIn("hmac.compare_digest", source)
@@ -918,7 +918,7 @@ class CSRFProtectionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_requests_skip_csrf(self):
         """GET requests should not require CSRF token."""
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
         mock_request = MagicMock()
         mock_request.method = "GET"
         mock_request.headers = {}
@@ -929,7 +929,7 @@ class CSRFProtectionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_mutation_requires_csrf(self):
         """POST/PUT/DELETE should require CSRF when cookie present."""
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
         mock_request = MagicMock()
         mock_request.method = "POST"
         mock_request.headers = {}

@@ -67,6 +67,7 @@ class ChatOut(BaseModel):
 
 
 class ChatDetailOut(ChatOut):
+    message_count: int = 0
     messages: list[MessageOut] = Field(default_factory=list)
 
 

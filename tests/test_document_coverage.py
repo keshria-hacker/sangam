@@ -10,7 +10,7 @@ from tempfile import NamedTemporaryFile
 from unittest.mock import MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Enable test mode
 os.environ["TEST_MODE"] = "1"
@@ -41,8 +41,8 @@ for submodule in ["Image", "ImageFont", "ImageDraw", "ImageFilter", "ImageColor"
     sys.modules[f"PIL.{submodule}"] = sub_mod
 sys.modules["PIL"] = pil_mock
 
-# Now import document - it will see pytesseract and PIL as available
-from document import (
+# Now import backend.document as document - it will see pytesseract and PIL as available
+from backend.document import (
     extract_text,
     _extract_plain_text,
     _extract_pdf,
@@ -64,30 +64,30 @@ from document import (
 class OCRUnavailableTests(unittest.TestCase):
     """Tests for when OCR is not available (lines 20-21, 106, 197)."""
 
-    @patch("document.OCR_AVAILABLE", False)
+    @patch("backend.document.OCR_AVAILABLE", False)
     def test_extract_pdf_ocr_returns_empty_when_unavailable(self):
         """_extract_pdf_ocr returns empty string when OCR not available (line 106)."""
-        from document import _extract_pdf_ocr
+        from backend.document import _extract_pdf_ocr
         with NamedTemporaryFile(suffix=".pdf") as f:
             f.write(b"%PDF-1.4\n%test")
             f.flush()
             result = _extract_pdf_ocr(Path(f.name))
         self.assertEqual(result, "")
 
-    @patch("document.OCR_AVAILABLE", False)
+    @patch("backend.document.OCR_AVAILABLE", False)
     def test_extract_image_ocr_returns_message_when_unavailable(self):
         """_extract_image_ocr returns message when OCR not available (line 197)."""
-        from document import _extract_image_ocr
+        from backend.document import _extract_image_ocr
         with NamedTemporaryFile(suffix=".png") as f:
             f.write(b"fake png")
             f.flush()
             result = _extract_image_ocr(Path(f.name))
         self.assertIn("OCR not available", result)
 
-    @patch("document.OCR_AVAILABLE", False)
+    @patch("backend.document.OCR_AVAILABLE", False)
     def test_extract_image_ocr_file_size_check_still_runs(self):
         """File size check runs even when OCR unavailable (lines 200-203)."""
-        from document import _extract_image_ocr
+        from backend.document import _extract_image_ocr
         with NamedTemporaryFile(suffix=".png") as f:
             f.write(b"x" * (51 * 1024 * 1024))  # 51 MB > 50 MB limit
             f.flush()
@@ -103,7 +103,7 @@ class ImportErrorTests(unittest.TestCase):
     def test_ocr_available_false_when_import_fails(self):
         """OCR_AVAILABLE is False when imports fail."""
         import importlib
-        import document
+        import backend.document as document
         importlib.reload(document)
         self.assertFalse(document.OCR_AVAILABLE)
 
@@ -111,9 +111,9 @@ class ImportErrorTests(unittest.TestCase):
 class PDFOCRBranchTests(unittest.TestCase):
     """Tests for PDF OCR fallback branches (lines 93-94, 133-134)."""
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document._extract_pdf_ocr")
-    @patch("document.PdfReader")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document._extract_pdf_ocr")
+    @patch("backend.document.PdfReader")
     def test_extract_pdf_ocr_fallback_on_corrupt_pdf(self, mock_reader, mock_ocr):
         """PDF extraction attempts OCR on corrupt PDF (lines 90-96)."""
         from pypdf.errors import PdfReadError
@@ -130,9 +130,9 @@ class PDFOCRBranchTests(unittest.TestCase):
         self.assertIn("OCR extracted from PDF", result)
         self.assertIn("OCR recovered text", result)
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document._extract_pdf_ocr")
-    @patch("document.PdfReader")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document._extract_pdf_ocr")
+    @patch("backend.document.PdfReader")
     def test_extract_pdf_ocr_fallback_ocr_fails(self, mock_reader, mock_ocr):
         """PDF extraction returns error when OCR also fails (lines 90-96)."""
         from pypdf.errors import PdfReadError
@@ -148,11 +148,11 @@ class PDFOCRBranchTests(unittest.TestCase):
         self.assertIn("Could not read PDF", result)
         self.assertIn("corrupt PDF", result)
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document.PdfReader")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document.PdfReader")
     def test_extract_pdf_ocr_handles_exception_per_page(self, mock_pdf_reader):
         """_extract_pdf_ocr continues on per-page exception (lines 133-134)."""
-        from document import _extract_pdf_ocr
+        from backend.document import _extract_pdf_ocr
 
         # Mock pdf2image.convert_from_path inside the function
         with patch("pdf2image.convert_from_path") as mock_convert:
@@ -161,7 +161,7 @@ class PDFOCRBranchTests(unittest.TestCase):
             mock_convert.return_value = [mock_image1, mock_image2]
 
             # Mock pytesseract inside document module
-            with patch("document.pytesseract.image_to_string") as mock_ocr:
+            with patch("backend.document.pytesseract.image_to_string") as mock_ocr:
                 # First page succeeds, second raises exception
                 mock_ocr.side_effect = ["Page 1 text", Exception("OCR failed")]
 
@@ -212,12 +212,12 @@ class PlainTextEdgeCaseTests(unittest.TestCase):
 class ImageOCRBranchTests(unittest.TestCase):
     """Tests for image OCR branches (lines 200-215)."""
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document.Image")
-    @patch("document.pytesseract.image_to_string")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document.Image")
+    @patch("backend.document.pytesseract.image_to_string")
     def test_extract_image_ocr_converts_image_mode(self, mock_ocr, mock_image_class):
         """Image mode conversion (lines 207-208)."""
-        from document import _extract_image_ocr
+        from backend.document import _extract_image_ocr
 
         mock_image = MagicMock()
         mock_image.mode = "RGBA"  # Not RGB or L, should convert
@@ -231,12 +231,12 @@ class ImageOCRBranchTests(unittest.TestCase):
         mock_image.convert.assert_called_with("RGB")
         self.assertIn("OCR text", result)
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document.Image")
-    @patch("document.pytesseract.image_to_string")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document.Image")
+    @patch("backend.document.pytesseract.image_to_string")
     def test_extract_image_ocr_no_text_detected(self, mock_ocr, mock_image_class):
         """No text detected returns specific message (lines 211-212)."""
-        from document import _extract_image_ocr
+        from backend.document import _extract_image_ocr
 
         mock_image = MagicMock()
         mock_image.mode = "RGB"
@@ -248,12 +248,12 @@ class ImageOCRBranchTests(unittest.TestCase):
 
         self.assertIn("No text detected", result)
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document.Image")
-    @patch("document.pytesseract.image_to_string")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document.Image")
+    @patch("backend.document.pytesseract.image_to_string")
     def test_extract_image_ocr_exception_handled(self, mock_ocr, mock_image_class):
         """General exception during OCR returns error message (lines 214-215)."""
-        from document import _extract_image_ocr
+        from backend.document import _extract_image_ocr
 
         mock_image = MagicMock()
         mock_image.mode = "RGB"
@@ -266,10 +266,10 @@ class ImageOCRBranchTests(unittest.TestCase):
         self.assertIn("Could not extract text from this image", result)
         self.assertIn("Tesseract error", result)
 
-    @patch("document.OCR_AVAILABLE", True)
+    @patch("backend.document.OCR_AVAILABLE", True)
     def test_extract_image_ocr_file_too_large(self):
         """File size limit check (lines 200-203)."""
-        from document import _extract_image_ocr
+        from backend.document import _extract_image_ocr
 
         with NamedTemporaryFile(suffix=".png") as f:
             f.write(b"x" * (51 * 1024 * 1024))  # 51 MB > 50 MB limit
@@ -283,10 +283,10 @@ class ImageOCRBranchTests(unittest.TestCase):
 class PDFOCRSizeLimitTests(unittest.TestCase):
     """Tests for PDF OCR size limit (lines 109-111)."""
 
-    @patch("document.OCR_AVAILABLE", True)
+    @patch("backend.document.OCR_AVAILABLE", True)
     def test_extract_pdf_ocr_file_too_large(self):
         """PDF file size limit returns error (lines 109-111)."""
-        from document import _extract_pdf_ocr
+        from backend.document import _extract_pdf_ocr
 
         with NamedTemporaryFile(suffix=".pdf") as f:
             f.write(b"x" * (51 * 1024 * 1024))  # 51 MB > 50 MB limit
@@ -300,10 +300,10 @@ class PDFOCRSizeLimitTests(unittest.TestCase):
 class DOCXBranchTests(unittest.TestCase):
     """Tests for DOCX extraction branches."""
 
-    @patch("document.DocxDocument")
+    @patch("backend.document.DocxDocument")
     def test_extract_docx_empty_paragraphs_skipped(self, mock_docx_class):
         """Empty paragraphs are skipped (line 142)."""
-        from document import _extract_docx
+        from backend.document import _extract_docx
 
         mock_doc = MagicMock()
         mock_para1 = MagicMock()
@@ -325,10 +325,10 @@ class DOCXBranchTests(unittest.TestCase):
         self.assertIn("Paragraph 1", result)
         self.assertIn("Paragraph 2", result)
 
-    @patch("document.DocxDocument")
+    @patch("backend.document.DocxDocument")
     def test_extract_docx_with_tables(self, mock_docx_class):
         """Table extraction (lines 144-148)."""
-        from document import _extract_docx
+        from backend.document import _extract_docx
 
         mock_doc = MagicMock()
         mock_doc.paragraphs = [MagicMock(text="Para 1")]
@@ -354,10 +354,10 @@ class DOCXBranchTests(unittest.TestCase):
 class CSVEdgeCaseTests(unittest.TestCase):
     """Tests for CSV edge cases."""
 
-    @patch("document.pd.read_csv")
+    @patch("backend.document.pd.read_csv")
     def test_extract_csv_empty_data_error(self, mock_read):
         """Empty CSV returns specific message (line 160)."""
-        from document import _extract_csv
+        from backend.document import _extract_csv
         from pandas.errors import EmptyDataError
         mock_read.side_effect = EmptyDataError("No data")
 
@@ -366,10 +366,10 @@ class CSVEdgeCaseTests(unittest.TestCase):
 
         self.assertIn("CSV file is empty", result)
 
-    @patch("document.pd.read_csv")
+    @patch("backend.document.pd.read_csv")
     def test_extract_csv_parser_error(self, mock_read):
         """Parser error returns specific message (lines 161-162)."""
-        from document import _extract_csv
+        from backend.document import _extract_csv
         from pandas.errors import ParserError
         mock_read.side_effect = ParserError("Parse failed")
 
@@ -379,10 +379,10 @@ class CSVEdgeCaseTests(unittest.TestCase):
         self.assertIn("Could not parse CSV", result)
         self.assertIn("Parse failed", result)
 
-    @patch("document.pd.read_csv")
+    @patch("backend.document.pd.read_csv")
     def test_extract_csv_general_exception(self, mock_read):
         """General exception handled (lines 163-164)."""
-        from document import _extract_csv
+        from backend.document import _extract_csv
         mock_read.side_effect = Exception("General error")
 
         with NamedTemporaryFile(suffix=".csv") as f:
@@ -395,10 +395,10 @@ class CSVEdgeCaseTests(unittest.TestCase):
 class XLSXEdgeCaseTests(unittest.TestCase):
     """Tests for XLSX edge cases."""
 
-    @patch("document.openpyxl.load_workbook")
+    @patch("backend.document.openpyxl.load_workbook")
     def test_extract_xlsx_general_exception(self, mock_load):
         """General exception returns error message (lines 176-177)."""
-        from document import _extract_xlsx
+        from backend.document import _extract_xlsx
         mock_load.side_effect = Exception("XLSX failed")
 
         with NamedTemporaryFile(suffix=".xlsx") as f:
@@ -411,10 +411,10 @@ class XLSXEdgeCaseTests(unittest.TestCase):
 class PPTXEdgeCaseTests(unittest.TestCase):
     """Tests for PPTX edge cases."""
 
-    @patch("document.Presentation")
+    @patch("backend.document.Presentation")
     def test_extract_pptx_general_exception(self, mock_pres):
         """General exception returns error message (lines 190-191)."""
-        from document import _extract_pptx
+        from backend.document import _extract_pptx
         mock_pres.side_effect = Exception("PPTX failed")
 
         with NamedTemporaryFile(suffix=".pptx") as f:
@@ -423,10 +423,10 @@ class PPTXEdgeCaseTests(unittest.TestCase):
         self.assertIn("Could not extract text from this PPTX file", result)
         self.assertIn("PPTX failed", result)
 
-    @patch("document.Presentation")
+    @patch("backend.document.Presentation")
     def test_extract_pptx_skip_shapes_without_text(self, mock_pres_class):
         """Shapes without text_frame are skipped."""
-        from document import _extract_pptx
+        from backend.document import _extract_pptx
 
         mock_pres = MagicMock()
         mock_slide = MagicMock()
@@ -511,9 +511,9 @@ class ExtractTextDispatchTests(unittest.TestCase):
             result = extract_text(Path(f.name), "")
         self.assertEqual(result, "")
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document._extract_pdf_ocr")
-    @patch("document.PdfReader")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document._extract_pdf_ocr")
+    @patch("backend.document.PdfReader")
     def test_pdf_sparse_text_triggers_ocr(self, mock_pdf_reader, mock_ocr):
         """PDF with sparse text triggers OCR (line 79)."""
         mock_ocr.return_value = "OCR text"
@@ -531,7 +531,7 @@ class ExtractTextDispatchTests(unittest.TestCase):
         # Blank page has < 100 chars extracted text, should trigger OCR
         mock_ocr.assert_called()
 
-    @patch("document._extract_pdf", return_value="PDF content")
+    @patch("backend.document._extract_pdf", return_value="PDF content")
     def test_dispatch_pdf_extension(self, mock_extract):
         """PDF extension dispatches to _extract_pdf (line 50)."""
         with NamedTemporaryFile(suffix=".pdf") as f:
@@ -541,7 +541,7 @@ class ExtractTextDispatchTests(unittest.TestCase):
         self.assertEqual(result, "PDF content")
         mock_extract.assert_called_once()
 
-    @patch("document._extract_docx", return_value="DOCX content")
+    @patch("backend.document._extract_docx", return_value="DOCX content")
     def test_dispatch_docx_extension(self, mock_extract):
         """DOCX extension dispatches to _extract_docx (line 52)."""
         with NamedTemporaryFile(suffix=".docx") as f:
@@ -551,7 +551,7 @@ class ExtractTextDispatchTests(unittest.TestCase):
         self.assertEqual(result, "DOCX content")
         mock_extract.assert_called_once()
 
-    @patch("document._extract_csv", return_value="CSV content")
+    @patch("backend.document._extract_csv", return_value="CSV content")
     def test_dispatch_csv_extension(self, mock_extract):
         """CSV extension dispatches to _extract_csv (line 54)."""
         with NamedTemporaryFile(suffix=".csv") as f:
@@ -561,7 +561,7 @@ class ExtractTextDispatchTests(unittest.TestCase):
         self.assertEqual(result, "CSV content")
         mock_extract.assert_called_once()
 
-    @patch("document._extract_xlsx", return_value="XLSX content")
+    @patch("backend.document._extract_xlsx", return_value="XLSX content")
     def test_dispatch_xlsx_extension(self, mock_extract):
         """XLSX extension dispatches to _extract_xlsx (line 56)."""
         with NamedTemporaryFile(suffix=".xlsx") as f:
@@ -571,7 +571,7 @@ class ExtractTextDispatchTests(unittest.TestCase):
         self.assertEqual(result, "XLSX content")
         mock_extract.assert_called_once()
 
-    @patch("document._extract_pptx", return_value="PPTX content")
+    @patch("backend.document._extract_pptx", return_value="PPTX content")
     def test_dispatch_pptx_extension(self, mock_extract):
         """PPTX extension dispatches to _extract_pptx (line 58)."""
         with NamedTemporaryFile(suffix=".pptx") as f:
@@ -581,7 +581,7 @@ class ExtractTextDispatchTests(unittest.TestCase):
         self.assertEqual(result, "PPTX content")
         mock_extract.assert_called_once()
 
-    @patch("document._extract_image_ocr", return_value="Image OCR")
+    @patch("backend.document._extract_image_ocr", return_value="Image OCR")
     def test_dispatch_image_extension(self, mock_extract):
         """Image extension dispatches to _extract_image_ocr (line 60)."""
         with NamedTemporaryFile(suffix=".png") as f:
@@ -595,9 +595,9 @@ class ExtractTextDispatchTests(unittest.TestCase):
 class PasswordProtectedPDFTests(unittest.TestCase):
     """Tests for password-protected PDF handling."""
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document._extract_pdf_ocr")
-    @patch("document.PdfReader")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document._extract_pdf_ocr")
+    @patch("backend.document.PdfReader")
     def test_password_protected_pdf_returns_message(self, mock_reader, mock_ocr):
         """Password-protected PDF returns specific message (lines 87-88)."""
         from pypdf.errors import PdfReadError
@@ -615,11 +615,11 @@ class PasswordProtectedPDFTests(unittest.TestCase):
 class PDFPdf2imageNotInstalledTests(unittest.TestCase):
     """Tests for when pdf2image is not installed."""
 
-    @patch("document.OCR_AVAILABLE", True)
-    @patch("document.PdfReader")
+    @patch("backend.document.OCR_AVAILABLE", True)
+    @patch("backend.document.PdfReader")
     def test_extract_pdf_ocr_pdf2image_not_installed(self, mock_pdf_reader):
         """Returns message when pdf2image not installed (lines 114-117)."""
-        from document import _extract_pdf_ocr
+        from backend.document import _extract_pdf_ocr
 
         # Mock PdfReader to have pages
         mock_reader = MagicMock()

@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from cryptography.fernet import Fernet
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Enable test mode
 os.environ["TEST_MODE"] = "1"

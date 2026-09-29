@@ -9,7 +9,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from typing import AsyncGenerator, List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 
-from backend.tests.conftest import (
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from tests.conftest import (
     ResponsePolicy,
     ChatMessage,
     ChatRequest,
@@ -31,20 +35,33 @@ class TestBaseProvider:
 
     def test_base_provider_is_abstract(self):
         """Test that base provider cannot be instantiated directly."""
-        # TODO: Implement in backend/providers/base.py
-        # from backend.providers.base import BaseProvider
-        #
-        # with pytest.raises(TypeError):
-        #     BaseProvider()
-        pytest.skip("BaseProvider not yet implemented")
+        from backend.providers.base import BaseProvider, ProviderConfig
+        with pytest.raises(TypeError):
+            BaseProvider(ProviderConfig(
+                provider_id="test",
+                label="Test",
+                local=False,
+                env_key_name="TEST_KEY",
+                api_base="http://test.com",
+                model_endpoint="http://test.com/models"
+            ))
 
     def test_base_provider_defines_interface(self):
         """Test base provider defines required abstract methods."""
-        pytest.skip("Not yet implemented")
+        from backend.providers.base import BaseProvider
+        assert hasattr(BaseProvider, 'list_models')
+        assert hasattr(BaseProvider, 'stream_completion')
+        # Check that they are abstract methods
+        assert getattr(BaseProvider.list_models, '__isabstractmethod__', False)
+        assert getattr(BaseProvider.stream_completion, '__isabstractmethod__', False)
 
     def test_base_provider_implements_common_logic(self):
         """Test base provider implements shared functionality."""
-        pytest.skip("Not yet implemented")
+        from backend.providers.base import BaseProvider
+        assert hasattr(BaseProvider, 'prepare_headers')
+        assert hasattr(BaseProvider, 'build_model_list_url')
+        assert hasattr(BaseProvider, 'parse_model_list')
+        assert hasattr(BaseProvider, '_derive_name')
 
 
 # =============================================================================

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 os.environ["TEST_MODE"] = "1"
 import base64
@@ -33,9 +33,9 @@ class LifespanTests(unittest.TestCase):
         # init_db is imported into main's namespace: from backend.database import init_db
         # Patch at the source to ensure lifespan captures it
         with patch("backend.database.init_db", new_callable=AsyncMock) as mock_init_db:
-            with patch("main.logger"):
+            with patch("backend.main.logger"):
                 # Also need to patch main.settings since SecurityHeadersMiddleware captures it
-                with patch("main.settings") as mock_settings:
+                with patch("backend.main.settings") as mock_settings:
                     # Use a real Path for UPLOAD_DIR but mock mkdir
                     mock_settings.UPLOAD_DIR = MagicMock()
                     mock_settings.UPLOAD_DIR.mkdir = MagicMock()
@@ -45,9 +45,9 @@ class LifespanTests(unittest.TestCase):
                     mock_settings.API_PREFIX = "/api"
                     mock_settings.ALLOWED_ORIGINS = ["http://localhost:5500"]
 
-                    import main
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     app = create_app()
                     # Use context manager to trigger lifespan
@@ -68,8 +68,8 @@ class LifespanTests(unittest.TestCase):
         with patch("backend.llm._cleanup_ollama", mock_cleanup_ollama):
             with patch("backend.ratelimit_redis.close_rate_limit_store", mock_close_redis):
                 with patch("backend.database.init_db", new_callable=AsyncMock):
-                    with patch("main.logger"):
-                        with patch("main.settings") as mock_settings:
+                    with patch("backend.main.logger"):
+                        with patch("backend.main.settings") as mock_settings:
                             mock_settings.UPLOAD_DIR = MagicMock()
                             mock_settings.UPLOAD_DIR.mkdir = MagicMock()
                             mock_settings.ENV = "development"
@@ -78,9 +78,9 @@ class LifespanTests(unittest.TestCase):
                             mock_settings.API_PREFIX = "/api"
                             mock_settings.ALLOWED_ORIGINS = ["http://localhost:5500"]
 
-                            import main
+                            import backend.main as main
                             importlib.reload(main)
-                            from main import create_app
+                            from backend.main import create_app
 
                             app = create_app()
                             # Use context manager to trigger lifespan startup AND shutdown
@@ -115,9 +115,9 @@ class HealthCheckTests(unittest.TestCase):
         mock_client_instance.get.return_value = mock_resp
         mock_client_class.return_value.__aenter__.return_value = mock_client_instance
 
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         app = create_app()
         with TestClient(app) as client:
@@ -140,9 +140,9 @@ class HealthCheckTests(unittest.TestCase):
             mock_client_instance.get.return_value = mock_resp
             mock_client_class.return_value.__aenter__.return_value = mock_client_instance
 
-            import main
+            import backend.main as main
             importlib.reload(main)
-            from main import create_app
+            from backend.main import create_app
 
             app = create_app()
             with TestClient(app) as client:
@@ -165,9 +165,9 @@ class HealthCheckTests(unittest.TestCase):
             mock_client_instance.get.return_value = mock_resp
             mock_client_class.return_value.__aenter__.return_value = mock_client_instance
 
-            import main
+            import backend.main as main
             importlib.reload(main)
-            from main import create_app
+            from backend.main import create_app
 
             app = create_app()
             with TestClient(app) as client:
@@ -189,9 +189,9 @@ class HealthCheckTests(unittest.TestCase):
             mock_client_instance.get.return_value = mock_resp
             mock_client_class.return_value.__aenter__.return_value = mock_client_instance
 
-            import main
+            import backend.main as main
             importlib.reload(main)
-            from main import create_app
+            from backend.main import create_app
 
             app = create_app()
             with TestClient(app) as client:
@@ -211,9 +211,9 @@ class HealthCheckTests(unittest.TestCase):
             mock_client_instance.get.side_effect = Exception("Connection refused")
             mock_client_class.return_value.__aenter__.return_value = mock_client_instance
 
-            import main
+            import backend.main as main
             importlib.reload(main)
-            from main import create_app
+            from backend.main import create_app
 
             app = create_app()
             with TestClient(app) as client:
@@ -242,10 +242,10 @@ class SecurityHeadersTests(unittest.TestCase):
         # Patch backend.config.settings (the module-level instance)
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     app = create_app()
                     with TestClient(app) as client:
@@ -267,10 +267,10 @@ class SecurityHeadersTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     app = create_app()
                     with TestClient(app) as client:
@@ -291,10 +291,10 @@ class SecurityHeadersTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     app = create_app()
                     with TestClient(app) as client:
@@ -313,14 +313,14 @@ class SecurityHeadersTests(unittest.TestCase):
 class CSRFMiddlewareTests(unittest.TestCase):
     """Tests for CSRF middleware (lines 181-190)."""
 
-    @patch("main.verify_csrf")
+    @patch("backend.main.verify_csrf")
     def test_csrf_middleware_valid(self, mock_verify_csrf):
         """Test CSRF middleware passes when valid."""
         mock_verify_csrf.return_value = None
 
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         app = create_app()
         with TestClient(app) as client:
@@ -332,7 +332,7 @@ class CSRFMiddlewareTests(unittest.TestCase):
         # Test verify_csrf function directly since it's imported from backend.auth
         from fastapi import HTTPException
 
-        import main
+        import backend.main as main
         importlib.reload(main)
 
         # Test verify_csrf function directly
@@ -407,9 +407,9 @@ class RootEndpointTests(unittest.TestCase):
 
     def test_root_endpoint(self):
         """Test root endpoint returns basic info."""
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         app = create_app()
         with TestClient(app) as client:

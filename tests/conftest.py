@@ -16,7 +16,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "mainfiles" / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Pre-mock OCR dependencies BEFORE any test imports the document module.
 # This ensures OCR_AVAILABLE = True and allows patching of pytesseract/PIL
@@ -64,7 +64,7 @@ async def app():
     # Use in-memory SQLite for testing
     os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
 
-    from main import app as _app
+    from backend.main import app as _app
     yield _app
 
 

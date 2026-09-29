@@ -5,10 +5,10 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
-from document import extract_text, truncate_preview
-from rag import (
+from backend.document import extract_text, truncate_preview
+from backend.rag import (
     chunk_text,
     close_client,
 )
@@ -163,7 +163,7 @@ class RetrievalTests(unittest.TestCase):
         # Force-import rag module module with the test path.
         # We need to reload rag so the CHROMA_DB_PATH env var takes effect.
         import importlib
-        import rag as rag_mod
+        import backend.rag as rag_mod
         importlib.reload(rag_mod)
         global rag
         rag = rag_mod

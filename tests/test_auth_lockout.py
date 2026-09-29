@@ -14,17 +14,17 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "backend"))
+sys.path.insert(0, os.path.join(ROOT, "mainfiles"))
 
 os.environ["TEST_MODE"] = "1"
 from cryptography.fernet import Fernet
 _test_key = Fernet.generate_key().decode()
 os.environ["MASTER_KEY"] = _test_key
 
-from auth import MAX_LOGIN_ATTEMPTS, login  # noqa: E402
+from backend.auth import MAX_LOGIN_ATTEMPTS, login  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
-from ratelimit_redis import MemoryStore, reset_rate_limit_store_for_testing  # noqa: E402
-from schemas import AuthCredentialsIn  # noqa: E402
+from backend.ratelimit_redis import MemoryStore, reset_rate_limit_store_for_testing  # noqa: E402
+from backend.schemas import AuthCredentialsIn  # noqa: E402
 
 
 def _make_mock_db(scalar_returns):
@@ -60,7 +60,7 @@ class LoginLockoutTests(unittest.TestCase):
         # Give login its own isolated store (not the shared singleton).
         reset_rate_limit_store_for_testing()
         self.store = MemoryStore()
-        self._patcher = patch("auth.get_rate_limit_store", return_value=self.store)
+        self._patcher = patch("backend.auth.get_rate_limit_store", return_value=self.store)
         self._patcher.start()
         self.addCleanup(self._patcher.stop)
 
@@ -108,8 +108,8 @@ class LoginLockoutTests(unittest.TestCase):
         )
         session = MagicMock()
         with (
-            patch("auth._hash_password", return_value="hash123"),
-            patch("auth._create_session", new=AsyncMock(return_value=session)) as mock_create,
+            patch("backend.auth._hash_password", return_value="hash123"),
+            patch("backend.auth._create_session", new=AsyncMock(return_value=session)) as mock_create,
         ):
             exc = self._call_login(
                 "alice", "CorrectPassword123", _make_mock_db([user]), _make_mock_response()
@@ -135,7 +135,7 @@ class LoginLockoutTests(unittest.TestCase):
                 "bob", "WrongPassword123", _make_mock_db([None]), _make_mock_response()
             )
 
-        with patch("auth.logger.warning") as mock_warn:
+        with patch("backend.auth.logger.warning") as mock_warn:
             exc = self._call_login(
                 "bob", "WrongPassword123", _make_mock_db([None]), _make_mock_response()
             )

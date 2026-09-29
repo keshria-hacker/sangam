@@ -115,6 +115,7 @@ export const [getIsGenerating, setIsGenerating] = createSignal(false);
 export const [getAbortController, setAbortController] = createSignal(null);
 export const [getLastUserText, setLastUserText] = createSignal('');
 export const [getWebSearchEnabled, setWebSearchEnabled] = createSignal(false);
+export const [getAgenticReasoningEnabled, setAgenticReasoningEnabled] = createSignal(false);
 export const [getSidebarCollapsed, setSidebarCollapsed] = createSignal(false);
 export const [getBackendReachable, setBackendReachable] = createSignal(null);
 export const [getMaxTokens, setMaxTokens] = createSignal('1024');

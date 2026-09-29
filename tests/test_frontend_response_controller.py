@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class FrontendResponseControllerTests(unittest.TestCase):
     def _run_controller_script(self, body: str):
         script = textwrap.dedent(f"""
-            import {{ createResponseController }} from {json.dumps((ROOT / 'frontend/js/features/chat/response_controller.js').as_uri())};
+            import {{ createResponseController }} from {json.dumps((ROOT / 'mainfiles/frontend/js/features/chat/response_controller.js').as_uri())};
             {body}
         """)
         result = subprocess.run(

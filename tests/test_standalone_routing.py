@@ -116,7 +116,8 @@ class RoutingStrategy(ABC):
 
 # Import our actual strategies module - but we need to avoid the backend __init__.py
 # Let's directly test our strategies by importing just the strategies module
-sys.path.insert(0, '/d/projects/chat_app/Universal-Ai-Chat-Platform')
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'mainfiles'))
 
 # Try to import just the strategies module directly
 try:
@@ -185,25 +186,28 @@ try:
         # Test different contexts
         test_contexts = [
             EnhancedRoutingContext(
-                task_type=EnhancedTaskType.CHAT,
-                estimated_tokens=500,
-                session_id="chat-session-1"
+                model_id="test",
+                messages=[{"role": "user", "content": "test"}],
+                task_type="chat",
+                priority=0
             ),
             EnhancedRoutingContext(
-                task_type=EnhancedTaskType.CODING,
-                estimated_tokens=1500,
-                session_id="coding-session-1"
+                model_id="test",
+                messages=[{"role": "user", "content": "test"}],
+                task_type="coding",
+                priority=50
             ),
             EnhancedRoutingContext(
-                task_type=EnhancedTaskType.REASONING,
-                estimated_tokens=2000,
-                session_id="reasoning-session-1"
+                model_id="test",
+                messages=[{"role": "user", "content": "test"}],
+                task_type="reasoning",
+                priority=80
             ),
             EnhancedRoutingContext(
-                task_type=EnhancedTaskType.VISION,
-                estimated_tokens=1000,
-                has_vision=True,
-                session_id="vision-session-1"
+                model_id="test",
+                messages=[{"role": "user", "content": "test"}],
+                task_type="vision",
+                priority=0
             )
         ]
         
@@ -215,7 +219,7 @@ try:
         ]
         
         for i, context in enumerate(test_contexts):
-            print(f"--- Test Context {i+1}: {context.task_type.value} ({context.estimated_tokens} tokens) ---")
+            print(f"--- Test Context {i+1}: {context.task_type} (priority {context.priority}) ---")
             
             for strategy_name in strategies_to_test:
                 try:

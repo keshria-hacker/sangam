@@ -18,7 +18,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Enable test mode
 os.environ["TEST_MODE"] = "1"
@@ -31,7 +31,7 @@ import tempfile
 test_chroma_dir = Path(tempfile.gettempdir()) / "test_chromadb_rag"
 os.environ["CHROMA_DB_PATH"] = str(test_chroma_dir)
 
-from rag import (
+from backend.rag import (
     chunk_text,
     index_document,
     retrieve_relevant_chunks,
@@ -45,7 +45,7 @@ from rag import (
 )
 
 # Need to import after setting CHROMA_DB_PATH
-import rag
+import backend.rag as rag
 
 
 class ChunkTextTests(unittest.TestCase):
@@ -161,7 +161,7 @@ class IndexDocumentTests(unittest.TestCase):
         result = index_document("file1", "   \n\n  ", "test.txt")
         self.assertEqual(result, 0)
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_index_document_success(self, mock_get_collection):
         """Successful indexing returns chunk count."""
         mock_collection = MagicMock()
@@ -184,7 +184,7 @@ class IndexDocumentTests(unittest.TestCase):
             self.assertEqual(meta["filename"], "test.txt")
             self.assertEqual(meta["chunk_index"], i)
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_index_document_exception_handling(self, mock_get_collection):
         """Exception during indexing returns -1."""
         mock_collection = MagicMock()
@@ -226,7 +226,7 @@ class RetrieveRelevantChunksTests(unittest.TestCase):
         result = retrieve_relevant_chunks("query", None)
         self.assertEqual(result, [])
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_retrieve_chunks_success(self, mock_get_collection):
         """Successful retrieval returns formatted chunks."""
         mock_collection = MagicMock()
@@ -255,7 +255,7 @@ class RetrieveRelevantChunksTests(unittest.TestCase):
             where={"file_id": {"$in": ["file1"]}}
         )
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_retrieve_chunks_empty_results(self, mock_get_collection):
         """Empty results from ChromaDB returns empty list."""
         mock_collection = MagicMock()
@@ -269,7 +269,7 @@ class RetrieveRelevantChunksTests(unittest.TestCase):
         result = retrieve_relevant_chunks("query", ["file1"])
         self.assertEqual(result, [])
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_retrieve_chunks_none_results(self, mock_get_collection):
         """None results from ChromaDB returns empty list."""
         mock_collection = MagicMock()
@@ -279,7 +279,7 @@ class RetrieveRelevantChunksTests(unittest.TestCase):
         result = retrieve_relevant_chunks("query", ["file1"])
         self.assertEqual(result, [])
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_retrieve_chunks_exception(self, mock_get_collection):
         """Exception during retrieval returns empty list."""
         mock_collection = MagicMock()
@@ -289,7 +289,7 @@ class RetrieveRelevantChunksTests(unittest.TestCase):
         result = retrieve_relevant_chunks("query", ["file1"])
         self.assertEqual(result, [])
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_retrieve_respects_top_k_cap(self, mock_get_collection):
         """top_k is capped at 50."""
         mock_collection = MagicMock()
@@ -305,7 +305,7 @@ class RetrieveRelevantChunksTests(unittest.TestCase):
         call_args = mock_collection.query.call_args
         self.assertEqual(call_args.kwargs["n_results"], 50)
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_retrieve_handles_missing_metadata(self, mock_get_collection):
         """Missing metadata handled gracefully."""
         mock_collection = MagicMock()
@@ -322,7 +322,7 @@ class RetrieveRelevantChunksTests(unittest.TestCase):
         self.assertEqual(result[0]["text"], "Chunk text")
         self.assertEqual(result[0]["score"], 0.1)
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_retrieve_handles_missing_distance(self, mock_get_collection):
         """Missing distance handled gracefully."""
         mock_collection = MagicMock()
@@ -347,7 +347,7 @@ class DeleteDocumentChunksTests(unittest.TestCase):
     def tearDown(self):
         rag.reset_vector_index()
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_delete_success(self, mock_get_collection):
         """Successful deletion returns True."""
         mock_collection = MagicMock()
@@ -357,7 +357,7 @@ class DeleteDocumentChunksTests(unittest.TestCase):
         self.assertTrue(result)
         mock_collection.delete.assert_called_once_with(where={"file_id": "file1"})
 
-    @patch("rag._get_collection")
+    @patch("backend.rag._get_collection")
     def test_delete_exception_returns_false(self, mock_get_collection):
         """Exception during deletion returns False."""
         mock_collection = MagicMock()
@@ -374,7 +374,7 @@ class ResetVectorIndexTests(unittest.TestCase):
     def tearDown(self):
         rag.close_client()
 
-    @patch("rag._get_client")
+    @patch("backend.rag._get_client")
     def test_reset_vector_index_deletes_collection(self, mock_get_client):
         """reset_vector_index deletes and recreates collection."""
         mock_client = MagicMock()
@@ -388,7 +388,7 @@ class ResetVectorIndexTests(unittest.TestCase):
         mock_client.delete_collection.assert_called_once_with("document_chunks")
         self.assertIsNone(rag._collection)
 
-    @patch("rag._get_client")
+    @patch("backend.rag._get_client")
     def test_reset_handles_value_error(self, mock_get_client):
         """ValueError (older chromadb) is caught."""
         mock_client = MagicMock()
@@ -399,7 +399,7 @@ class ResetVectorIndexTests(unittest.TestCase):
         reset_vector_index()  # Should not raise
         self.assertIsNone(rag._collection)
 
-    @patch("rag._get_client")
+    @patch("backend.rag._get_client")
     def test_reset_handles_not_found_error(self, mock_get_client):
         """NotFoundError (chromadb 1.5+) is caught."""
         import chromadb.errors
@@ -411,7 +411,7 @@ class ResetVectorIndexTests(unittest.TestCase):
         reset_vector_index()  # Should not raise
         self.assertIsNone(rag._collection)
 
-    @patch("rag._get_client")
+    @patch("backend.rag._get_client")
     def test_close_client_resets_singletons(self, mock_get_client):
         """close_client resets both _client and _collection."""
         mock_client = MagicMock()
@@ -560,8 +560,8 @@ class RagFailureLoggingTests(unittest.TestCase):
     finding (C-004) is about *visibility*, not raising.
     """
 
-    @patch("rag.logger")
-    @patch("rag._get_collection")
+    @patch("backend.rag.logger")
+    @patch("backend.rag._get_collection")
     def test_index_document_logs_exception(self, mock_get_collection, mock_logger):
         """index_document failure logs exception with file context, returns -1."""
         mock_collection = MagicMock()
@@ -575,8 +575,8 @@ class RagFailureLoggingTests(unittest.TestCase):
         logged = " ".join(str(a) for a in mock_logger.exception.call_args.args)
         self.assertIn("file1", logged)  # context logged
 
-    @patch("rag.logger")
-    @patch("rag._get_collection")
+    @patch("backend.rag.logger")
+    @patch("backend.rag._get_collection")
     def test_retrieve_relevant_chunks_logs_exception(self, mock_get_collection, mock_logger):
         """retrieve failure logs exception with query context, returns []."""
         mock_collection = MagicMock()
@@ -590,8 +590,8 @@ class RagFailureLoggingTests(unittest.TestCase):
         logged = " ".join(str(a) for a in mock_logger.exception.call_args.args)
         self.assertIn("some query", logged)  # context logged
 
-    @patch("rag.logger")
-    @patch("rag._get_collection")
+    @patch("backend.rag.logger")
+    @patch("backend.rag._get_collection")
     def test_delete_document_chunks_logs_exception(self, mock_get_collection, mock_logger):
         """delete failure logs exception with file context, returns False."""
         mock_collection = MagicMock()

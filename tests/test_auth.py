@@ -5,9 +5,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
-from auth import _hash_password, _hash_token, _issue_token
+from backend.auth import _hash_password, _hash_token, _issue_token
 
 
 class AuthHashTests(unittest.TestCase):

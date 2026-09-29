@@ -16,7 +16,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Enable test mode
 os.environ["TEST_MODE"] = "1"
@@ -135,7 +135,7 @@ class TestOllamaProvider(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(TypeError):
             OllamaProvider()
 
-    @patch('providers.ollama.httpx.AsyncClient')
+    @patch('backend.providers.ollama.httpx.AsyncClient')
     async def test_list_models_empty_on_connection_error(self, mock_client):
         """Should return empty list on connection error."""
         import httpx
@@ -148,7 +148,7 @@ class TestOllamaProvider(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(models, [])
 
-    @patch('providers.ollama.httpx.AsyncClient')
+    @patch('backend.providers.ollama.httpx.AsyncClient')
     async def test_list_models_filters_non_chat(self, mock_client):
         """Should filter out non-chat models."""
         mock_response = MagicMock()
@@ -191,7 +191,7 @@ class TestOpenAICompatibleProvider(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(TypeError):
             OpenAICompatibleProvider()
 
-    @patch('providers.openai_compatible.httpx.AsyncClient')
+    @patch('backend.providers.openai_compatible.httpx.AsyncClient')
     async def test_list_models_handles_error(self, mock_client):
         """Should handle API errors gracefully."""
         import httpx
@@ -206,7 +206,7 @@ class TestOpenAICompatibleProvider(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(models, [])
 
-    @patch('providers.openai_compatible.httpx.AsyncClient')
+    @patch('backend.providers.openai_compatible.httpx.AsyncClient')
     async def test_list_models_filters_completion_models(self, mock_client):
         """Should filter out non-chat models based on NON_CHAT_MARKERS."""
         mock_response = MagicMock()
@@ -309,7 +309,7 @@ class TestModelDiscovery(unittest.IsolatedAsyncioTestCase):
         from backend.providers.model_discovery import fetch_ollama_models
         self.assertTrue(callable(fetch_ollama_models))
 
-    @patch('providers.model_discovery.httpx.AsyncClient')
+    @patch('backend.providers.model_discovery.httpx.AsyncClient')
     async def test_fetch_models_from_provider_empty_on_error(self, mock_client):
         """Should return empty list on API error."""
         import httpx

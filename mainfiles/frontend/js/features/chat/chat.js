@@ -2,7 +2,7 @@
  * Chat feature - Message handling, streaming, and chat management.
  */
 
-import { getApiBaseUrl, apiFetch, streamChatCompletion, parseSSE, ApiError } from '../../shared/http.js';
+import { getApiBaseUrl, apiFetch, apiPost, streamChatCompletion, parseSSE, ApiError } from '../../shared/http.js';
 import { showToast, showError } from '../../shared/toast.js';
 import { escapeHtml, formatTime, nowTime, formatBytes, extOf } from '../../shared/utils.js';
 import { renderMarkdown, renderMarkdownStream, finalizeMarkdownRender, clearStreamCache } from '../../shared/markdown.js';
@@ -13,6 +13,7 @@ import {
   getLastUserText, setLastUserText, getIsGenerating, setIsGenerating,
   getAbortController, setAbortController, getWebSearchEnabled, setWebSearchEnabled,
   getMaxTokens, getReasoningEffort, getTemperature,
+  getAgenticReasoningEnabled, setAgenticReasoningEnabled,
   getChats, setChats,
   resetChatState
 } from '../../core/state.js';
@@ -49,6 +50,8 @@ export function initElements() {
     sendBtn: $('#sendBtn'),
     stopBtn: $('#stopBtn'),
     webSearchToggle: $('#webSearchToggle'),
+    agenticReasoningToggle: $('#agenticReasoningToggle'),
+    agenticReasoningPanel: $('#agenticReasoningPanel'),
     tempControl: $('#tempControl'),
     tempPopover: $('#tempPopover'),
     tempSlider: $('#tempSlider'),
@@ -681,7 +684,7 @@ export async function handleFileSelection(fileList) {
 /**
  * Sending a message - main entry point.
  */
-export function handleSend() {
+export async function handleSend() {
   const text = elements.messageInput?.value.trim() || '';
   const files = getAttachedFiles();
 
@@ -698,7 +701,55 @@ export function handleSend() {
 
   elements.welcomeScreen?.classList.add('hidden');
 
-  const userMsg = { role: 'user', content: text || '(Sent with attached files)', created_at: new Date().toISOString() };
+  // Process user message with agentic reasoning if enabled
+  let processedContent = text;
+  let toolResults = [];
+  if (getAgenticReasoningEnabled()) {
+    try {
+      // Show thinking indicator
+      showToast({ type: 'info', title: 'Agentic Reasoning', message: 'Enhancing your request with reasoning and tool use...' });
+
+      // Call the backend agentic reasoning endpoint — pass the panel's
+      // iteration limit and the checked tool groups so the backend honours them.
+      const panel = elements.agenticReasoningPanel;
+      const maxIterations = Number(panel?.querySelector('#agenticReasoningIterations')?.value) || 2;
+      const tools = panel
+        ? [...panel.querySelectorAll('.tool-checkboxes input:checked')]
+            .map((el) => {
+              const label = el.parentElement?.textContent?.trim().toLowerCase() || '';
+              if (label.includes('web')) return 'web_search';
+              if (label.includes('file')) return 'file_operations';
+              if (label.includes('code')) return 'code_execution';
+              return '';
+            })
+            .filter(Boolean)
+        : [];
+
+      const response = await apiPost('/agentic-reasoning', {
+        message: text,
+        model: getSelectedModel()?.id || '',
+        chat_id: getActiveChatId(),
+        max_iterations: maxIterations,
+        tools,
+      });
+
+      if (response.reasoning_used) {
+        processedContent = response.enhanced_message || text;
+        toolResults = response.tool_results || [];
+        console.log('[Agentic Reasoning] Enhanced response:', processedContent);
+        console.log('[Agentic Reasoning] Tool results:', toolResults);
+        showToast({ type: 'success', title: 'Agentic Reasoning', message: `Enhanced with ${toolResults.length} tool(s)` });
+      } else {
+        showToast({ type: 'info', title: 'Agentic Reasoning', message: 'No enhancement needed' });
+      }
+    } catch (error) {
+      console.error('[Agentic Reasoning] Error:', error);
+      showToast({ type: 'warning', title: 'Agentic Reasoning', message: 'Reasoning enhancement failed, proceeding with original request.' });
+      processedContent = text;
+    }
+  }
+
+  const userMsg = { role: 'user', content: processedContent || '(Sent with attached files)', created_at: new Date().toISOString() };
   setMessages([...getMessages(), userMsg]);
   elements.messages?.appendChild(buildMessageNode(userMsg));
   setLastUserText(userMsg.content);
@@ -772,7 +823,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
     <div class="msg-avatar" style="color:${info.color}" aria-hidden="true"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></div>
     <div class="msg-body">
       <div class="msg-meta"><span class="msg-author">${escapeHtml(model.name)}</span><span class="msg-provider-tag" style="color:${info.color}">${escapeHtml(info.label)}</span></div>
-      <article class="assistant-response" aria-live="polite" aria-busy="true"><div class="typing-indicator" aria-label="Generating response"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></div></article>
+      <article class="assistant-response" aria-live="polite" aria-busy="true"><div class="typing-indicator" aria-label="Generating response">thinking<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></div></article>
     </div>`;
   elements.messages?.appendChild(typingNode);
   scrollToBottom(true);
@@ -1228,6 +1279,27 @@ export function initChatEvents() {
     elements.webSearchToggle.classList.toggle('active', enabled);
     elements.webSearchToggle.setAttribute('aria-pressed', String(enabled));
   });
+
+  // Agentic reasoning toggle
+  elements.agenticReasoningToggle?.addEventListener('click', () => {
+    const enabled = !getAgenticReasoningEnabled();
+    setAgenticReasoningEnabled(enabled);
+    elements.agenticReasoningToggle.classList.toggle('active', enabled);
+    elements.agenticReasoningToggle.setAttribute('aria-pressed', String(enabled));
+
+    // Show/hide the agentic reasoning panel
+    if (elements.agenticReasoningPanel) {
+      elements.agenticReasoningPanel.classList.toggle('hidden', !enabled);
+    }
+  });
+
+  // Initialize agentic reasoning toggle state
+  const agenticReasoningEnabled = getAgenticReasoningEnabled();
+  elements.agenticReasoningToggle?.classList.toggle('active', agenticReasoningEnabled);
+  elements.agenticReasoningToggle?.setAttribute('aria-pressed', String(agenticReasoningEnabled));
+  if (elements.agenticReasoningPanel) {
+    elements.agenticReasoningPanel.classList.toggle('hidden', !agenticReasoningEnabled);
+  }
 
   // Composer drag-drop
   const composerEl = document.getElementById('composer');

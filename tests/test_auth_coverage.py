@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import UTC, datetime, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "backend"))
+sys.path.insert(0, os.path.join(ROOT, "mainfiles"))
 
 os.environ["TEST_MODE"] = "1"
 from cryptography.fernet import Fernet
@@ -25,9 +25,9 @@ _test_key = Fernet.generate_key().decode()
 os.environ["MASTER_KEY"] = _test_key
 
 # Import auth functions for test utilities
-from auth import _hash_token
+from backend.auth import _hash_token
 
-from schemas import AuthCredentialsIn, ForgotPasswordIn, ResetPasswordIn
+from backend.schemas import AuthCredentialsIn, ForgotPasswordIn, ResetPasswordIn
 
 
 def _make_mock_db(scalar_returns, execute_returns=None):
@@ -68,7 +68,7 @@ class RegisterPasswordValidationTests(unittest.TestCase):
     def test_register_password_no_uppercase(self):
         """Registration fails with password missing uppercase (line 197)."""
         import asyncio
-        from auth import register
+        from backend.auth import register
         from fastapi import HTTPException
 
         mock_db = _make_mock_db([0, None])  # user count = 0, _clean_expired_sessions = None
@@ -88,7 +88,7 @@ class RegisterPasswordValidationTests(unittest.TestCase):
     def test_register_password_no_lowercase(self):
         """Registration fails with password missing lowercase (line 199)."""
         import asyncio
-        from auth import register
+        from backend.auth import register
         from fastapi import HTTPException
 
         mock_db = _make_mock_db([0, None])
@@ -107,7 +107,7 @@ class RegisterPasswordValidationTests(unittest.TestCase):
     def test_register_password_no_digit(self):
         """Registration fails with password missing digit (line 201)."""
         import asyncio
-        from auth import register
+        from backend.auth import register
         from fastapi import HTTPException
 
         mock_db = _make_mock_db([0, None])
@@ -130,7 +130,7 @@ class LoginInvalidCredentialsTests(unittest.TestCase):
     def test_login_invalid_credentials(self):
         """Login fails with invalid credentials (line 222)."""
         import asyncio
-        from auth import login
+        from backend.auth import login
         from fastapi import HTTPException
 
         # mock_db.scalar returns user (None = not found)
@@ -154,7 +154,7 @@ class ForgotPasswordTests(unittest.TestCase):
     def test_forgot_password_user_not_found(self):
         """Forgot password returns vague message for non-existent user (line 253)."""
         import asyncio
-        from auth import forgot_password
+        from backend.auth import forgot_password
 
         mock_db = _make_mock_db([None])  # user not found
 
@@ -174,7 +174,7 @@ class ResetPasswordValidationTests(unittest.TestCase):
     def test_reset_password_no_uppercase(self):
         """Reset password fails without uppercase (line 311)."""
         import asyncio
-        from auth import reset_password
+        from backend.auth import reset_password
         from fastapi import HTTPException
 
         mock_token = MagicMock(user_id=1, used=False, expires_at=datetime.now(UTC) + timedelta(hours=1))
@@ -193,7 +193,7 @@ class ResetPasswordValidationTests(unittest.TestCase):
     def test_reset_password_no_lowercase(self):
         """Reset password fails without lowercase (line 313)."""
         import asyncio
-        from auth import reset_password
+        from backend.auth import reset_password
         from fastapi import HTTPException
 
         mock_token = MagicMock(user_id=1, used=False, expires_at=datetime.now(UTC) + timedelta(hours=1))
@@ -212,7 +212,7 @@ class ResetPasswordValidationTests(unittest.TestCase):
     def test_reset_password_no_digit(self):
         """Reset password fails without digit (line 315)."""
         import asyncio
-        from auth import reset_password
+        from backend.auth import reset_password
         from fastapi import HTTPException
 
         mock_token = MagicMock(user_id=1, used=False, expires_at=datetime.now(UTC) + timedelta(hours=1))
@@ -232,13 +232,13 @@ class ResetPasswordValidationTests(unittest.TestCase):
 class ProductionModeTests(unittest.TestCase):
     """Tests for production mode logging in forgot password (lines 282-288)."""
 
-    @patch("auth.logger.warning")
-    @patch("auth.settings")  # Patch the settings object used by auth module
+    @patch("backend.auth.logger.warning")
+    @patch("backend.auth.settings")  # Patch the settings object used by auth module
     def test_forgot_password_production_mode_logs_token(self, mock_settings, mock_logger):
         """In production mode, token is logged not returned (lines 282-288)."""
         import asyncio
-        from auth import forgot_password
-        from schemas import ForgotPasswordIn
+        from backend.auth import forgot_password
+        from backend.schemas import ForgotPasswordIn
 
         mock_settings.ENV = "production"
 
@@ -275,7 +275,7 @@ class GetCurrentUserTests(unittest.TestCase):
     def test_get_current_user_no_token(self):
         """No token raises 401 (line 165-166)."""
         import asyncio
-        from auth import get_current_user
+        from backend.auth import get_current_user
         from fastapi import HTTPException
 
         mock_request = MagicMock()
@@ -294,7 +294,7 @@ class GetCurrentUserTests(unittest.TestCase):
     def test_get_current_user_invalid_token(self):
         """Invalid token raises 401 (lines 175-176)."""
         import asyncio
-        from auth import get_current_user
+        from backend.auth import get_current_user
         from fastapi import HTTPException
 
         mock_request = MagicMock()
@@ -316,7 +316,7 @@ class GetCurrentUserTests(unittest.TestCase):
     def test_get_current_user_from_cookie(self):
         """Valid cookie token returns user (lines 156-177)."""
         import asyncio
-        from auth import get_current_user
+        from backend.auth import get_current_user
 
         mock_request = MagicMock()
         mock_request.cookies.get.return_value = "valid_token"
@@ -338,7 +338,7 @@ class GetCurrentUserTests(unittest.TestCase):
     def test_get_current_user_from_header(self):
         """Valid Authorization header returns user (lines 161-177)."""
         import asyncio
-        from auth import get_current_user
+        from backend.auth import get_current_user
 
         mock_request = MagicMock()
         mock_request.cookies.get.return_value = None
@@ -364,7 +364,7 @@ class CleanExpiredSessionsTests(unittest.TestCase):
     def test_clean_expired_sessions_deletes_expired(self):
         """Expired sessions are deleted (lines 94-98)."""
         import asyncio
-        from auth import _clean_expired_sessions
+        from backend.auth import _clean_expired_sessions
 
         mock_expired_session1 = MagicMock()
         mock_expired_session2 = MagicMock()
@@ -388,7 +388,7 @@ class CreateSessionTests(unittest.TestCase):
     def test_create_session_creates_new_session(self):
         """Creates new session and returns token (lines 101-118)."""
         import asyncio
-        from auth import _create_session
+        from backend.auth import _create_session
 
         mock_user = MagicMock(id=1, username="testuser")
         mock_db = AsyncMock()
@@ -421,7 +421,7 @@ class CreateSessionTests(unittest.TestCase):
     def test_create_session_without_response(self):
         """Works when no response object provided (lines 120-144)."""
         import asyncio
-        from auth import _create_session
+        from backend.auth import _create_session
 
         mock_user = MagicMock(id=1, username="testuser")
         mock_db = AsyncMock()
@@ -448,7 +448,7 @@ class VerifyCsrfTests(unittest.TestCase):
     def test_verify_csrf_skip_get_requests(self):
         """GET requests skip CSRF check (line 70-71)."""
         import asyncio
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
 
         mock_request = MagicMock()
         mock_request.method = "GET"
@@ -462,7 +462,7 @@ class VerifyCsrfTests(unittest.TestCase):
     def test_verify_csrf_skip_skip_paths(self):
         """CSRF skip paths bypass check (lines 72-73)."""
         import asyncio
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
 
         mock_request = MagicMock()
         mock_request.method = "POST"
@@ -476,7 +476,7 @@ class VerifyCsrfTests(unittest.TestCase):
     def test_verify_csrf_no_cookie_returns(self):
         """No CSRF cookie means no check needed (line 77-78)."""
         import asyncio
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
 
         mock_request = MagicMock()
         mock_request.method = "POST"
@@ -491,7 +491,7 @@ class VerifyCsrfTests(unittest.TestCase):
     def test_verify_csrf_missing_header_raises(self):
         """Missing header raises 403 (lines 80-85)."""
         import asyncio
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
         from fastapi import HTTPException
 
         mock_request = MagicMock()
@@ -511,7 +511,7 @@ class VerifyCsrfTests(unittest.TestCase):
     def test_verify_csrf_invalid_token_raises(self):
         """Invalid token raises 403 (lines 87-88)."""
         import asyncio
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
         from fastapi import HTTPException
 
         mock_request = MagicMock()
@@ -531,7 +531,7 @@ class VerifyCsrfTests(unittest.TestCase):
     def test_verify_csrf_valid_token_passes(self):
         """Valid token passes (line 88)."""
         import asyncio
-        from auth import verify_csrf
+        from backend.auth import verify_csrf
 
         mock_request = MagicMock()
         mock_request.method = "POST"
@@ -551,7 +551,7 @@ class LogoutTests(unittest.TestCase):
     def test_logout_deletes_session_and_cookies(self):
         """Deletes server session and clears cookies (lines 362-375)."""
         import asyncio
-        from auth import logout
+        from backend.auth import logout
         from fastapi import HTTPException
 
         mock_request = MagicMock()
@@ -579,7 +579,7 @@ class LogoutTests(unittest.TestCase):
     def test_logout_with_header_token(self):
         """Uses Authorization header when no cookie (lines 363-364)."""
         import asyncio
-        from auth import logout
+        from backend.auth import logout
 
         mock_request = MagicMock()
         mock_request.cookies.get.return_value = None
@@ -604,7 +604,7 @@ class LogoutTests(unittest.TestCase):
     def test_logout_no_token_just_clears_cookies(self):
         """No token just clears cookies (lines 365-375)."""
         import asyncio
-        from auth import logout
+        from backend.auth import logout
 
         mock_request = MagicMock()
         mock_request.cookies.get.return_value = None
@@ -631,7 +631,7 @@ class AuthStatusTests(unittest.TestCase):
     def test_auth_status_no_users(self):
         """When no users, registration is open (line 182)."""
         import asyncio
-        from auth import auth_status
+        from backend.auth import auth_status
 
         mock_db = AsyncMock()
         mock_db.scalar = AsyncMock(return_value=0)
@@ -645,7 +645,7 @@ class AuthStatusTests(unittest.TestCase):
     def test_auth_status_users_exist(self):
         """When users exist, registration is closed (line 182)."""
         import asyncio
-        from auth import auth_status
+        from backend.auth import auth_status
 
         mock_db = AsyncMock()
         mock_db.scalar = AsyncMock(return_value=1)
@@ -662,7 +662,7 @@ class HashTests(unittest.TestCase):
 
     def test_hash_password_consistency(self):
         """Same password and salt produces same hash."""
-        from auth import _hash_password, _hash_token, _issue_token
+        from backend.auth import _hash_password, _hash_token, _issue_token
         import os
 
         # Use environment variable for test password, fallback to generated one
@@ -674,7 +674,7 @@ class HashTests(unittest.TestCase):
 
     def test_hash_token_consistency(self):
         """Same token produces same hash."""
-        from auth import _hash_token
+        from backend.auth import _hash_token
 
         token = "test_token_123"
         hash1 = _hash_token(token)
@@ -683,7 +683,7 @@ class HashTests(unittest.TestCase):
 
     def test_issue_token_length(self):
         """Token has expected length."""
-        from auth import _issue_token, _issue_csrf_token
+        from backend.auth import _issue_token, _issue_csrf_token
 
         token = _issue_token()
         csrf = _issue_csrf_token()

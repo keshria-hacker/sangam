@@ -18,7 +18,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "backend"))
+sys.path.insert(0, os.path.join(ROOT, "mainfiles"))
 
 os.environ["TEST_MODE"] = "1"
 import base64
@@ -32,10 +32,10 @@ os.environ["MASTER_KEY"] = _test_key
 class RequestLoggingMiddlewareTests(unittest.TestCase):
     """Tests for RequestLoggingMiddleware (lines 67-76)."""
 
-    @patch("main.logger")
+    @patch("backend.main.logger")
     def test_request_logging_middleware_success(self, mock_logger):
         """RequestLoggingMiddleware logs successful request."""
-        from main import RequestLoggingMiddleware
+        from backend.main import RequestLoggingMiddleware
         from starlette.requests import Request
         from starlette.responses import Response
 
@@ -62,10 +62,10 @@ class RequestLoggingMiddlewareTests(unittest.TestCase):
 
         asyncio.run(test())
 
-    @patch("main.logger")
+    @patch("backend.main.logger")
     def test_request_logging_middleware_exception(self, mock_logger):
         """RequestLoggingMiddleware handles exceptions (lines 67-76)."""
-        from main import RequestLoggingMiddleware
+        from backend.main import RequestLoggingMiddleware
         from starlette.requests import Request
         from fastapi.responses import JSONResponse
 
@@ -113,17 +113,17 @@ class LifespanTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock) as mock_init_db:
-                with patch("main.BASE_DIR") as mock_base_dir:
+                with patch("backend.main.BASE_DIR") as mock_base_dir:
                     mock_history_dir = MagicMock()
                     mock_history_dir.mkdir = MagicMock()
                     mock_logs_dir = MagicMock()
                     mock_logs_dir.mkdir = MagicMock()
                     mock_base_dir.__truediv__.side_effect = lambda x: mock_history_dir if x == "history" else mock_logs_dir
 
-                    with patch("main.logger"):
-                        import main
+                    with patch("backend.main.logger"):
+                        import backend.main as main
                         importlib.reload(main)
-                        from main import create_app
+                        from backend.main import create_app
 
                         app = create_app()
                         from fastapi.testclient import TestClient
@@ -148,7 +148,7 @@ class LifespanTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.BASE_DIR") as mock_base_dir:
+                with patch("backend.main.BASE_DIR") as mock_base_dir:
                     mock_dir = MagicMock()
                     mock_dir.mkdir = MagicMock()
                     mock_base_dir.__truediv__.return_value = mock_dir
@@ -156,10 +156,10 @@ class LifespanTests(unittest.TestCase):
                     with patch("backend.llm._cleanup_ollama", new_callable=MagicMock) as mock_cleanup:
                         with patch("backend.ratelimit_redis.close_rate_limit_store", new_callable=AsyncMock) as mock_close_redis:
 
-                            with patch("main.logger"):
-                                import main
+                            with patch("backend.main.logger"):
+                                import backend.main as main
                                 importlib.reload(main)
-                                from main import create_app
+                                from backend.main import create_app
 
                                 app = create_app()
                                 from fastapi.testclient import TestClient
@@ -187,10 +187,10 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     # Create app to instantiate the SecurityHeadersMiddleware class
                     app = create_app()
@@ -216,10 +216,10 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     app = create_app()
                     from fastapi.testclient import TestClient
@@ -241,10 +241,10 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     app = create_app()
                     from fastapi.testclient import TestClient
@@ -268,10 +268,10 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
+                    from backend.main import create_app
 
                     app = create_app()
                     from fastapi.testclient import TestClient
@@ -288,14 +288,14 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
 class CSRFMiddlewareTests(unittest.TestCase):
     """Tests for CSRF middleware (lines 185-186)."""
 
-    @patch("main.verify_csrf")
+    @patch("backend.main.verify_csrf")
     def test_csrf_middleware_valid(self, mock_verify_csrf):
         """CSRF middleware passes when valid."""
         mock_verify_csrf.return_value = None
 
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         app = create_app()
         from fastapi.testclient import TestClient
@@ -303,12 +303,12 @@ class CSRFMiddlewareTests(unittest.TestCase):
             response = client.get("/health")
             self.assertEqual(response.status_code, 200)
 
-    @patch("main.verify_csrf")
+    @patch("backend.main.verify_csrf")
     def test_csrf_middleware_invalid_returns_json_response(self, mock_verify_csrf):
         """CSRF middleware returns JSONResponse on HTTPException (lines 185-186)."""
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
         from fastapi import HTTPException
 
         # Can't easily test the inline middleware - test verify_csrf directly
@@ -342,9 +342,9 @@ class HealthCheckTests(unittest.TestCase):
     @patch("httpx.AsyncClient")
     def test_health_check_database_connected(self, mock_client_class, mock_engine):
         """Database connected returns healthy status (line 221)."""
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock()
@@ -370,9 +370,9 @@ class HealthCheckTests(unittest.TestCase):
     @patch("httpx.AsyncClient")
     def test_health_check_database_error(self, mock_client_class, mock_engine):
         """Database error returns degraded status (lines 222-224)."""
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock(side_effect=Exception("DB error"))
@@ -397,9 +397,9 @@ class HealthCheckTests(unittest.TestCase):
     @patch("httpx.AsyncClient")
     def test_health_check_ollama_http_error(self, mock_client_class, mock_engine):
         """Ollama HTTP error status (lines 232-233)."""
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock()
@@ -423,9 +423,9 @@ class HealthCheckTests(unittest.TestCase):
     @patch("httpx.AsyncClient")
     def test_health_check_ollama_unreachable(self, mock_client_class, mock_engine):
         """Ollama unreachable (lines 234-235)."""
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock()
@@ -448,9 +448,9 @@ class RootEndpointTests(unittest.TestCase):
 
     def test_root_endpoint(self):
         """Root endpoint returns app info."""
-        import main
+        import backend.main as main
         importlib.reload(main)
-        from main import create_app
+        from backend.main import create_app
 
         app = create_app()
         from fastapi.testclient import TestClient
@@ -481,11 +481,11 @@ class MiddlewareOrderTests(unittest.TestCase):
 
         with patch("backend.config.settings", mock_settings):
             with patch("backend.database.init_db", new_callable=AsyncMock):
-                with patch("main.logger"):
-                    import main
+                with patch("backend.main.logger"):
+                    import backend.main as main
                     importlib.reload(main)
-                    from main import create_app
-                    from main import RequestLoggingMiddleware
+                    from backend.main import create_app
+                    from backend.main import RequestLoggingMiddleware
                     from backend.middleware.request_id import RequestIDMiddleware
                     from backend.ratelimit import RateLimitMiddleware
                     from fastapi.middleware.cors import CORSMiddleware

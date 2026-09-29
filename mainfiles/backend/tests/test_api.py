@@ -5,12 +5,16 @@ Tests the FastAPI endpoints for chat completion with adaptive policies.
 """
 
 import pytest
+import sys
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import AsyncGenerator, List, Dict, Any
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
-from backend.tests.conftest import (
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from tests.conftest import (
     ResponsePolicy,
     ChatMessage,
     ChatRequest,

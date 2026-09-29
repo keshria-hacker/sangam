@@ -170,9 +170,19 @@ def ensure_env_file() -> None:
     print("Generated a new MASTER_KEY in .env (used to encrypt provider API keys at rest).")
 
 def build_commands(python_exe: str):
-    backend_cmd = [python_exe, "-m", "uvicorn", "mainfiles.backend.main:app", "--host", "127.0.0.1", "--port", str(BACKEND_PORT)]
+    backend_cmd = [python_exe, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", str(BACKEND_PORT)]
     frontend_cmd = [python_exe, "-m", "http.server", str(FRONTEND_PORT)]
     return backend_cmd, frontend_cmd
+
+
+def backend_env() -> dict:
+    """Environment for the backend process — `<root>/mainfiles` holds the
+    `backend` package, so it must be importable from any working directory."""
+    env = os.environ.copy()
+    extra = str(ROOT / "mainfiles")
+    current = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = extra + (os.pathsep + current if current else "")
+    return env
 
 
 def main() -> None:
@@ -200,6 +210,7 @@ def main() -> None:
     time.sleep(0.5)
     backend_proc = subprocess.Popen(
         backend_cmd, cwd=ROOT,
+        env=backend_env(),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1,
     )
@@ -277,7 +288,7 @@ def main() -> None:
                 proc.terminate()
         raise
 
-    def stop_all(signum, _frame):
+    def stop_all(_signum, _frame):
         for proc in (backend_proc, frontend_proc):
             if proc.poll() is None:
                 proc.terminate()

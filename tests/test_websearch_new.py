@@ -20,7 +20,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Enable test mode
 os.environ["TEST_MODE"] = "1"
@@ -32,7 +32,7 @@ os.environ["MASTER_KEY"] = _test_key
 os.environ["WEB_SEARCH_PROVIDER"] = "duckduckgo"
 os.environ["WEB_SEARCH_MAX_RESULTS"] = "5"
 
-from websearch import (
+from backend.websearch import (
     SearchResult,
     _parse_duckduckgo,
     _snippet_after,
@@ -388,7 +388,7 @@ class WebSearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_duckduckgo_search_called(self):
         """web_search calls DuckDuckGo when provider not set."""
-        with patch("websearch._search_duckduckgo", new_callable=AsyncMock) as mock_ddg:
+        with patch("backend.websearch._search_duckduckgo", new_callable=AsyncMock) as mock_ddg:
             mock_ddg.return_value = [SearchResult("T", "https://e.com", "S")]
 
             results = await web_search("test query", 3)
@@ -398,10 +398,10 @@ class WebSearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_duckduckgo_default_max_results(self):
         """Default max_results from settings used."""
-        with patch("websearch._search_duckduckgo", new_callable=AsyncMock) as mock_ddg:
+        with patch("backend.websearch._search_duckduckgo", new_callable=AsyncMock) as mock_ddg:
             mock_ddg.return_value = [SearchResult("T", "https://e.com", "S")]
             # Import settings to check default
-            from config import settings
+            from backend.config import settings
             defaults = settings.WEB_SEARCH_MAX_RESULTS
 
             await web_search("query", None)
@@ -410,12 +410,12 @@ class WebSearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_tavily_search_when_configured(self):
         """Tavily used when provider=tavily and key set."""
-        with patch("websearch.settings") as mock_settings:
+        with patch("backend.websearch.settings") as mock_settings:
             mock_settings.WEB_SEARCH_PROVIDER = "tavily"
             mock_settings.WEB_SEARCH_API_KEY = "test-key"
             mock_settings.WEB_SEARCH_MAX_RESULTS = 5
 
-            with patch("websearch._search_tavily", new_callable=AsyncMock) as mock_tavily:
+            with patch("backend.websearch._search_tavily", new_callable=AsyncMock) as mock_tavily:
                 mock_tavily.return_value = [SearchResult("T", "https://e.com", "S")]
 
                 results = await web_search("query", 3)
@@ -424,12 +424,12 @@ class WebSearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_brave_search_when_configured(self):
         """Brave used when provider=brave and key set."""
-        with patch("websearch.settings") as mock_settings:
+        with patch("backend.websearch.settings") as mock_settings:
             mock_settings.WEB_SEARCH_PROVIDER = "brave"
             mock_settings.WEB_SEARCH_API_KEY = "test-key"
             mock_settings.WEB_SEARCH_MAX_RESULTS = 5
 
-            with patch("websearch._search_brave", new_callable=AsyncMock) as mock_brave:
+            with patch("backend.websearch._search_brave", new_callable=AsyncMock) as mock_brave:
                 mock_brave.return_value = [SearchResult("T", "https://e.com", "S")]
 
                 results = await web_search("query", 3)
@@ -438,11 +438,11 @@ class WebSearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_bravesearch_alias(self):
         """bravesearch alias works."""
-        with patch("websearch.settings") as mock_settings:
+        with patch("backend.websearch.settings") as mock_settings:
             mock_settings.WEB_SEARCH_PROVIDER = "bravesearch"
             mock_settings.WEB_SEARCH_API_KEY = "test-key"
 
-            with patch("websearch._search_brave", new_callable=AsyncMock) as mock_brave:
+            with patch("backend.websearch._search_brave", new_callable=AsyncMock) as mock_brave:
                 mock_brave.return_value = [SearchResult("T", "https://e.com", "S")]
 
                 await web_search("query", 3)
@@ -450,11 +450,11 @@ class WebSearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_fallback_to_duckduckgo_no_key(self):
         """Falls back to DuckDuckGo if provider set but no API key."""
-        with patch("websearch.settings") as mock_settings:
+        with patch("backend.websearch.settings") as mock_settings:
             mock_settings.WEB_SEARCH_PROVIDER = "tavily"
             mock_settings.WEB_SEARCH_API_KEY = None  # No key
 
-            with patch("websearch._search_duckduckgo", new_callable=AsyncMock) as mock_ddg:
+            with patch("backend.websearch._search_duckduckgo", new_callable=AsyncMock) as mock_ddg:
                 mock_ddg.return_value = [SearchResult("T", "https://e.com", "S")]
 
                 await web_search("query", 3)
@@ -464,7 +464,7 @@ class WebSearchTests(unittest.IsolatedAsyncioTestCase):
 class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
     """Tests for _search_tavily function (mocked HTTP)."""
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_successful_response(self, mock_settings):
         """Successful Tavily response parsed correctly."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -484,7 +484,7 @@ class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_tavily
+            from backend.websearch import _search_tavily
             results = await _search_tavily("query", 5)
 
             self.assertEqual(len(results), 2)
@@ -492,7 +492,7 @@ class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(results[0].url, "https://example.com/1")
             self.assertEqual(results[0].snippet, "Content 1")
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_empty_results_raises(self, mock_settings):
         """Empty results raises RuntimeError."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -507,12 +507,12 @@ class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_tavily
+            from backend.websearch import _search_tavily
             with self.assertRaises(RuntimeError) as cm:
                 await _search_tavily("query", 5)
             self.assertIn("no results", str(cm.exception).lower())
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_missing_url_skipped(self, mock_settings):
         """Results without URL are skipped."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -532,13 +532,13 @@ class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_tavily
+            from backend.websearch import _search_tavily
             results = await _search_tavily("query", 5)
 
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0].title, "Has URL")
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_snippet_truncated(self, mock_settings):
         """Long snippets truncated to 400 chars."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -556,12 +556,12 @@ class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_tavily
+            from backend.websearch import _search_tavily
             results = await _search_tavily("query", 5)
 
             self.assertEqual(len(results[0].snippet), 400)
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_http_error_raises(self, mock_settings):
         """HTTP errors raise RuntimeError."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -573,7 +573,7 @@ class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
             mock_client.post.side_effect = httpx.HTTPError("Connection failed")
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_tavily
+            from backend.websearch import _search_tavily
             with self.assertRaises(RuntimeError) as cm:
                 await _search_tavily("query", 5)
             self.assertIn("tavily search request failed", str(cm.exception).lower())
@@ -582,7 +582,7 @@ class SearchTavilyTests(unittest.IsolatedAsyncioTestCase):
 class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
     """Tests for _search_brave function (mocked HTTP)."""
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_successful_response(self, mock_settings):
         """Successful Brave response parsed correctly."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -604,7 +604,7 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
             mock_client.get.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_brave
+            from backend.websearch import _search_brave
             results = await _search_brave("query", 5)
 
             self.assertEqual(len(results), 2)
@@ -612,7 +612,7 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(results[0].url, "https://example.com/1")
             self.assertEqual(results[0].snippet, "Desc 1")
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_empty_web_results_raises(self, mock_settings):
         """Empty web results raises RuntimeError."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -627,12 +627,12 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
             mock_client.get.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_brave
+            from backend.websearch import _search_brave
             with self.assertRaises(RuntimeError) as cm:
                 await _search_brave("query", 5)
             self.assertIn("no results", str(cm.exception).lower())
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_missing_web_key_handled(self, mock_settings):
         """Missing 'web' key handled gracefully."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -647,12 +647,12 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
             mock_client.get.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_brave
+            from backend.websearch import _search_brave
             with self.assertRaises(RuntimeError) as cm:
                 await _search_brave("query", 5)
             self.assertIn("no results", str(cm.exception).lower())
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_missing_url_skipped(self, mock_settings):
         """Results without URL skipped."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -674,13 +674,13 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
             mock_client.get.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_brave
+            from backend.websearch import _search_brave
             results = await _search_brave("query", 5)
 
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0].title, "Has URL")
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_snippet_truncated(self, mock_settings):
         """Long description truncated to 400 chars."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -698,12 +698,12 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
             mock_client.get.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_brave
+            from backend.websearch import _search_brave
             results = await _search_brave("query", 5)
 
             self.assertEqual(len(results[0].snippet), 400)
 
-    @patch("websearch.settings")
+    @patch("backend.websearch.settings")
     async def test_http_error_raises(self, mock_settings):
         """HTTP errors raise RuntimeError."""
         mock_settings.WEB_SEARCH_API_KEY = "test-key"
@@ -715,7 +715,7 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
             mock_client.get.side_effect = httpx.HTTPError("Connection failed")
             mock_client_class.return_value = mock_client
 
-            from websearch import _search_brave
+            from backend.websearch import _search_brave
             with self.assertRaises(RuntimeError) as cm:
                 await _search_brave("query", 5)
             self.assertIn("brave search request failed", str(cm.exception).lower())
@@ -724,7 +724,7 @@ class SearchBraveTests(unittest.IsolatedAsyncioTestCase):
 class DuckDuckGoSearchTests(unittest.IsolatedAsyncioTestCase):
     """Tests for _search_duckduckgo function (mocked HTTP)."""
 
-    @patch("websearch._parse_duckduckgo")
+    @patch("backend.websearch._parse_duckduckgo")
     @patch("httpx.AsyncClient")
     async def test_successful_request(self, mock_client_class, mock_parse):
         """Successful DDG request returns parsed results."""
@@ -739,7 +739,7 @@ class DuckDuckGoSearchTests(unittest.IsolatedAsyncioTestCase):
         mock_client.post.return_value = mock_response
         mock_client_class.return_value = mock_client
 
-        from websearch import _search_duckduckgo
+        from backend.websearch import _search_duckduckgo
         results = await _search_duckduckgo("query", 5)
 
         mock_client.post.assert_called_once()
@@ -758,7 +758,7 @@ class DuckDuckGoSearchTests(unittest.IsolatedAsyncioTestCase):
         mock_client.post.side_effect = httpx.HTTPError("Connection failed")
         mock_client_class.return_value = mock_client
 
-        from websearch import _search_duckduckgo
+        from backend.websearch import _search_duckduckgo
         with self.assertRaises(RuntimeError) as cm:
             await _search_duckduckgo("query", 5)
         self.assertIn("web search request failed", str(cm.exception).lower())

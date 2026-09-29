@@ -13,7 +13,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "backend"))
+sys.path.insert(0, os.path.join(ROOT, "mainfiles"))
 
 # Enable test mode
 os.environ["TEST_MODE"] = "1"

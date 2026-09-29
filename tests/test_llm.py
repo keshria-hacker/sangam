@@ -188,7 +188,7 @@ class LinkedProvidersTests(unittest.TestCase):
 
     def test_empty_keys_returns_only_env_providers(self):
         """Empty keys returns providers with env keys."""
-        with patch.dict("llm.PROVIDERS", {
+        with patch.dict("backend.llm.PROVIDERS", {
             "openai": {"local": False, "env_key": "OPENAI_API_KEY"},
             "ollama": {"local": True},
             "custom": {"local": False, "env_key": None},
@@ -200,7 +200,7 @@ class LinkedProvidersTests(unittest.TestCase):
 
     def test_keys_matches_linked(self):
         """Keys with matching provider IDs are linked."""
-        with patch.dict("llm.PROVIDERS", {
+        with patch.dict("backend.llm.PROVIDERS", {
             "openai": {"local": False, "env_key": "OPENAI_API_KEY"},
             "anthropic": {"local": False, "env_key": "ANTHROPIC_API_KEY"},
         }, clear=True):
@@ -209,7 +209,7 @@ class LinkedProvidersTests(unittest.TestCase):
 
     def test_env_key_providers_linked(self):
         """Providers with env_key set are linked even without DB key."""
-        with patch.dict("llm.PROVIDERS", {
+        with patch.dict("backend.llm.PROVIDERS", {
             "openai": {"local": False, "env_key": "OPENAI_API_KEY"},
         }, clear=True):
             # Pretend env var is set
@@ -219,7 +219,7 @@ class LinkedProvidersTests(unittest.TestCase):
 
     def test_local_providers_excluded(self):
         """Local providers (ollama) are always excluded."""
-        with patch.dict("llm.PROVIDERS", {
+        with patch.dict("backend.llm.PROVIDERS", {
             "ollama": {"local": True, "env_key": None},
             "lmstudio": {"local": True, "env_key": None},
         }, clear=True):

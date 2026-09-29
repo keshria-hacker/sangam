@@ -1,7 +1,7 @@
 """Test script to reproduce the chat error."""
 import asyncio, sys, hashlib, secrets
 sys.path.insert(0, 'backend')
-from database import AsyncSessionLocal
+from backend.database import AsyncSessionLocal
 from sqlalchemy import text
 from datetime import datetime, timezone, timedelta
 

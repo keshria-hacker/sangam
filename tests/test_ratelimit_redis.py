@@ -13,14 +13,14 @@ import unittest
 from unittest.mock import AsyncMock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "backend"))
+sys.path.insert(0, os.path.join(ROOT, "mainfiles"))
 
 os.environ["TEST_MODE"] = "1"
 from cryptography.fernet import Fernet
 _test_key = Fernet.generate_key().decode()
 os.environ["MASTER_KEY"] = _test_key
 
-from ratelimit_redis import MemoryStore, RedisStore  # noqa: E402
+from backend.ratelimit_redis import MemoryStore, RedisStore  # noqa: E402
 
 
 class MemoryStoreResetLimitTests(unittest.TestCase):

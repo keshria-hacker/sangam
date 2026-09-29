@@ -16,6 +16,14 @@
 <!-- Highlight.js theme (base — swapped dynamically via data-code-theme) -->
 <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.0/styles/github-dark.min.css">
 
+<!-- KaTeX for math rendering -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFAsHpSy" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlWwcjdpTAUJ3AuLaf1g00As+5VJ+UAle5XLiTiv+ZQz9cN1u3UfgKm6vW0" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURymqtZD7Kn8Ph2IMe+0+U7D0zR8K+H6HQZaWagYfB8VP4+VfNfmyQ6" crossorigin="anonymous"></script>
+
+<!-- Mermaid.js for diagram rendering -->
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
 <!-- App styles (cache-busting v3 for Paper/Ink design system) -->
 <link rel="stylesheet" href="css/style.css?v=7">
 </head>
@@ -320,6 +328,40 @@ if (location.protocol === 'file:') {
             </div>
           </div>
 
+          <!-- Agentic Reasoning Panel -->
+          <div class="agentic-reasoning-panel hidden" id="agenticReasoningPanel">
+            <div class="panel-header">
+              <i class="fa-solid fa-brain"></i>
+              <span>Agentic Reasoning</span>
+            </div>
+            <div class="panel-content">
+              <p class="panel-description">
+                When enabled, your message will be processed with reasoning and tool use
+                before being sent to the AI model. This allows for web search, file operations,
+                and code execution to enhance your request.
+              </p>
+              <div class="panel-settings">
+                <div class="setting-row">
+                  <label class="setting-label">Max Iterations:</label>
+                  <select id="agenticReasoningIterations">
+                    <option value="1">1</option>
+                    <option value="2" selected>2</option>
+                    <option value="3">3</option>
+                    <option value="5">5</option>
+                  </select>
+                </div>
+                <div class="setting-row">
+                  <label class="setting-label">Tools:</label>
+                  <div class="tool-checkboxes">
+                    <label><input type="checkbox" checked> Web Search</label>
+                    <label><input type="checkbox" checked> File Operations</label>
+                    <label><input type="checkbox"> Code Execution</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="composer-select" id="reasoningSelect" title="Reasoning effort (supported by OpenAI o-series and other reasoning models)">
             <i class="fa-solid fa-brain"></i>
             <button class="select-btn" id="reasoningBtn" aria-label="Reasoning effort">
@@ -338,6 +380,11 @@ if (location.protocol === 'file:') {
           <button class="pill-control toggle-pill" id="webSearchToggle" title="Enable web search for this message" aria-pressed="false">
             <i class="fa-solid fa-globe"></i>
             <span>Web</span>
+          </button>
+
+          <button class="pill-control toggle-pill" id="agenticReasoningToggle" title="Enable agentic reasoning for this message" aria-pressed="false">
+            <i class="fa-solid fa-brain"></i>
+            <span>Reason</span>
           </button>
 
           <span class="composer-hint" id="composerHint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to send</span>
@@ -382,130 +429,130 @@ if (location.protocol === 'file:') {
           </div>
         </section>
 
-        <section class="settings-section">
-          <h3>Appearance</h3>
+          <section class="settings-section">
+            <h3>Appearance</h3>
 
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Theme</span>
-              <small>Choose how Sangam looks on this device</small>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Theme</span>
+                <small>Choose how Sangam looks on this device</small>
+              </div>
+              <div class="theme-options" id="themeOptions">
+                <button class="theme-option active" data-theme="dark"><i class="fa-solid fa-moon"></i> Dark</button>
+                <button class="theme-option" data-theme="light"><i class="fa-solid fa-sun"></i> Light</button>
+                <button class="theme-option" data-theme="system"><i class="fa-solid fa-display"></i> System</button>
+              </div>
             </div>
-            <div class="theme-options" id="themeOptions">
-              <button class="theme-option active" data-theme="dark"><i class="fa-solid fa-moon"></i> Dark</button>
-              <button class="theme-option" data-theme="light"><i class="fa-solid fa-sun"></i> Light</button>
-              <button class="theme-option" data-theme="system"><i class="fa-solid fa-display"></i> System</button>
-            </div>
-          </div>
 
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Font size</span>
-              <small>Adjust the size of message text</small>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Font size</span>
+                <small>Adjust the size of message text</small>
+              </div>
+              <div class="segmented" id="fontSizeSegmented">
+                <button data-size="sm">Small</button>
+                <button data-size="md" class="active">Medium</button>
+                <button data-size="lg">Large</button>
+              </div>
             </div>
-            <div class="segmented" id="fontSizeSegmented">
-              <button data-size="sm">Small</button>
-              <button data-size="md" class="active">Medium</button>
-              <button data-size="lg">Large</button>
-            </div>
-          </div>
 
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Chat width</span>
-              <small>How wide the conversation column is</small>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Chat width</span>
+                <small>How wide the conversation column is</small>
+              </div>
+              <div class="segmented" id="chatWidthSegmented">
+                <button data-width="narrow">Narrow</button>
+                <button data-width="default" class="active">Default</button>
+                <button data-width="wide">Wide</button>
+              </div>
             </div>
-            <div class="segmented" id="chatWidthSegmented">
-              <button data-width="narrow">Narrow</button>
-              <button data-width="default" class="active">Default</button>
-              <button data-width="wide">Wide</button>
-            </div>
-          </div>
 
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Code block theme</span>
-              <small>Syntax highlighting style</small>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Code block theme</span>
+                <small>Syntax highlighting style</small>
+              </div>
+              <div class="pill-control select-wrap">
+                <i class="fa-solid fa-code"></i>
+                <select id="codeThemeSelect">
+                  <option value="github-dark">GitHub Dark</option>
+                  <option value="atom-one-dark">Atom One Dark</option>
+                  <option value="nord">Nord</option>
+                  <option value="dracula">Dracula</option>
+                  <option value="github">GitHub Light</option>
+                </select>
+              </div>
             </div>
-            <div class="pill-control select-wrap">
-              <i class="fa-solid fa-code"></i>
-              <select id="codeThemeSelect">
-                <option value="github-dark">GitHub Dark</option>
-                <option value="atom-one-dark">Atom One Dark</option>
-                <option value="nord">Nord</option>
-                <option value="dracula">Dracula</option>
-                <option value="github">GitHub Light</option>
-              </select>
-            </div>
-          </div>
 
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Interface animations</span>
-              <small>Message transitions, typing indicator, hover effects</small>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Interface animations</span>
+                <small>Message transitions, typing indicator, hover effects</small>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="animationToggle" checked>
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+              </label>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="animationToggle" checked>
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-        </section>
+          </section>
 
-        <!-- Response style (Phase 4 — persisted server-side per user) -->
-        <section class="settings-section">
-          <h3>Response style</h3>
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Answer length</span>
-              <small>Saved to your account — applies to every chat</small>
+          <!-- Response style (Phase 4 — persisted server-side per user) -->
+          <section class="settings-section">
+            <h3>Response style</h3>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Answer length</span>
+                <small>Saved to your account — applies to every chat</small>
+              </div>
+              <div class="segmented" id="responseStyleSegmented">
+                <button data-style="concise">Concise</button>
+                <button data-style="balanced" class="active">Balanced</button>
+                <button data-style="detailed">Detailed</button>
+              </div>
             </div>
-            <div class="segmented" id="responseStyleSegmented">
-              <button data-style="concise">Concise</button>
-              <button data-style="balanced" class="active">Balanced</button>
-              <button data-style="detailed">Detailed</button>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Tone</span>
+                <small>How formal replies should read</small>
+              </div>
+              <div class="segmented" id="formalitySegmented">
+                <button data-tone="casual">Casual</button>
+                <button data-tone="neutral" class="active">Neutral</button>
+                <button data-tone="formal">Formal</button>
+              </div>
             </div>
-          </div>
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Tone</span>
-              <small>How formal replies should read</small>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Technical depth</span>
+                <small>Match answers to your expertise</small>
+              </div>
+              <div class="segmented" id="expertiseSegmented">
+                <button data-expertise="beginner">Beginner</button>
+                <button data-expertise="general" class="active">General</button>
+                <button data-expertise="expert">Expert</button>
+              </div>
             </div>
-            <div class="segmented" id="formalitySegmented">
-              <button data-tone="casual">Casual</button>
-              <button data-tone="neutral" class="active">Neutral</button>
-              <button data-tone="formal">Formal</button>
-            </div>
-          </div>
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Technical depth</span>
-              <small>Match answers to your expertise</small>
-            </div>
-            <div class="segmented" id="expertiseSegmented">
-              <button data-expertise="beginner">Beginner</button>
-              <button data-expertise="general" class="active">General</button>
-              <button data-expertise="expert">Expert</button>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
+
+        <!-- Providers tabpanel (Status + API Keys) -->
+        <div class="settings-tabpanel" role="tabpanel" data-tabpanel="providers" hidden>
+          <section class="settings-section">
+            <h3>Providers</h3>
+            <div class="provider-status-list" id="providerStatusList"><!-- Populated by JS --></div>
+          </section>
+
+          <!-- Provider API Keys -->
+          <section class="settings-section">
+            <h3>API Keys</h3>
+            <div id="providerKeyManager"><!-- Populated by JS --></div>
+          </section>
+        </div>
+
       </div>
-
-      <!-- Providers tabpanel (Status + API Keys) -->
-      <div class="settings-tabpanel" role="tabpanel" data-tabpanel="providers" hidden>
-        <section class="settings-section">
-          <h3>Providers</h3>
-          <div class="provider-status-list" id="providerStatusList"><!-- Populated by JS --></div>
-        </section>
-
-        <!-- Provider API Keys -->
-        <section class="settings-section">
-          <h3>API Keys</h3>
-          <div id="providerKeyManager"><!-- Populated by JS --></div>
-        </section>
-      </div>
-
     </div>
   </div>
-</div>
 
 <!-- ============ CONFIRM DIALOG ============ -->
 <div class="confirm-overlay hidden" id="confirmOverlay">
@@ -679,4 +726,3 @@ if (location.protocol === 'file:') {
 <!-- App (ES modules) — ?v=YYYYMMDD cache-bust prevents stale module graph -->
 <script type="module" src="js/app.js?v=20260816"></script>
 </html>
-

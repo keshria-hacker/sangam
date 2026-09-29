@@ -612,21 +612,49 @@ class FusionStrategy(RoutingStrategy):
 
 class PipelineStrategy(RoutingStrategy):
     """Run targets sequentially, threading output"""
-    
+
     def __init__(self):
         super().__init__("pipeline", "Run targets sequentially, threading output")
-    
+
     def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         # For pipeline, we typically want the first step in the pipeline
-        # This would be configured per combo - for now return the "healthiest" 
+        # This would be configured per combo - for now return the "healthiest"
         # as a placeholder for the first stage
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
-        
+
         # Sort by health score for pipeline initialization
         sorted_candidates = sorted(filtered, key=lambda c: c.health_score, reverse=True)
         return sorted_candidates[0]
+
+
+class EnhancedProviderManager:
+    """Manager for selecting providers using enhanced routing strategies"""
+
+    def __init__(self):
+        self.strategy_factory = StrategyFactory()
+
+    def select_provider(self, candidates: List[ProviderCandidate], strategy_name: str, context: RoutingContext) -> ProviderCandidate:
+        """
+        Select a provider from candidates using the specified strategy
+
+        Args:
+            candidates: List of provider candidates to choose from
+            strategy_name: Name of the strategy to use
+            context: Routing context for the selection
+
+        Returns:
+            Selected ProviderCandidate
+        """
+        if not candidates:
+            raise ValueError("No candidates provided")
+
+        # Create strategy instance
+        strategy = self.strategy_factory.create_strategy(strategy_name)
+
+        # Select provider using the strategy
+        return strategy.select(candidates, context)
 
 
 # ============================================================================
@@ -635,7 +663,7 @@ class PipelineStrategy(RoutingStrategy):
 
 class StrategyFactory:
     """Factory for creating routing strategy instances"""
-    
+
     _strategies = {
         'priority': PriorityStrategy,
         'weighted': WeightedStrategy,
@@ -657,27 +685,27 @@ class StrategyFactory:
         'fusion': FusionStrategy,
         'pipeline': PipelineStrategy
     }
-    
+
     @classmethod
     def create_strategy(cls, strategy_name: str, **kwargs) -> RoutingStrategy:
         """Create a strategy instance by name"""
         if strategy_name not in cls._strategies:
             raise ValueError(f"Unknown strategy: {strategy_name}")
-        
+
         strategy_class = cls._strategies[strategy_name]
         return strategy_class(**kwargs)
-    
+
     @classmethod
     def get_available_strategies(cls) -> List[str]:
         """Get list of available strategy names"""
         return list(cls._strategies.keys())
-    
+
     @classmethod
     def get_strategy_description(cls, strategy_name: str) -> str:
         """Get description of a strategy"""
         if strategy_name not in cls._strategies:
             raise ValueError(f"Unknown strategy: {strategy_name}")
-        
+
         # Create temporary instance to get description
         strategy = cls._strategies[strategy_name]()
         return strategy.description
@@ -689,8 +717,8 @@ class StrategyFactory:
 
 class EnhancedRouter:
     """Main enhanced routing engine that combines strategies with resilience"""
-    
-    def __init__(self, 
+
+    def __init__(self,
                  resilience_manager: Any = None,
                  enable_model_routing: bool = True,
                  enable_time_based_routing: bool = False,
@@ -699,7 +727,7 @@ class EnhancedRouter:
                  enable_quality_optimization: bool = True):
         """
         Initialize enhanced router
-        
+
         Args:
             resilience_manager: Resilience manager instance
             enable_model_routing: Enable model-specific routing
@@ -714,27 +742,27 @@ class EnhancedRouter:
         self.enable_geo_routing = enable_geo_routing
         self.enable_cost_optimization = enable_cost_optimization
         self.enable_quality_optimization = enable_quality_optimization
-        
+
         # Provider registry: provider_id -> config
         self.providers: Dict[str, Any] = {}
         self.provider_locals: Dict[str, bool] = {}  # provider_id -> is_local
-        
+
         # Strategy factory
         self.strategy_factory = StrategyFactory()
-        
+
         # Default strategy
         self.default_strategy = 'auto'
-    
+
     def register_provider(self, provider_id: str, config: Any, is_local: bool = False):
         """Register a provider with the router"""
         self.providers[provider_id] = config
         self.provider_locals[provider_id] = is_local
-    
+
     def _create_candidate_from_config(self, provider_id: str, config: Any) -> ProviderCandidate:
         """Create a ProviderCandidate from provider config"""
         # Extract relevant information from config
         # This is a simplified version - in practice we'd get more detailed info
-        
+
         # Get model information (simplified)
         model_name = getattr(config, 'model', 'unknown')
         if not model_name or model_name == 'unknown':
@@ -742,9 +770,9 @@ class EnhancedRouter:
             model_name = getattr(config, 'litellm_prefix', 'unknown').rstrip('/')
             if not model_name or model_name == 'unknown':
                 model_name = 'default'
-        
+
         display_name = f"{provider_id}/{model_name}"
-        
+
         # Extract metrics from config or use defaults
         cost_per_1m_tokens = getattr(config, 'cost_per_1m_tokens', 0.001) * 1000  # Convert to per 1M
         avg_latency_ms = getattr(config, 'latency_baseline_ms', 1000.0)
@@ -752,12 +780,12 @@ class EnhancedRouter:
         quota_headroom = getattr(config, 'quota_headroom', 0.5)
         error_rate = getattr(config, 'error_rate', 0.05)
         context_window = getattr(config, 'context_window', 4096)
-        
+
         # Capabilities (simplified)
         supports_vision = getattr(config, 'supports_vision', False)
         supports_reasoning = getattr(config, 'supports_reasoning', False)
         supports_tools = getattr(config, 'supports_tools', False)
-        
+
         return ProviderCandidate(
             provider_name=provider_id,
             model_name=model_name,
@@ -773,14 +801,14 @@ class EnhancedRouter:
             supports_tools=supports_tools,
             is_available=True  # Assume available unless we have specific health data
         )
-    
+
     async def select_provider(self, context: RoutingContext) -> str:
         """
         Select the best provider for the given context
-        
+
         Args:
             context: Routing context with request details
-            
+
         Returns:
             Selected provider ID
         """
@@ -789,37 +817,37 @@ class EnhancedRouter:
             candidates = []
             for provider_id, config in self.providers.items():
                 is_local = self.provider_locals.get(provider_id, False)
-                
+
                 # Skip local providers if no API key (though they might not need one)
                 # For now, we'll include all registered providers
                 candidate = self._create_candidate_from_config(provider_id, config)
                 candidates.append(candidate)
-            
+
             if not candidates:
                 raise ValueError("No providers available")
-            
+
             # Determine which strategy to use based on context and configuration
             strategy_name = self._select_strategy(context)
-            
+
             # Create strategy instance
             strategy = self.strategy_factory.create_strategy(strategy_name)
-            
+
             # Select provider using the strategy
             selected_candidate = strategy.select(candidates, context)
-            
+
             return selected_candidate.provider_name
-            
+
         except Exception as e:
             # Fallback to first available provider if selection fails
             if self.providers:
                 return list(self.providers.keys())[0]
             raise
-    
+
     def _select_strategy(self, context: RoutingContext) -> str:
         """Select the appropriate routing strategy based on context"""
         # Start with default strategy
         strategy_name = self.default_strategy
-        
+
         # Override based on context and enabled features
         if context.task_type == "coding" and self.enable_cost_optimization:
             strategy_name = "cost-optimized"
@@ -833,7 +861,7 @@ class EnhancedRouter:
         elif self.enable_model_routing and hasattr(context, 'model_id'):
             # Model-specific routing (simplified)
             strategy_name = "auto"  # Use auto strategy for model-aware routing
-        
+
         return strategy_name
 
 
@@ -892,20 +920,20 @@ def create_example_candidates() -> List[ProviderCandidate]:
 if __name__ == "__main__":
     # Example usage
     from dataclasses import dataclass
-    
+
     @dataclass
     class MockResilienceManager:
         pass
-    
+
     manager = MockResilienceManager()
     router = EnhancedRouter(resilience_manager=manager)
-    
+
     # Register example providers (mock configs)
     class MockConfig:
         def __init__(self, **kwargs):
             for k, v in kwargs.items():
                 setattr(self, k, v)
-    
+
     router.register_provider("openai", MockConfig(
         model="gpt-4",
         cost_per_1m_tokens=0.03,
@@ -918,7 +946,7 @@ if __name__ == "__main__":
         supports_reasoning=True,
         supports_tools=True
     ))
-    
+
     router.register_provider("anthropic", MockConfig(
         model="claude-3-opus-20240229",
         cost_per_1m_tokens=0.015,
@@ -931,7 +959,7 @@ if __name__ == "__main__":
         supports_reasoning=True,
         supports_tools=True
     ))
-    
+
     router.register_provider("ollama", MockConfig(
         model="llama3-70b",
         cost_per_1m_tokens=0.0,
@@ -944,10 +972,10 @@ if __name__ == "__main__":
         supports_reasoning=True,
         supports_tools=False
     ))
-    
+
     # Test different strategies via context
     import asyncio
-    
+
     async def test_router():
         contexts = [
             RoutingContext(
@@ -969,7 +997,7 @@ if __name__ == "__main__":
                 priority=80
             )
         ]
-        
+
         print("Testing enhanced router with different contexts...")
         for i, context in enumerate(contexts):
             try:
@@ -977,5 +1005,5 @@ if __name__ == "__main__":
                 print(f"Context {i+1} ({context.task_type}, priority {context.priority}) -> {selected}")
             except Exception as e:
                 print(f"Context {i+1} -> ERROR: {e}")
-    
+
     asyncio.run(test_router())

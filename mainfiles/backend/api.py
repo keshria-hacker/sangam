@@ -6,6 +6,7 @@ out and persists chat state via SQLAlchemy.
 import asyncio
 import logging
 import re
+import sys
 import time
 import uuid
 from datetime import UTC, datetime
@@ -19,6 +20,7 @@ from .summarizer import should_summarize, summarize_chat
 from .context_manager import create_context_manager
 from .database import AsyncSessionLocal, get_db
 from .document import extract_text, truncate_preview
+from .domain import ChatMessage
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from .models import Chat, Message, ProviderKey, UploadedFile, UserPreference
@@ -57,6 +59,49 @@ logger = logging.getLogger(__name__)
 # Phase 5: strong references to fire-and-forget tasks so the event loop
 # doesn't garbage-collect them mid-flight.
 _background_tasks: set[asyncio.Task] = set()
+
+
+def sse_event(data: str, event: str | None = None) -> str:
+    """Format data as a Server-Sent Event (SSE) string.
+
+    Args:
+        data: The data to send in the event
+        event: Optional event type
+
+    Returns:
+        Formatted SSE string
+    """
+    if event:
+        lines = [f"event: {event}"]
+    else:
+        lines = []
+
+    # Handle multiline data by splitting into multiple data: lines
+    # But preserve SSE comment lines (starting with :) as-is
+    if "\n" in data or "\r" in data:
+        # Normalize line endings and split
+        lines_data = data.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        for line in lines_data:
+            if line.startswith(":"):
+                # SSE comment line - preserve as-is
+                lines.append(line)
+            else:
+                lines.append(f"data: {line}")
+    else:
+        if data.startswith(":"):
+            # SSE comment line - preserve as-is
+            lines.append(data)
+        else:
+            lines.append(f"data: {data}")
+
+    lines.append("")  # Empty line to end the event
+    return "\n".join(lines) + "\n"
+
+
+def sse_response_event(event: ResponseEvent) -> str:
+    """Serialize a canonical response event as an SSE frame."""
+    return sse_event(event.to_json(), event="response_event")
+
 
 # Magic byte validator for file uploads
 # Maps extension to expected MIME types (using python-magic)
@@ -107,81 +152,10 @@ def _get_magic():
         from loguru import logger
         logger.warning(
             "python-magic / libmagic not available — file uploads will only be "
-            "validated by extension, not by content. Install the system libmagic "
-            "library (apt: libmagic1, brew: libmagic) to re-enable content validation."
+            "validated by extension."
         )
     return _magic
 
-
-def sse_event(data: str, event: str | None = None) -> str:
-    """Serialize multiline provider output as a valid SSE frame."""
-    event_line = f"event: {event}\n" if event else ""
-    data_lines = str(data).replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    # SSE comments (lines starting with :) are ignored by clients but keep connection alive
-    if event_line == "" and len(data_lines) == 1 and data_lines[0].startswith(":"):
-        return f"{data_lines[0]}\n\n"
-    data_text = "\n".join(f"data: {line}" for line in data_lines)
-    return f"{event_line}{data_text}\n\n"
-
-
-def sse_response_event(event: ResponseEvent) -> str:
-    """Serialize a canonical response event as an SSE frame."""
-    return sse_event(event.to_json(), event="response_event")
-
-
-# ---------------------------------------------------------------------------
-# Health
-# ---------------------------------------------------------------------------
-
-@public_router.get("/health")
-async def health():
-    return {"status": "ok", "app": settings.APP_NAME}
-
-
-@router.get("/websearch")
-async def get_websearch(q: str, max_results: int = 5):
-    """Live web search. Works out of the box via DuckDuckGo (no key); upgrade
-    by setting WEB_SEARCH_PROVIDER + WEB_SEARCH_API_KEY in .env."""
-    if not q or not q.strip():
-        raise HTTPException(status_code=422, detail="Query (q) is required")
-    try:
-        results = await websearch.web_search(q, max_results=max_results)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return {
-        "query": q,
-        "provider": (settings.WEB_SEARCH_PROVIDER or "duckduckgo"),
-        "results": [
-            {"title": r.title, "url": r.url, "snippet": r.snippet} for r in results
-        ],
-    }
-
-
-# ---------------------------------------------------------------------------
-# Models & providers
-# ---------------------------------------------------------------------------
-
-@router.get("/models", response_model=list[ModelInfo])
-async def get_models(db: AsyncSession = Depends(get_db)):
-    return await llm.list_models(db)
-
-
-@router.get("/providers", response_model=list[ProviderStatus])
-async def get_providers(db: AsyncSession = Depends(get_db)):
-    return await llm.list_provider_status(db)
-
-
-@router.post("/models/inaccessible/clear", status_code=204)
-async def clear_inaccessible_models():
-    """Clear the set of models that have been flagged as inaccessible
-    (NotFoundError during streaming) so they reappear on the next fetch."""
-    llm.clear_inaccessible_models()
-
-
-# ---------------------------------------------------------------------------
-# Provider API key management — this is what lets a user link a provider
-# entirely from the Settings UI, no .env editing required.
-# ---------------------------------------------------------------------------
 
 @router.get("/settings/providers", response_model=list[ProviderKeyOut])
 async def list_provider_keys(db: AsyncSession = Depends(get_db)):
@@ -207,6 +181,7 @@ async def list_provider_keys(db: AsyncSession = Depends(get_db)):
 
 @router.put("/settings/providers/{provider_id}/key", response_model=ProviderKeyOut)
 async def set_provider_key(provider_id: str, payload: ProviderKeyIn, db: AsyncSession = Depends(get_db)):
+    """Link a provider API key from the Settings UI (stored encrypted)."""
     static = llm.list_providers_static()
     if provider_id not in static:
         raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
@@ -226,14 +201,15 @@ async def set_provider_key(provider_id: str, payload: ProviderKeyIn, db: AsyncSe
 
     key = api_key
     masked = f"{key[:6]}···{key[-4:]}" if len(key) > 10 else "···"
-    return ProviderKeyOut(provider_id=provider_id, linked=True, masked_key=masked)
+    return ProviderKeyOut(provider_id=provider_id, label=static[provider_id]["label"], linked=True, masked_key=masked)
 
 
 @router.delete("/settings/providers/{provider_id}/key", status_code=204)
 async def delete_provider_key(provider_id: str, db: AsyncSession = Depends(get_db)):
+    """Unlink a stored provider API key."""
     static = llm.list_providers_static()
     if provider_id not in static:
-        raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
+        raise HTTPException(status_code=404, detail="Provider not found")
     existing = await db.get(ProviderKey, provider_id)
     if existing:
         await db.delete(existing)
@@ -244,20 +220,20 @@ async def delete_provider_key(provider_id: str, db: AsyncSession = Depends(get_d
 async def refresh_provider_models(provider_id: str, db: AsyncSession = Depends(get_db)):
     """Live-fetch the full model catalogue for a linked provider.
 
-    Queries the provider's model listing endpoint (e.g. ``/v1/models``),
-    returns the standardized model list with count.  Errors inside the
-    fetch function are caught gracefully (returns count=0), so the caller
-    always gets a valid response — no 5xx for transient network blips.
+    Queries the provider's model listing endpoint (e.g. ``/v1/models``) and
+    returns the standardized model list with a count. Errors inside the fetch
+    are caught gracefully (``success=False``), so transient network blips never
+    surface as a 5xx.
     """
     config = llm.registry.get_config(provider_id)
-    if not config:
-        raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
+    if config is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
     if config.local:
         raise HTTPException(status_code=400, detail="Local runtimes don't support model listing")
 
     api_key = await llm.resolve_api_key(provider_id, db)
-    if not api_key:
-        raise HTTPException(status_code=400, detail=f"No API key linked for {config.label}")
+    if api_key is None:
+        raise HTTPException(status_code=400, detail="No API key linked")
 
     try:
         models = await llm.fetch_models_from_provider(
@@ -280,37 +256,208 @@ async def refresh_provider_models(provider_id: str, db: AsyncSession = Depends(g
             count=len(models),
             models=[ProviderModelEntry(**m) for m in models],
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — never 5xx on a transient blip
         logger.warning("fetch_models_from_provider(%s) failed: %s", provider_id, exc)
-        return RefreshModelsOut(
-            provider_id=provider_id,
-            success=False,
-            count=0,
-            models=[],
-        )
+        return RefreshModelsOut(provider_id=provider_id, success=False, count=0, models=[])
+
+
+@router.get("/websearch")
+async def get_websearch(q: str, max_results: int = 5):
+    """Live web search. Works out of the box via DuckDuckGo (no key); upgrade
+    by setting WEB_SEARCH_PROVIDER + WEB_SEARCH_API_KEY in .env."""
+    if not q or not q.strip():
+        raise HTTPException(status_code=422, detail="Query (q) is required")
+    try:
+        results = await websearch.web_search(q, max_results=max_results)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "query": q,
+        "provider": (settings.WEB_SEARCH_PROVIDER or "duckduckgo"),
+        "results": [
+            {"title": r.title, "url": r.url, "snippet": r.snippet} for r in results
+        ],
+    }
+
+
+@router.post("/models/inaccessible/clear", status_code=204)
+async def clear_inaccessible_models():
+    """Clear models flagged as inaccessible so they reappear on the next fetch."""
+    llm.clear_inaccessible_models()
+
+
+@router.post("/files", response_model=FileUploadOut)
+async def upload_file(request: Request, file: UploadFile, db: AsyncSession = Depends(get_db)):
+    """Upload a document, extract its text and index it for RAG."""
+    filename = Path(file.filename or "upload").name
+    if not filename or filename == ".":
+        raise HTTPException(status_code=400, detail="A valid filename is required")
+    # Prevent path traversal via ..\ or ../ sequences in the filename
+    filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
+
+    extension = (filename.rsplit(".", 1)[-1] if "." in filename else "").lower()
+    if extension not in settings.ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=415, detail=f"Unsupported file type: .{extension}")
+
+    # Early size check via Content-Length — reject before reading into memory
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            size_mb = int(content_length) / (1024 * 1024)
+            if size_mb > settings.MAX_UPLOAD_SIZE_MB:
+                raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit")
+        except ValueError:
+            pass  # Malformed header — fall through to the read-based check below
+
+    contents = await file.read()
+    size_mb = len(contents) / (1024 * 1024)
+    if size_mb > settings.MAX_UPLOAD_SIZE_MB:
+        raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit")
+
+    # Magic byte validation — skipped gracefully when libmagic is unavailable.
+    _magic = _get_magic()
+    if _magic:
+        try:
+            detected_mime = _magic.from_buffer(contents)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Could not determine file type") from exc
+
+        allowed_mimes = ALLOWED_MIME_TYPES.get(extension, [])
+        if allowed_mimes and detected_mime not in allowed_mimes:
+            raise HTTPException(
+                status_code=415,
+                detail=f"File content does not match extension .{extension}. Detected: {detected_mime}",
+            )
+
+    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex[:12]}_{filename}"
+    stored_path = settings.UPLOAD_DIR / stored_name
+    stored_path.write_bytes(contents)
+
+    extracted = extract_text(stored_path, extension)
+
+    record = UploadedFile(
+        filename=filename,
+        stored_path=str(stored_path),
+        extension=extension,
+        size_bytes=len(contents),
+        extracted_text=extracted,
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+
+    # Index for RAG — non-blocking, a failure never breaks the upload
+    if extracted:
+        index_document(record.id, extracted, filename)
+
+    return FileUploadOut(
+        file_id=record.id,
+        filename=record.filename,
+        extension=record.extension,
+        size_bytes=record.size_bytes,
+        preview=truncate_preview(extracted) if extracted else None,
+    )
 
 
 # ---------------------------------------------------------------------------
-# Chats (history)
+# Health
 # ---------------------------------------------------------------------------
+
+
+@public_router.get("/health")
+async def health():
+    return {"status": "ok", "app": settings.APP_NAME}
+
+
+# ---------------------------------------------------------------------------
+# Providers
+# ---------------------------------------------------------------------------
+
+@router.get("/providers", response_model=list[ProviderStatus])
+async def get_providers(db: AsyncSession = Depends(get_db)):
+    """Return providers that are currently reachable (key linked + endpoint up)."""
+    return await llm.list_provider_status(db)
+
+
+# ---------------------------------------------------------------------------
+# Chats
+# ---------------------------------------------------------------------------
+
+
+@router.post("/chats", response_model=ChatDetailOut)
+async def create_chat(request: Request, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+    """Create a new chat."""
+    body = await request.json()
+    title = body.get("title", "New chat")
+    model_id = body.get("model")
+
+    if not model_id:
+        raise HTTPException(status_code=400, detail="Model is required")
+
+    model_info = llm._resolve_model(model_id)
+    if not model_info:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {model_id}")
+
+    chat = Chat(title=title[:60], model=model_id)
+    db.add(chat)
+    await db.flush()
+    await db.commit()
+    await db.refresh(chat)
+
+    return ChatDetailOut(
+        id=chat.id,
+        title=chat.title,
+        model=chat.model,
+        chat_id=chat.id,
+        created_at=chat.created_at,
+        updated_at=chat.updated_at,
+        message_count=0,
+    )
+
 
 @router.get("/chats", response_model=list[ChatOut])
-async def list_chats(db: AsyncSession = Depends(get_db)):
+async def list_chats(db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+    """List chats newest-first. Messages are loaded with selectinload — a lazy
+    load here would raise MissingGreenlet inside the async response loop."""
     result = await db.execute(
-        select(Chat).order_by(Chat.updated_at.desc()).limit(100)
+        select(Chat).order_by(Chat.updated_at.desc()).limit(100).options(selectinload(Chat.messages))
     )
-    return result.scalars().all()
+    chats = result.scalars().unique().all()
+
+    return [
+        ChatOut(
+            id=chat.id,
+            title=chat.title,
+            model=chat.model,
+            created_at=chat.created_at,
+            updated_at=chat.updated_at,
+            message_count=len(chat.messages),
+        )
+        for chat in chats
+    ]
 
 
 @router.get("/chats/{chat_id}", response_model=ChatDetailOut)
-async def get_chat(chat_id: str, db: AsyncSession = Depends(get_db)):
+async def get_chat(chat_id: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+    """Get a chat by ID."""
     result = await db.execute(
         select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.messages))
     )
     chat = result.scalar_one_or_none()
-    if chat is None:
+    if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    return chat
+
+    return ChatDetailOut(
+        id=chat.id,
+        title=chat.title,
+        model=chat.model,
+        chat_id=chat.id,
+        created_at=chat.created_at,
+        updated_at=chat.updated_at,
+        message_count=len(chat.messages),
+        messages=list(chat.messages),
+    )
 
 
 @router.delete("/chats/{chat_id}", status_code=204)
@@ -319,19 +466,16 @@ async def delete_chat(chat_id: str, db: AsyncSession = Depends(get_db)):
         select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.messages))
     )
     chat = result.scalar_one_or_none()
-    if chat is None:
+    if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     await db.delete(chat)
     await db.commit()
 
 
 # ---------------------------------------------------------------------------
-# Message feedback
+# User preferences (response style)
 # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# User preferences (Phase 4)
-# ---------------------------------------------------------------------------
 
 @router.get("/user/preferences", response_model=UserPreferenceOut)
 async def get_preferences(
@@ -341,8 +485,8 @@ async def get_preferences(
     """Return the caller's stored response-style preferences (defaults if unset)."""
     pref = await db.get(UserPreference, user.id)
     if pref is None:
-        # Return explicit defaults — an unpersisted ORM instance would serialize
-        # None for every field and fail response validation.
+        # An unpersisted ORM instance would serialize None for every field and
+        # fail response validation, so return explicit defaults instead.
         return UserPreferenceOut(
             user_id=user.id,
             response_style="balanced",
@@ -372,9 +516,14 @@ async def update_preferences(
     return pref
 
 
+# ---------------------------------------------------------------------------
+# Chat summary + message feedback
+# ---------------------------------------------------------------------------
+
+
 @router.get("/chats/{chat_id}/summary")
 async def get_chat_summary(chat_id: str, db: AsyncSession = Depends(get_db)):
-    """Return the chat's rolling summary and key topics (Phase 5)."""
+    """Return the chat's rolling summary and key topics."""
     chat = await db.get(Chat, chat_id)
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -392,7 +541,7 @@ async def submit_feedback(
     body: FeedbackIn,
     db: AsyncSession = Depends(get_db),
 ):
-    """Record user quality feedback (thumbs up/down) on an assistant message.
+    """Record quality feedback (thumbs up/down) on an assistant message.
 
     Sending the same value again clears the feedback (toggle-off undo), so a
     mis-click is recoverable. A note is optional free-text context.
@@ -414,87 +563,57 @@ async def submit_feedback(
 
 
 # ---------------------------------------------------------------------------
-# File upload
+# Models
 # ---------------------------------------------------------------------------
 
-@router.post("/files", response_model=FileUploadOut)
-async def upload_file(request: Request, file: UploadFile, db: AsyncSession = Depends(get_db)):
-    filename = Path(file.filename or "upload").name
-    if not filename or filename == ".":
-        raise HTTPException(status_code=400, detail="A valid filename is required")
-    # Prevent path traversal via ..\ or ../ sequences in the filename
-    filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
 
-    extension = (filename.rsplit(".", 1)[-1] if "." in filename else "").lower()
-    if extension not in settings.ALLOWED_UPLOAD_EXTENSIONS:
-        raise HTTPException(status_code=415, detail=f"Unsupported file type: .{extension}")
-
-    # Early size check via Content-Length header — reject before reading into memory
-    content_length = request.headers.get("content-length")
-    if content_length:
-        try:
-            size_mb = int(content_length) / (1024 * 1024)
-            if size_mb > settings.MAX_UPLOAD_SIZE_MB:
-                raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit")
-        except (ValueError, TypeError):
-            pass  # Malformed header — fall through to the read-based check below
-
-    contents = await file.read()
-    size_mb = len(contents) / (1024 * 1024)
-    if size_mb > settings.MAX_UPLOAD_SIZE_MB:
-        raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit")
-
-    # Magic byte validation - verify the file contents match the declared extension.
-    # Skipped gracefully if libmagic isn't installed on this system (extension
-    # check above still applies).
-    _magic = _get_magic()
-    if _magic:
-        try:
-            detected_mime = _magic.from_buffer(contents)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail="Could not determine file type") from exc
-
-        allowed_mimes = ALLOWED_MIME_TYPES.get(extension, [])
-        if allowed_mimes and detected_mime not in allowed_mimes:
-            raise HTTPException(
-                status_code=415,
-                detail=f"File content does not match extension .{extension}. Detected: {detected_mime}"
-            )
-
-    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    stored_name = f"{uuid.uuid4().hex[:12]}_{filename}"
-    stored_path = settings.UPLOAD_DIR / stored_name
-    stored_path.write_bytes(contents)
-
-    extracted = extract_text(stored_path, extension)
-
-    record = UploadedFile(
-        filename=filename,
-        stored_path=str(stored_path),
-        extension=extension,
-        size_bytes=len(contents),
-        extracted_text=extracted,
+def _to_model_info(model) -> ModelInfo:
+    """Normalize a provider model (dataclass *or* dict) into the wire schema."""
+    if isinstance(model, dict):
+        return ModelInfo(
+            id=model["id"],
+            name=model.get("name") or model["id"],
+            provider=model.get("provider") or model.get("provider_id", ""),
+            litellm_id=model.get("litellm_id") or model["id"],
+            context_window=model.get("context_window"),
+            capabilities=model.get("capabilities"),
+        )
+    return ModelInfo(
+        id=model.id,
+        name=model.name,
+        provider=getattr(model, "provider", None) or getattr(model, "provider_id", ""),
+        litellm_id=getattr(model, "litellm_id", None) or model.id,
+        context_window=getattr(model, "context_window", None),
+        capabilities=getattr(model, "capabilities", None),
     )
-    db.add(record)
-    await db.commit()
-    await db.refresh(record)
 
-    # Index document for RAG (non-blocking — failure doesn't break upload)
-    if extracted:
-        index_document(record.id, extracted, filename)
 
-    return FileUploadOut(
-        file_id=record.id,
-        filename=record.filename,
-        extension=record.extension,
-        size_bytes=record.size_bytes,
-        preview=truncate_preview(extracted) if extracted else None,
-    )
+@router.get("/models", response_model=list[ModelInfo])
+async def get_models(db: AsyncSession = Depends(get_db)):
+    """Get all selectable models from every linked provider."""
+    return [_to_model_info(m) for m in await llm.list_models(db)]
+
+
+# ---------------------------------------------------------------------------
+# Model selection
+# ---------------------------------------------------------------------------
+
+
+@router.get("/models/{provider}", response_model=list[ProviderModelEntry])
+async def get_provider_models(provider: str, db: AsyncSession = Depends(get_db)):
+    """Get the selectable models that belong to one provider."""
+    entries = [_to_model_info(m) for m in await llm.list_models(db)]
+    return [
+        ProviderModelEntry(id=m.id, name=m.name, provider=m.provider)
+        for m in entries
+        if m.provider == provider
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Chat streaming
 # ---------------------------------------------------------------------------
+
 
 # SSE heartbeat interval (seconds) — keeps proxies/load-balancers from timing out
 # long-lived streaming connections during slow model generations.
@@ -502,8 +621,6 @@ SSE_HEARTBEAT_INTERVAL = 15
 
 
 @router.post("/chat/stream")
-
-
 async def chat_stream(  # noqa: PLR0912
     payload: ChatStreamRequest,
     request: Request,
@@ -654,8 +771,6 @@ async def chat_stream(  # noqa: PLR0912
                         metadata={"options": options},
                     )
                     yield sse_response_event(ev)
-                    yield sse_response_event(builder.message_end(finish_reason=FinishReason.STOP))
-                    yield sse_event("[DONE]")
                 except (GeneratorExit, asyncio.CancelledError):
                     await clarify_db.rollback()
                     if not payload.chat_id:
@@ -834,3 +949,109 @@ async def chat_stream(  # noqa: PLR0912
                 return
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# Agentic Reasoning Endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.post("/agentic-reasoning")
+async def agentic_reasoning_endpoint(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Enhance the user's message with reasoning + tool use.
+
+    Returns the enriched message (and the tool calls that produced it) so the
+    client can send it through the normal ``/chat/stream`` pipeline.
+    """
+    body = await request.json()
+    message = body.get("message", "")
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    model_id = body.get("model") or ""
+    chat_id = body.get("chat_id")
+
+    # --- Reasoning panel settings -------------------------------------
+    try:
+        max_iterations = max(1, min(int(body.get("max_iterations", 3)), 5))
+    except (TypeError, ValueError):
+        max_iterations = 3
+
+    # The panel groups tools; expand the groups into concrete tool names.
+    _TOOL_GROUPS = {
+        "web_search": ["web_search"],
+        "file_operations": ["read_file", "list_files"],
+        "code_execution": ["execute_code"],
+    }
+    allowed_tools: list[str] = []
+    for entry in body.get("tools") or []:
+        allowed_tools.extend(_TOOL_GROUPS.get(entry, [entry]))
+
+    try:
+        # Chat history gives the reasoning loop the conversation context.
+        chat_history = []
+        if chat_id:
+            chat_result = await db.execute(
+                select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.messages))
+            )
+            chat = chat_result.scalar_one_or_none()
+            if chat:
+                chat_history = [
+                    ChatMessage(role=msg.role, content=msg.content)
+                    for msg in chat.messages
+                ]
+
+        # The agent package lives in `<project root>/.agents`.
+        agents_dir = str(Path(__file__).resolve().parents[2] / ".agents")
+        if agents_dir not in sys.path:
+            sys.path.append(agents_dir)
+
+        from agentic_reasoning import (
+            AgenticReasoningConfig,
+            enhance_chat_response_with_reasoning,
+        )
+
+        config = AgenticReasoningConfig(
+            max_iterations=max_iterations,
+            enable_tools=bool(allowed_tools),
+            allowed_tools=allowed_tools,
+        )
+
+        enhanced_message, tool_results = await enhance_chat_response_with_reasoning(
+            user_message=message,
+            model_id=model_id,
+            db=db,
+            chat_history=chat_history or None,
+            config=config,
+        )
+
+        tool_results_data = [
+            {
+                "tool_call_id": r.tool_call_id,
+                "name": r.name,
+                "content": str(r.content) if r.content else "",
+                "error": r.error,
+                "is_error": r.is_error,
+            }
+            for r in tool_results
+            if not r.is_error  # failed tools are logged, never shown as context
+        ]
+
+        return {
+            "enhanced_message": enhanced_message or message,
+            "reasoning_used": bool(tool_results_data),
+            "tool_results": tool_results_data,
+        }
+
+    except Exception as exc:  # noqa: BLE001 — enhancement must never block chat
+        logger.error("Agentic reasoning failed: %s", exc)
+        return {
+            "enhanced_message": message,
+            "reasoning_used": False,
+            "tool_results": [],
+            "error": str(exc),
+        }

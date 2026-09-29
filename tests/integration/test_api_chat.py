@@ -25,14 +25,14 @@ if TEST_DB_PATH.exists():
     TEST_DB_PATH.unlink()
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
 
-from mainfiles.backend.config import reset_settings, settings as config_settings
+from backend.config import reset_settings, settings as config_settings
 reset_settings()
 config_settings.DATABASE_URL = os.environ["DATABASE_URL"]
 
 from httpx import ASGITransport, AsyncClient
-from mainfiles.backend.main import app
-from mainfiles.backend.database import init_db, reset_db
-from mainfiles.backend.ratelimit_redis import reset_rate_limit_store_for_testing
+from backend.main import app
+from backend.database import init_db, reset_db
+from backend.ratelimit_redis import reset_rate_limit_store_for_testing
 
 
 

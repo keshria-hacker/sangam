@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 # Enable test mode
 os.environ["TEST_MODE"] = "1"
@@ -22,7 +22,7 @@ _test_key = Fernet.generate_key().decode()
 os.environ["MASTER_KEY"] = _test_key
 
 from pathlib import Path
-from prompt_injection import (
+from backend.prompt_injection import (
     detect_injection,
     sanitize_for_log,
     validate_messages,
