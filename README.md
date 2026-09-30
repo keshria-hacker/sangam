@@ -163,7 +163,7 @@ API keys can also be managed later from:
 Simply run:
 
 ```bash
-run.bat
+start.bat
 ```
 
 Or:
@@ -316,13 +316,19 @@ See [`SECURITY.md`](SECURITY.md) for security and vulnerability reporting inform
 
 ## 🧪 Testing
 
-Run the test suite from the project root:
-
 ```bash
+# From project root
 venv\Scripts\python.exe -m pytest tests/ -v
+
+# Quality checks (lint + typecheck + tests)
+./scripts/quality.sh      # Linux / macOS
+.\scripts\quality.ps1     # Windows
 ```
 
-Tests cover core functionality including authentication, document processing, model discovery, streaming, Skills, and web search.
+The suite lives in a single `tests/` tree (~1,000 tests across unit and
+integration layers, one file per domain). `TEST_MODE=1` is set automatically
+by the conftest; every DB-backed test binds a per-test SQLite file with a
+hard guard against the production database.
 
 ---
 

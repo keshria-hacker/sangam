@@ -34,7 +34,7 @@
 - Paper / Ink theme system (light / dark / system) — monochrome design tokens
 - Extensible Skills system
 - Local authentication (single-user, password-hashed)
-- Ollama auto-detection (auto-start is a stub — user must run `ollama serve` manually)
+- Ollama auto-detection (auto-starts `ollama serve` when the executable is on PATH)
 
 ---
 
@@ -144,8 +144,8 @@ sangam/
 │   ├── test_main.py            # App factory, lifespan, health, CSRF middleware
 │   ├── test_models.py          # Model discovery + selection
 │   ├── test_providers.py       # Provider registry + adapters
-│   ├── test_rag.py             # Chunking + vector retrieval
-│   ├── test_websearch.py       # Web search parsers│   └── ...                     # One file per domain
+│   ├── test_rag.py             # Chunking + vector retrieval│   ├── test_websearch.py       # Web search parsers
+│   └── ...                     # One file per domain
 ├── scripts/                    # Developer tooling
 │   ├── quality.sh / quality.ps1# Lint + typecheck + test runner
 │   ├── runtime_verify.py       # Provider tool-calling runtime verification
@@ -183,14 +183,21 @@ sangam/
 async def lifespan(app: FastAPI):
     settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     (BASE_DIR / "history").mkdir(parents=True, exist_ok=True)
+    (BASE_DIR / "logs").mkdir(parents=True, exist_ok=True)
     await init_db()       # Create all SQLAlchemy tables
+    logger.info("Application startup complete")
     yield
+    _cleanup_ollama()             # stop auto-started Ollama, if any
+    await close_rate_limit_store()  # close Redis, if configured
+    logger.info("Application shutdown")
 ```
 
 The lifespan handler runs on startup:
-1. Creates the `uploads/` directory if missing
-2. Creates the `history/` directory if missing  
-3. Runs `Base.metadata.create_all` to create all database tables
+1. Creates the `uploads/`, `history/`, and `logs/` directories if missing
+2. Runs `Base.metadata.create_all` to create all database tables
+
+On shutdown it cleans up the auto-started Ollama process (if any) and closes
+the Redis rate-limit store (if configured).
 
 ### 3.3 CORS Configuration
 
@@ -206,7 +213,27 @@ app.add_middleware(
 
 The CORS middleware allows the frontend (running on port 5500) to call the backend (port 8001).
 
-### 3.4 Router Mounting
+### 3.4 API Layering
+
+Route handlers live in `mainfiles/backend/api_routes/`, split by resource:
+
+| Module | Endpoints |
+|--------|-----------|
+| `common.py` | SSE framing helpers, upload MIME validation, shared routers |
+| `providers_routes.py` | Provider key CRUD, live model refresh, websearch, `/health`, provider status |
+| `files_routes.py` | Document upload (validation → storage → extraction → RAG index) |
+| `chats_routes.py` | Chat CRUD, user preferences, rolling summary, message feedback |
+| `models_routes.py` | Model catalogue (`/models`, `/models/{provider}`) |
+| `chat_stream_routes.py` | The streaming pipeline (`/chat/stream`) + `/agentic-reasoning` |
+
+`mainfiles/backend/api.py` is a thin **facade**: it imports the route modules
+(which register their endpoints on the shared routers) and re-exports every
+handler plus the shared module objects (`llm`, `websearch`, `settings`, ...).
+`main.py` mounts `router`/`public_router` from `api.py`, and tests patch
+`backend.api.llm.*` exactly as before — the route modules import the same
+module objects, so a patch on either path affects both.
+
+### 3.5 Router Mounting
 
 ```python
 app.include_router(auth_router, prefix=settings.API_PREFIX)                    # /api/auth/*
@@ -257,7 +284,7 @@ The frontend is a vanilla JS SPA served as static files. There is no build step,
 
 ### 4.3 Module Organization
 
-The frontend now uses a **feature-based module structure** under `frontend/js/features/` — each feature owns its own DOM, state, and logic:
+The frontend now uses a **feature-based module structure** under `mainfiles/frontend/js/features/` — each feature owns its own DOM, state, and logic:
 
 | Module | Responsibility |
 |--------|----------------|
@@ -268,7 +295,10 @@ The frontend now uses a **feature-based module structure** under `frontend/js/fe
 | `shared/toast.js` | Toast notifications |
 | `shared/utils.js` | `escapeHtml`, `formatDate`, `debounce`, etc. |
 | `features/auth/auth.js` | Login, register, forgot password, session check |
-| `features/chat/chat.js` | Message rendering, SSE streaming, send/regenerate, file attachments |
+| `features/chat/chat.js` | Streaming pipeline, send/regenerate, composer + file attachments |
+| `features/chat/message_view.js` | Message DOM construction + in-stream status widgets (thinking phase, reasoning, tools, citations, artifacts) |
+| `features/chat/response_controller.js` | Canonical SSE event state machine (sequence/ordering enforcement, buffering) |
+| `features/chat/autoscroll.js` | Smart auto-scroll with hysteresis + "↓ Jump to latest" |
 | `features/models/models.js` | Model selector dropdown, provider status badges, "no models" handling |
 | `features/settings/settings.js` | Theme (Paper/Ink/system), font size, chat width, code theme, animations; provider key manager (add/remove keys) |
 | `features/skills/skills.js` | Skills modal: search, category/invocation filters, detail panel, execution |
@@ -357,7 +387,7 @@ Design rules:
 - **Interaction states** — every control defines default / hover / focus-visible / active / disabled; micro-interactions run at 120 ms (fast) / 200 ms (medium) on `cubic-bezier(.4,0,.2,1)`.
 - **Motion & contrast** — `prefers-reduced-motion` collapses animation; `forced-colors` keeps focus rings visible under Windows High Contrast.
 
-See [`docs/design-system.md`](docs/design-system.md) for the full token reference and component guidance.
+Design tokens live directly in `mainfiles/frontend/css/style.css` (the `:root` / `[data-theme]` variable blocks).
 
 ---
 
@@ -556,14 +586,18 @@ CURATED_MODELS = {
 Ollama gets special treatment:
 
 ```python
-async def list_ollama_models():
+async def fetch_ollama_models(base_url):
     # 1. Query local Ollama server: GET /api/tags
-    # 2. If unreachable, try to auto-start `ollama serve` in background
+    # 2. If unreachable, auto-start `ollama serve` in the background
     # 3. Query again after a delay
     # 4. Return real pulled models only
 ```
 
-The `_try_start_ollama()` function **attempts** to spawn a detached `ollama serve` process so the user doesn't need to start Ollama manually. However, this is currently a **stub implementation** — it logs the attempt but does not actually spawn the process. Users must run `ollama serve` manually for local models to work.
+`_try_start_ollama()` (in `providers/ollama.py`) spawns a detached
+`ollama serve` process when the server is unreachable and an `ollama`
+executable is on `PATH`; `_cleanup_ollama()` terminates it on shutdown. If
+Ollama is not installed, discovery simply returns no local models — users
+can also run `ollama serve` manually.
 
 ### 7.4 Model Resolution
 
@@ -611,38 +645,38 @@ The request body (`ChatStreamRequest`) includes:
 }
 ```
 
-Processing pipeline:
-1. **Web search** (optional) — inject live web results as a system message
-2. **Chat resolution** — find existing or create new `Chat` record
-3. **File context** — attach extracted text from uploaded files
-4. **Persist user message** — save to `messages` table (skipped on regenerate)
-5. **Stream** — call `llm.stream_completion()` and yield SSE tokens
-6. **Persist assistant reply** — save complete response after streaming ends
+Processing pipeline (implemented in `api_routes/chat_stream_routes.py`):
+1. **Model validation** — resolve the model up front; unknown models fail fast with 400
+2. **Web search** (optional) — inject live web results as a system message
+3. **Chat resolution** — find existing or create new `Chat` record
+4. **File context** — attach retrieved RAG chunks from uploaded files
+5. **Response intelligence** — analyze the request and inject style guidance; stored user preferences override detected signals
+6. **Clarification gate** — ambiguous short requests are intercepted with a clarification_request event instead of calling the provider
+7. **Cross-session memory** — inject relevant past-conversation summaries
+8. **Context truncation** — token-budget the message list to the model's window
+9. **Stream** — emit canonical response events (`message_start` → deltas → `message_end` → `[DONE]`) with heartbeats
+10. **Persist** — save user + assistant messages atomically; trigger rolling summarization in the background
 
 ### 8.2 Provider Routing (`stream_completion`)
 
-```python
-async def stream_completion(model_id, messages, db, temperature, max_tokens):
-    model = _resolve_model(model_id)  # Convert app model_id → ModelInfo
-    if model.provider == "ollama":
-        async for token in _stream_ollama_completion(model, messages, temperature, max_tokens):
-            yield token
-        return
+The provider package routes each model to its adapter (Ollama streams
+natively; cloud providers stream through LiteLLM):
 
-    # Cloud provider: use LiteLLM
-    api_key = await resolve_api_key(model.provider, db)
-    response = await litellm.acompletion(
-        model=model.litellm_id,
-        messages=messages,
-        stream=True,
-        api_key=api_key,
-        api_base=base_url,  # Custom base URL (NVIDIA, etc.)
-    )
-    async for chunk in response:
-        yield chunk.choices[0].delta.content or ""
+```python
+# mainfiles/backend/providers/__init__.py — stream_completion()
+provider_id, litellm_id = _resolve_model(model_id)   # "ollama::x" -> ("ollama", "ollama/x")
+provider_class = registry.get_provider_class(provider_id) or LiteLLMProvider
+provider = provider_class(config, await resolve_api_key(provider_id, db))
+async for chunk in provider.stream_completion(model_id=model_id, messages=messages, ...):
+    yield chunk
 ```
 
-**Ollama streaming** uses its native `/api/chat` endpoint with SSE parsing for better support of reasoning models:
+The canonical event stream (`stream_response_events`) wraps this with
+`message_start` / `text_delta` / `message_end` lifecycle events, tool-call
+execution, and error normalization — see `response_events.py`.
+
+**Ollama streaming** uses its native `/api/chat` endpoint with JSON-line
+parsing for better support of reasoning models:
 
 ```python
 payload = {"model": model.name, "messages": messages, "stream": True, "options": {...}}
@@ -660,7 +694,7 @@ async with client.stream("POST", endpoint, json=payload) as response:
 
 ### 9.1 Skill Definition Format
 
-Skills are defined as `SKILL.md` files in `config/skills/<skill-name>/SKILL.md` using YAML front matter:
+Skills are defined as `SKILL.md` files in `mainfiles/config/skills/<skill-name>/SKILL.md` using YAML front matter:
 
 ```markdown
 ---
@@ -700,7 +734,7 @@ You are an API design expert. Given the following requirements...
 ### 9.3 Skill Registry
 
 The `SkillRegistry` class:
-1. Scans `config/skills/` for `SKILL.md` files
+1. Scans `mainfiles/config/skills/` for `SKILL.md` files
 2. Parses YAML front matter + body
 3. Validates parameters, categories, invocation types
 4. Supports dependency resolution (`resolve()` — DFS traversal with cycle detection)
@@ -858,7 +892,7 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 [relevant chunk]
 ```
 
-**RAG Pipeline (backend/rag.py):**
+**RAG Pipeline (mainfiles/backend/rag.py):**
 
 | Step | Function | Description |
 |------|----------|-------------|
@@ -880,17 +914,34 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 
 ### 12.1 Test Suite Overview
 
+Single consolidated tree under `tests/` — one file per domain, unit tests at
+the top level and API-level integration tests under `tests/integration/`.
+~1,000 tests total (948 root + 38 integration as of the 2026-09 refactor).
+
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
-| `test_auth.py` | 8 | Password hashing, token generation, security properties |
-| `test_document.py` | 22 | Text extraction, preview truncation, chunking, RAG retrieval |
-| `test_schemas.py` | 2 | ChatStreamRequest validation rules |
-| `test_model_selection.py` | 8 | Live model fetch, filtering, Ollama discovery, fallback logic |
-| `test_skills.py` | 1 | Skill model selection (real model, not hardcoded) |
-| `test_skill_registry.py` | 2 | SKILL.md loading, parameter validation |
-| `test_startup.py` | 2 | Launcher command construction, dependency caching |
-| `test_streaming.py` | 1 | SSE event formatting |
-| `test_websearch.py` | 4 | DuckDuckGo parser, format_context, live search |
+| `test_document.py` | 129 | Text extraction (PDF/DOCX/CSV/XLSX/PPTX/OCR), truncation |
+| `test_auth.py` | 88 | Hashing, sessions, CSRF, lockout, endpoints, production mode |
+| `test_llm.py` | 69 | Provider facade, model resolution, discovery wrappers |
+| `test_rag.py` | 68 | Chunking, indexing, retrieval, cleanup |
+| `test_websearch.py` | 57 | DuckDuckGo parsing, context formatting, providers |
+| `test_prompt_injection_new.py` | 54 | Injection detection, log sanitization, validation |
+| `test_api.py` | 53 | Route handlers (all endpoints, patch-level) |
+| `test_provider_adapters.py` | 52 | Provider base/registry/adapter protocol |
+| `test_providers.py` | 47 | Provider registry facade (list/status/stream) |
+| `test_response_intelligence.py` | 46 | Request analysis, guidance, prompt additions |
+| `test_policy_domain.py` | 42 | Response policy + domain dataclasses |
+| `test_policy_integration.py` | 39 | Policy integration with chat flow |
+| `test_policy_module.py` | 37 | Policy selector/adapter/manager |
+| `test_context_manager.py` | 37 | Token budgeting, safe truncation |
+| `test_models.py` | 36 | Model discovery + selection |
+| `test_executor_coverage.py` | 31 | Skills executor |
+| `test_main.py` | 29 | App factory, lifespan, health, CSRF middleware |
+| `test_capability_orchestration.py` | 16 | Clarification heuristics, capability decisions |
+| `test_response_events.py` | 11 | Canonical event builder/serialization |
+| `test_postprocessor.py` | 11 | Uncertainty hedging |
+| `test_preferences.py` / `test_clarification.py` / `test_message_feedback.py` / `test_memory.py` | 9/9/8/8 | Preferences, clarification gate, feedback, memory/summaries |
+| `tests/integration/` | 38 | Auth, models, chat, security (HTTP-level) |
 
 ### 12.2 Running Tests
 
@@ -905,12 +956,15 @@ DB-backed test binds a per-test SQLite file guarded against the production DB.
 
 ### 12.3 CI Pipeline (GitHub Actions)
 
-The `.github/workflows/ci.yml` runs on push/PR to `main`:
-1. Checkout + setup Python 3.12 + Node.js 22
+The `.github/workflows/ci.yml` runs on push to `main`/`sangam` and on PRs:
+1. Checkout + setup Python 3.13 + Node.js 22
 2. Install Python dependencies
-3. `compileall` check on backend
-4. Run all unit tests
-5. `node --check` on frontend JS files
+3. `compileall` check on backend, scripts, and tests
+4. Run the full pytest suite (`TEST_MODE=1`)
+5. `node --check` on every frontend JS file
+
+A second `security` job runs Bandit (static analysis) and Safety (dependency
+vulnerabilities) and uploads the reports as artifacts.
 
 ---
 
@@ -925,6 +979,10 @@ ENV=development                                # environment
 APP_DEBUG=true                                 # SQLAlchemy echo + FastAPI debug
 API_PREFIX=/api                                # URL prefix for all routes
 ALLOWED_ORIGINS=["http://localhost:5500","http://127.0.0.1:5500"]
+
+# --- Security ---
+MASTER_KEY=                                   # Fernet key for provider-key encryption at rest.
+                                              # start.py auto-generates one on first run if blank.
 
 # --- Storage ---
 MAX_UPLOAD_SIZE_MB=25                          # File upload limit
@@ -944,6 +1002,10 @@ GEMINI_API_KEY=AIza...
 OLLAMA_BASE_URL=http://localhost:11434
 LM_STUDIO_BASE_URL=http://localhost:1234/v1
 VLLM_BASE_URL=http://localhost:8001/v1
+
+# --- OpenAI-compatible custom providers ---
+OMNIROUTE_API_KEY=                            # optional
+OMNIROUTE_BASE_URL=http://localhost:20128/v1
 
 # --- Web Search (optional, DuckDuckGo is default) ---
 WEB_SEARCH_PROVIDER=          # tavily, brave, or blank for DuckDuckGo
@@ -977,6 +1039,13 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/skills/execute` | Yes | Execute skill |
 | POST | `/api/skills/chain` | Yes | Chain skills |
 | POST | `/api/skills/auto-suggest` | Yes | Suggest skills |
+| GET | `/api/chats/{id}/summary` | Yes | Rolling summary + key topics |
+| POST | `/api/messages/{id}/feedback` | Yes | Thumbs up/down feedback |
+| GET/PUT | `/api/user/preferences` | Yes | Response-style preferences |
+| GET | `/api/settings/providers/{id}/models/refresh` | Yes | Live model catalogue fetch |
+| POST | `/api/models/inaccessible/clear` | Yes | Reset inaccessible-model flags |
+| POST | `/api/agentic-reasoning` | Yes | Enhance message with reasoning + tools |
+| GET | `/health` (no prefix) | No | Deep health check (DB + Ollama) |
 
 ### 13.3 Database Schema
 
@@ -1046,8 +1115,8 @@ The `start.py` launcher:
 2. **Install dependencies** — `pip install -r requirements.txt` (with SHA-256 caching)
 3. **Create `.env`** — copies `.env.example` if `.env` doesn't exist
 4. **Free stale ports** — kills any process holding port 8001 or 5500
-5. **Start backend** — `uvicorn main:app --host 127.0.0.1 --port 8001`
-6. **Start frontend** — `python -m http.server 5500` serving `frontend/`
+5. **Start backend** — `python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001` (with `mainfiles/` on `PYTHONPATH`)
+6. **Start frontend** — `python -m http.server 5500` serving `mainfiles/frontend/`
 7. **Monitor** — watches both processes; terminates both on Ctrl+C
 
 ### 13.5 Ports
@@ -1090,15 +1159,16 @@ The `start.py` launcher:
 │  ┌─────────────────────────┴─────────────────────────────────────────┐ │
 │  │  main.py — FastAPI app + CORS + lifespan                          │ │
 │  │  ├── /api/auth/* — auth.py (register, login, logout, session)     │ │
-│  │  ├── /api/* — api.py (chat, models, files, providers, settings)   │ │
+│  │  ├── /api/* — api.py facade -> api_routes/ (chat, models,          │ │
+│  │  │    files, providers, settings)                                 │ │
 │  │  └── /api/skills/* — skills/api_skills.py (skills CRUD + execute) │ │
 │  └─────────────────────────┬─────────────────────────────────────────┘ │
 │                            │                                            │
 │  ┌─────────────────────────┴─────────────────────────────────────────┐ │
-│  │  LLM Layer (llm.py)                                               │ │
+│  │  LLM Layer (llm.py facade -> providers/)                           │ │
 │  │  ├── list_models() → live API fetch + curated fallback            │ │
 │  │  ├── list_provider_status() → online/offline/needs_key per provider│ │
-│  │  ├── stream_completion() → Ollama native or LiteLLM               │ │
+│  │  ├── stream_completion() → provider adapters (Ollama/LiteLLM)     │ │
 │  │  └── resolve_api_key() → DB keys (Fernet) or .env fallback       │ │
 │  └─────────────────────────┬─────────────────────────────────────────┘ │
 │                            │                                            │
