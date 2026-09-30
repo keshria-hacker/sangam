@@ -5,7 +5,7 @@ Provider-neutral: works with all providers that support system messages.
 """
 from __future__ import annotations
 
-from .schema import ResponseGuidance, QueryMode
+from .schema import QueryMode, ResponseGuidance
 
 
 def build_system_prompt_additions(guidance: ResponseGuidance) -> list[str]:
@@ -133,12 +133,12 @@ def _add_tone_instruction(tone: str, additions: list[str]) -> None:
 def format_guidance_for_debug(guidance: ResponseGuidance) -> str:
     """Format guidance for logging/debugging."""
     lines = [
-        f"=== Response Intelligence Guidance ===",
+        "=== Response Intelligence Guidance ===",
         f"Mode: {guidance.mode.value}",
         f"Confidence: {guidance.confidence:.2f}",
         f"Source: {guidance.source}",
-        f"",
-        f"Intent Signals:",
+        "",
+        "Intent Signals:",
         f"  wants_concise: {guidance.intent.wants_concise}",
         f"  wants_detailed: {guidance.intent.wants_detailed}",
         f"  wants_direct_answer: {guidance.intent.wants_direct_answer}",
@@ -152,8 +152,8 @@ def format_guidance_for_debug(guidance: ResponseGuidance) -> str:
         f"  technical_depth: {guidance.intent.technical_depth}",
         f"  tone: {guidance.intent.tone}",
         f"  urgency: {guidance.intent.urgency}",
-        f"",
-        f"Profile:",
+        "",
+        "Profile:",
         f"  message_count: {guidance.profile.message_count}",
         f"  avg_user_length: {guidance.profile.avg_user_length}",
         f"  topics: {guidance.profile.topics}",
@@ -161,9 +161,9 @@ def format_guidance_for_debug(guidance: ResponseGuidance) -> str:
         f"  has_file_context: {guidance.profile.has_file_context}",
         f"  user_prefers_concise: {guidance.profile.user_prefers_concise}",
         f"  user_prefers_detailed: {guidance.profile.user_prefers_detailed}",
-        f"",
+        "",
         f"Constraints: {guidance.constraints}",
-        f"",
+        "",
         f"System Prompt Additions ({len(guidance.system_prompt_additions)}):",
     ]
     for i, addition in enumerate(guidance.system_prompt_additions, 1):

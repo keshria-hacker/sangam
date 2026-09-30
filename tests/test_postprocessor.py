@@ -12,7 +12,7 @@ os.environ["TEST_MODE"] = "1"
 import sys
 from pathlib import Path
 
-_MAINFILES = Path(__file__).resolve().parents[2]
+_MAINFILES = Path(__file__).resolve().parents[1]
 if str(_MAINFILES) not in sys.path:
     sys.path.insert(0, str(_MAINFILES))
 

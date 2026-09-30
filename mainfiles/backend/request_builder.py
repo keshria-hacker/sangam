@@ -7,19 +7,20 @@ adaptive response policies based on context, user preferences, and system state.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .domain import ChatMessage, ChatRequest
-from .response_policy import ResponsePolicy, build_chat_request as policy_build_chat_request
+from .response_policy import ResponsePolicy
+from .response_policy import build_chat_request as policy_build_chat_request
 
 
 def build_chat_request(
-    messages: List[ChatMessage],
+    messages: list[ChatMessage],
     model: str,
     policy: ResponsePolicy,
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> ChatRequest:
     """
     Build a chat request with the given policy applied.
@@ -49,11 +50,11 @@ def build_chat_request(
 
 
 def build_chat_request_from_conversation(
-    messages: List[ChatMessage],
+    messages: list[ChatMessage],
     model: str,
     policy: ResponsePolicy,
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
 ) -> ChatRequest:
     """
     Build a chat request from conversation history with policy applied.

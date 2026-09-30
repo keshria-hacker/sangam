@@ -2,42 +2,19 @@
 Enhanced LLM Provider Integration
 Integrates enhanced provider routing with the existing LLM facade
 """
-import asyncio
-import time
-from typing import AsyncGenerator, Optional, Dict, Any, List, Tuple
 from collections.abc import AsyncGenerator as AsyncGenType
+from typing import Any
+
+from ...response_events import FinishReason, ResponseEvent
+from ...response_intelligence import analyze_request
 
 # Import existing Sangam components
-from .. import (
-    PROVIDERS,
-    resolve_api_key,
-    _resolve_model,
-    stream_completion as original_stream_completion,
-    list_models,
-    registry
-)
-from ..base import ProviderStreamChunk, ModelInfo
-from .strategies import (
-    EnhancedRouter,
-    RoutingContext,
-    ProviderCandidate,
-    create_example_candidates
-)
-from .resilience import (
-    ResilienceManager,
-    CircuitBreakerConfig,
-    ConnectionPoolConfig,
-    ModelLockoutConfig
-)
-from .config import get_routing_config, RoutingStrategy
-from ...response_events import (
-    ResponseEvent,
-    ResponseEventBuilder,
-    ResponseEventType,
-    FinishReason
-)
-from ...response_intelligence import analyze_request, capability_decide
-from ...tools import ToolCall, ToolResult, executor, registry as tool_registry
+from .. import PROVIDERS, _resolve_model, registry, resolve_api_key
+from .. import stream_completion as original_stream_completion
+from ..base import ProviderStreamChunk
+from .config import get_routing_config
+from .resilience import ResilienceManager
+from .strategies import EnhancedRouter, RoutingContext
 
 MAX_TOOL_ROUNDS = 10
 DEFAULT_TOOL_TIMEOUT = 30.0
@@ -193,7 +170,7 @@ async def enhanced_stream_completion(
                 # Pass through provider chunks unchanged
                 yield chunk
                 
-    except Exception as e:
+    except Exception:
         # If enhanced routing fails, fall back to original implementation
         # but log the error for debugging
         async for chunk in original_stream_completion(
@@ -231,9 +208,9 @@ def _create_routing_context_from_guidance(guidance: Any, model_id: str, messages
     )
 
 
-async def _get_available_providers_for_model(model_id: str, db: Any) -> List[Tuple[str, Any, bool]]:
+async def _get_available_providers_for_model(model_id: str, db: Any) -> list[tuple[str, Any, bool]]:
     """Get list of providers that can handle the given model"""
-    from .. import PROVIDERS, resolve_api_key
+    from .. import resolve_api_key
     
     available = []
     
@@ -424,7 +401,7 @@ async def enhanced_stream_response_events(
                 yield event
         else:
             # Fall back to streaming completion and converting to events
-            from ....response_events import ResponseEventBuilder, ResponseEventType
+            from ....response_events import ResponseEventBuilder
             
             builder = ResponseEventBuilder(
                 provider=selected_provider_id,

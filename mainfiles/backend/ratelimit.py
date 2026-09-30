@@ -59,6 +59,7 @@ EXEMPT_PATHS = {
 
 # Test mode: set TEST_MODE=1 to disable rate limiting (for CI/tests)
 import os
+
 TEST_MODE = os.getenv("TEST_MODE") == "1"
 
 

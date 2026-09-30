@@ -2,12 +2,13 @@
 Resilience Layer for Provider Management
 Implements circuit breakers, connection cooldown, and model lockout mechanisms
 """
-import time
-import threading
-from enum import Enum
-from typing import Dict, Any, Optional, List, Callable
-from dataclasses import dataclass, field
 import logging
+import threading
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -150,9 +151,9 @@ class ResilienceManager:
     """Manages resilience mechanisms for providers"""
     
     def __init__(self,
-                 circuit_breaker_config: Optional[CircuitBreakerConfig] = None,
-                 connection_pool_config: Optional[ConnectionPoolConfig] = None,
-                 model_lockout_config: Optional[ModelLockoutConfig] = None):
+                 circuit_breaker_config: CircuitBreakerConfig | None = None,
+                 connection_pool_config: ConnectionPoolConfig | None = None,
+                 model_lockout_config: ModelLockoutConfig | None = None):
         """
         Initialize resilience manager
         
@@ -166,11 +167,11 @@ class ResilienceManager:
         self.model_lockout_config = model_lockout_config or ModelLockoutConfig()
         
         # Provider metrics storage
-        self._metrics: Dict[str, ProviderMetrics] = {}
+        self._metrics: dict[str, ProviderMetrics] = {}
         self._lock = threading.RLock()
         
         # Connection pools (simplified - in practice would use actual HTTP connection pools)
-        self._connection_pools: Dict[str, Any] = {}
+        self._connection_pools: dict[str, Any] = {}
     
     def get_metrics(self, provider_id: str) -> ProviderMetrics:
         """Get or create metrics for a provider"""
@@ -271,14 +272,14 @@ class ResilienceManager:
                 del self._metrics[pid]
                 logger.debug(f"Cleaned up metrics for provider {pid}")
     
-    def get_all_metrics(self) -> Dict[str, ProviderMetrics]:
+    def get_all_metrics(self) -> dict[str, ProviderMetrics]:
         """Get a copy of all provider metrics"""
         with self._lock:
             return self._metrics.copy()
 
 
 # Global resilience manager instance
-_resilience_manager: Optional[ResilienceManager] = None
+_resilience_manager: ResilienceManager | None = None
 
 
 def get_resilience_manager() -> ResilienceManager:
@@ -309,7 +310,7 @@ def with_resilience(provider_id: str):
                 latency = time.time() - start_time
                 resilience_manager.record_success(provider_id, latency)
                 return result
-            except Exception as e:
+            except Exception:
                 latency = time.time() - start_time
                 resilience_manager.record_failure(provider_id, latency)
                 raise
@@ -323,7 +324,7 @@ def with_resilience(provider_id: str):
                 latency = time.time() - start_time
                 resilience_manager.record_success(provider_id, latency)
                 return result
-            except Exception as e:
+            except Exception:
                 latency = time.time() - start_time
                 resilience_manager.record_failure(provider_id, latency)
                 raise

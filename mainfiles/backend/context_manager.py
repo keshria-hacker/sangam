@@ -20,7 +20,6 @@ from typing import Any
 import tiktoken
 
 from .providers.base import ModelInfo
-from .response_events import ModelCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -244,9 +243,7 @@ class ContextManager:
                         tool_call_ids.discard(next_msg["tool_call_id"])
                         if not tool_call_ids:
                             break
-                    elif next_msg.get("role") == "assistant" and next_msg.get("tool_calls"):
-                        break
-                    elif next_msg.get("role") == "user":
+                    elif next_msg.get("role") == "assistant" and next_msg.get("tool_calls") or next_msg.get("role") == "user":
                         break
                     j += 1
 

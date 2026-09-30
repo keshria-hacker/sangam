@@ -2,12 +2,11 @@
 Routing Strategy Interface and Base Implementations
 Based on OmniRoute's 19 routing strategies
 """
+import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
-import random
-import heapq
 from enum import Enum
+from typing import Any
 
 
 class TaskType(Enum):
@@ -26,13 +25,13 @@ class RoutingContext:
     messages: list[dict]
     temperature: float = 0.7
     max_tokens: int = 1024
-    reasoning_effort: Optional[str] = None
+    reasoning_effort: str | None = None
     priority: int = 0  # Higher priority gets better treatment
     task_type: str = "general"
     complexity: float = 0.5
     urgency: float = 0.5
-    session_id: Optional[str] = None
-    metadata: Dict[str, Any] = None
+    session_id: str | None = None
+    metadata: dict[str, Any] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -83,7 +82,7 @@ class ProviderCandidate:
             
         return min(score, 1.0)
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
             "provider_name": self.provider_name,
@@ -113,11 +112,11 @@ class RoutingStrategy(ABC):
         self.description = description
     
     @abstractmethod
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         """Select the best provider candidate based on the strategy"""
         pass
     
-    def filter_candidates(self, candidates: List[ProviderCandidate]) -> List[ProviderCandidate]:
+    def filter_candidates(self, candidates: list[ProviderCandidate]) -> list[ProviderCandidate]:
         """Filter out unavailable candidates"""
         return [c for c in candidates if c.is_available]
 
@@ -132,7 +131,7 @@ class PriorityStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("priority", "First-target ordered list with explicit priority")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -148,7 +147,7 @@ class WeightedStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("weighted", "Weighted random by per-target weight")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -183,7 +182,7 @@ class RoundRobinStrategy(RoutingStrategy):
         super().__init__("round-robin", "Cycle through targets in order")
         self._last_index = -1
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -199,7 +198,7 @@ class ContextRelayStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("context-relay", "Hand off context across targets (long conversations)")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -227,7 +226,7 @@ class FillFirstStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("fill-first", "Fill each target's quota before moving to next")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -243,7 +242,7 @@ class PowerOfTwoChoicesStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("p2c", "Power-of-2-choices random load balancing")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -267,7 +266,7 @@ class RandomStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("random", "Uniform random selection")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -281,7 +280,7 @@ class LeastUsedStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("least-used", "Pick target with lowest current load")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -297,7 +296,7 @@ class CostOptimizedStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("cost-optimized", "Minimize $ per request given catalog pricing")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -313,7 +312,7 @@ class ResetAwareStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("reset-aware", "Prioritize by quota reset time — short reset windows ranked higher")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -330,7 +329,7 @@ class ResetWindowStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("reset-window", "Prefer targets whose quota window resets soonest")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -346,7 +345,7 @@ class HeadroomStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("headroom", "Pick the target with the most remaining quota headroom")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -362,7 +361,7 @@ class StrictRandomStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("strict-random", "Random without deduplication of repeats")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -377,7 +376,7 @@ class AutoStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("auto", "Use Auto Combo scoring (14-factor)")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -490,9 +489,9 @@ class LastKnownGoodStrategy(RoutingStrategy):
     
     def __init__(self):
         super().__init__("lkgp", "Last-Known-Good Path (sticky route to last successful target)")
-        self._last_good_provider: Dict[str, str] = {}  # session_id -> provider_model
+        self._last_good_provider: dict[str, str] = {}  # session_id -> provider_model
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -522,7 +521,7 @@ class ContextOptimizedStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("context-optimized", "Pick target with best fit for current context size")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -561,7 +560,7 @@ class CacheOptimizedStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("cache-optimized", "Reorder targets by prompt-cache affinity")
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         filtered = self.filter_candidates(candidates)
         if not filtered:
             raise ValueError("No available candidates")
@@ -592,7 +591,7 @@ class FusionStrategy(RoutingStrategy):
         super().__init__("fusion", "Fan out to panel models in parallel, then synthesize via judge")
         self.judge_model = judge_model
     
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         # For fusion strategy, we return the judge model if specified,
         # otherwise we fall back to auto strategy for selecting the panel
         filtered = self.filter_candidates(candidates)
@@ -616,7 +615,7 @@ class PipelineStrategy(RoutingStrategy):
     def __init__(self):
         super().__init__("pipeline", "Run targets sequentially, threading output")
 
-    def select(self, candidates: List[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
+    def select(self, candidates: list[ProviderCandidate], context: RoutingContext) -> ProviderCandidate:
         # For pipeline, we typically want the first step in the pipeline
         # This would be configured per combo - for now return the "healthiest"
         # as a placeholder for the first stage
@@ -635,7 +634,7 @@ class EnhancedProviderManager:
     def __init__(self):
         self.strategy_factory = StrategyFactory()
 
-    def select_provider(self, candidates: List[ProviderCandidate], strategy_name: str, context: RoutingContext) -> ProviderCandidate:
+    def select_provider(self, candidates: list[ProviderCandidate], strategy_name: str, context: RoutingContext) -> ProviderCandidate:
         """
         Select a provider from candidates using the specified strategy
 
@@ -696,7 +695,7 @@ class StrategyFactory:
         return strategy_class(**kwargs)
 
     @classmethod
-    def get_available_strategies(cls) -> List[str]:
+    def get_available_strategies(cls) -> list[str]:
         """Get list of available strategy names"""
         return list(cls._strategies.keys())
 
@@ -744,8 +743,8 @@ class EnhancedRouter:
         self.enable_quality_optimization = enable_quality_optimization
 
         # Provider registry: provider_id -> config
-        self.providers: Dict[str, Any] = {}
-        self.provider_locals: Dict[str, bool] = {}  # provider_id -> is_local
+        self.providers: dict[str, Any] = {}
+        self.provider_locals: dict[str, bool] = {}  # provider_id -> is_local
 
         # Strategy factory
         self.strategy_factory = StrategyFactory()
@@ -837,7 +836,7 @@ class EnhancedRouter:
 
             return selected_candidate.provider_name
 
-        except Exception as e:
+        except Exception:
             # Fallback to first available provider if selection fails
             if self.providers:
                 return list(self.providers.keys())[0]
@@ -869,7 +868,7 @@ class EnhancedRouter:
 # EXAMPLE USAGE AND TESTING
 # ============================================================================
 
-def create_example_candidates() -> List[ProviderCandidate]:
+def create_example_candidates() -> list[ProviderCandidate]:
     """Create example provider candidates for testing"""
     return [
         ProviderCandidate(

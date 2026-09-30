@@ -14,7 +14,6 @@ from ..response_events import (
     normalize_finish_reason,
     normalize_usage,
 )
-from ..response_events import ResponseEventType
 
 
 @dataclass

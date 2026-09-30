@@ -4,13 +4,11 @@ Kept separate from models.py (SQLAlchemy) so persistence and the wire
 format can evolve independently.
 """
 from datetime import datetime
-
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .response_events import ModelCapabilities
-
 
 
 class ChatMessageIn(BaseModel):

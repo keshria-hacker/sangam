@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import AsyncGenerator, List, Dict, Any
 
-from backend.tests.conftest import (
+from tests.conftest import (
     ResponsePolicy,
     ChatMessage,
     ChatRequest,

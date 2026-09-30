@@ -8,7 +8,7 @@ import pytest
 from dataclasses import FrozenInstanceError
 from typing import List
 
-from backend.tests.conftest import (
+from tests.conftest import (
     ResponsePolicy,
     ChatMessage,
     ChatRequest,

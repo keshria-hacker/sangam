@@ -319,7 +319,7 @@ See [`SECURITY.md`](SECURITY.md) for security and vulnerability reporting inform
 Run the test suite from the project root:
 
 ```bash
-venv\Scripts\python.exe -m unittest discover -s tests -v
+venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
 Tests cover core functionality including authentication, document processing, model discovery, streaming, Skills, and web search.

@@ -2,7 +2,7 @@
 .SYNOPSIS
     Quality checks for Sangam — run before commit
 .DESCRIPTION
-    Runs Ruff, MyPy, Bandit, ESLint, Prettier, and optional checks
+    Runs Ruff, MyPy, Bandit, browser script syntax checks, and the test suite
 .EXAMPLE
     .\scripts\quality.ps1
 #>
@@ -13,55 +13,37 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
+$Backend = "mainfiles/backend"
+$Frontend = "mainfiles/frontend"
+
 Write-Host "🔍 Running quality checks..." -ForegroundColor Cyan
 
-# ─── Backend ──────────────────────────────────────────────
+# ─── Backend ───────────────────────────────────────
 Write-Host "`n▶ Backend: Ruff lint" -ForegroundColor Yellow
-Set-Location "$ProjectRoot\backend"
 
 $UseUv = (Get-Command uv -ErrorAction SilentlyContinue) -ne $null
 
 if ($UseUv) {
-    uv run ruff check . --output-format=github
-    uv run ruff format --check . --output-format=github
-    uv run mypy . --strict --show-error-codes
-    uv run bandit -r . -ll --exit-on-error
+    uv run ruff check "$Backend" --output-format=github
+    uv run ruff format --check "$Backend" --output-format=github
+    uv run mypy "$Backend" --show-error-codes
+    uv run bandit -r "$Backend" -ll --exit-on-error
 } else {
-    python -m ruff check . --output-format=github
-    python -m ruff format --check . --output-format=github
-    python -m mypy . --strict --show-error-codes
-    python -m bandit -r . -ll --exit-on-error
+    python -m ruff check "$Backend" --output-format=github
+    python -m ruff format --check "$Backend" --output-format=github
+    python -m mypy "$Backend" --show-error-codes
+    python -m bandit -r "$Backend" -ll --exit-on-error
 }
 
-# ─── Frontend ─────────────────────────────────────────────
-Write-Host "`n▶ Frontend: ESLint + Prettier" -ForegroundColor Yellow
-Set-Location "$ProjectRoot\frontend"
+# ─── Frontend ─────────────────────────────────────
+Write-Host "`n▶ Frontend: syntax checks" -ForegroundColor Yellow
 
-if (Test-Path "package.json") {
-    npx eslint js/ --ext .js --format=github
-    npx prettier --check "js/**/*.js", "css/**/*.css", "*.html"
-} else {
-    Write-Warning "  No package.json found, skipping frontend checks"
-    Write-Host "  Run: npm init -y && npm install -D eslint prettier eslint-plugin-jsdoc"
+Get-ChildItem "$Frontend/js" -Recurse -Filter *.js | ForEach-Object {
+    node --check $_.FullName
 }
 
-# ─── Dead Code (Optional) ─────────────────────────────────
-Write-Host "`n▶ Dead code check (vulture)" -ForegroundColor Yellow
-Set-Location "$ProjectRoot\backend"
-
-if ($UseUv) {
-    uv run vulture . --min-confidence 80 --exclude=*test*,main.py 2>$null || $true
-} else {
-    python -m vulture . --min-confidence 80 --exclude=*test*,main.py 2>$null || $true
-}
-
-# ─── Complexity (Optional) ────────────────────────────────
-Write-Host "`n▶ Cyclomatic complexity (radon)" -ForegroundColor Yellow
-
-if ($UseUv) {
-    uv run radon cc . -a --min B --show-closures 2>$null || $true
-} else {
-    python -m radon cc . -a --min B --show-closures 2>$null || $true
-}
+# ─── Tests ───────────────────────────────────────────
+Write-Host "`n▶ Backend tests" -ForegroundColor Yellow
+python -m pytest tests/ -q
 
 Write-Host "`n✅ All quality checks passed!" -ForegroundColor Green

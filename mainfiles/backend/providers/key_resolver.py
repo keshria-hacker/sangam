@@ -2,9 +2,10 @@
 API key resolution - environment variables and database keys.
 """
 
-from ..models import ProviderKey
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models import ProviderKey
 
 
 async def get_db_keys(db: AsyncSession) -> dict[str, str]:

@@ -49,13 +49,13 @@ docstring-code-format = true
     "PLR0915",  # too-many-statements
     "S101",     # assert-in-test — required for testing
 ]
-"backend/llm.py" = [
+"mainfiles/backend/llm.py" = [
     "F811",     # redefined-while-unused — intentional re-exports from providers package
     "PLC0415",  # import-outside-top-level — lazy imports for circular deps
     "PLW0603",  # global-statement — singleton cache
     "PLR0913",  # too-many-arguments — legacy facade with many params
 ]
-"backend/providers/**" = [
+"mainfiles/backend/providers/**" = [
     "ARG002",   # unused-method-argument — interface compliance with abstract method signatures
     "PLC0415",  # import-outside-top-level — lazy imports to avoid circular deps
     "PLW0603",  # global-statement — singleton/registry pattern
@@ -65,35 +65,35 @@ docstring-code-format = true
     "TRY300",   # try-consider-else — minor style preference
     "TRY301",   # raise-within-try — exception handling clarity
 ]
-"backend/skills/**" = [
+"mainfiles/backend/skills/**" = [
     "PLW0603",  # global-statement — singleton/registry pattern
     "PLR0911",  # too-many-return-statements — command dispatcher pattern
     "UP042",    # replace-str-enum — str+enum is intentional for API serialization
 ]
-"backend/migrations/**" = [
+"mainfiles/backend/migrations/**" = [
     "E402",     # module-import-not-at-top-of-file — Alembic auto-generated
     "PLC0415",  # import-outside-top-level — Alembic auto-generated
 ]
-"backend/providers/__init__.py" = [
+"mainfiles/backend/providers/__init__.py" = [
     "E402",     # module-import-not-at-top — backward compat imports after __all__
 ]
-"backend/main.py" = [
+"mainfiles/backend/main.py" = [
     "PLC0415",  # import-outside-top-level — middleware registration uses lazy imports
 ]
-"backend/document.py" = [
+"mainfiles/backend/document.py" = [
     "PLC0415",  # import-outside-top-level — lazy import for optional PDF support
     "PLR0911",  # too-many-return-statements — file-type dispatcher pattern
     "TRY300",   # try-consider-else — minor style preference
 ]
-"backend/ratelimit.py" = [
+"mainfiles/backend/ratelimit.py" = [
     "PLC0415",  # import-outside-top-level — lazy import for optional Redis
 ]
-"backend/ratelimit_redis.py" = [
+"mainfiles/backend/ratelimit_redis.py" = [
     "PLC0415",  # import-outside-top-level — redis.asyncio is lazily imported
     "PLW0603",  # global-statement — singleton store instance
     "TRY300",   # try-consider-else — minor style preference
 ]
-"backend/api.py" = [
+"mainfiles/backend/api.py" = [
     "PLR0915",  # too-many-statements — chat_stream is intentionally monolithic (SSE generator)
 ]
 
@@ -122,9 +122,9 @@ filterwarnings = [
 norecursedirs = ["tests/manual"]
 
 [tool.coverage.run]
-source = ["backend"]
+source = ["mainfiles/backend"]
 omit = [
-    "backend/migrations/*",
+    "mainfiles/backend/migrations/*",
     "tests/*",
 ]
 

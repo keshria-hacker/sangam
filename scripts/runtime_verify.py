@@ -7,8 +7,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock, patch
 from cryptography.fernet import Fernet
 
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT / "backend"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "mainfiles"))
 
 os.environ["TEST_MODE"] = "1"
 # Generate test master key dynamically - never hardcode

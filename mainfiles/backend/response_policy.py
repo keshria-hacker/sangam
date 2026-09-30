@@ -8,19 +8,15 @@ and performance metrics.
 
 from __future__ import annotations
 
-import time
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
 
 # Shared domain types live in one canonical place (domain.py)
 from .domain import (
     ChatMessage,
     ChatRequest,
-    ChatResponse,
-    StreamChunk,
-    LLMProvider,
 )
+
 
 # Define ResponsePolicy in this module to avoid circular imports and ensure
 # we're using the correct class throughout the backend
@@ -32,10 +28,10 @@ class ResponsePolicy:
     top_p: float = 0.9
     presence_penalty: float = 0.0
     frequency_penalty: float = 0.0
-    stop_sequences: List[str] = None
+    stop_sequences: list[str] = None
     stream: bool = True
     adaptive_timeout: float = 30.0  # seconds
-    fallback_provider: Optional[str] = None
+    fallback_provider: str | None = None
     enable_reasoning: bool = False
     reasoning_budget: int = 1024
 
@@ -153,7 +149,7 @@ class PolicyAdapter:
     """Adapts policies dynamically during conversation based on performance."""
 
     def __init__(self):
-        self.performance_history: List[Dict[str, Any]] = []
+        self.performance_history: list[dict[str, Any]] = []
 
     def adapt_policy_on_timeout(self, policy: ResponsePolicy, error: Exception) -> ResponsePolicy:
         """Adapt policy when requests timeout."""
@@ -303,7 +299,7 @@ class PolicyManager:
     """Centralized policy management."""
 
     def __init__(self):
-        self._policies: Dict[str, ResponsePolicy] = {}
+        self._policies: dict[str, ResponsePolicy] = {}
         self.selector = PolicySelector()
         self.adapter = PolicyAdapter()
         self._register_default_policies()
@@ -375,11 +371,11 @@ class PolicyManager:
         """Register custom policy."""
         self._policies[name] = policy
 
-    def list_available_policies(self) -> List[str]:
+    def list_available_policies(self) -> list[str]:
         """List all available policies."""
         return list(self._policies.keys())
 
-    def policy_validation(self, policy: ResponsePolicy) -> List[str]:
+    def policy_validation(self, policy: ResponsePolicy) -> list[str]:
         """Validate policy parameters and return list of issues."""
         issues = []
 
@@ -412,12 +408,12 @@ class PolicyManager:
 
 
 def build_chat_request(
-    messages: List[ChatMessage],
+    messages: list[ChatMessage],
     model: str,
     policy: ResponsePolicy,
     user_id: str | None = None,
     session_id: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> ChatRequest:
     """
     Build a chat request with the given policy applied.

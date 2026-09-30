@@ -40,10 +40,10 @@ RUN groupadd --system sangam && \
 WORKDIR /app
 
 # Copy backend code
-COPY backend/ /app/backend/
+COPY mainfiles/backend/ /app/backend/
 
 # Copy frontend code
-COPY frontend/ /app/frontend/
+COPY mainfiles/frontend/ /app/frontend/
 
 # Create data directories
 RUN mkdir -p /app/uploads /app/history /app/logs /app/.chromadb && \

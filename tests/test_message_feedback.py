@@ -27,7 +27,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 # Make `backend` importable when pytest runs from mainfiles/backend.
-_MAINFILES = Path(__file__).resolve().parents[2]
+_MAINFILES = Path(__file__).resolve().parents[1]
 if str(_MAINFILES) not in sys.path:
     sys.path.insert(0, str(_MAINFILES))
 

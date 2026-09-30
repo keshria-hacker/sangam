@@ -3,12 +3,12 @@ Configuration System for Enhanced Provider Routing
 Based on OmniRoute's approach but adapted for Sangam
 """
 import os
-import json
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
-import yaml
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 
 class RoutingStrategy(Enum):
@@ -40,7 +40,7 @@ class StrategyConfig:
     name: RoutingStrategy
     enabled: bool = True
     weight: float = 1.0
-    parameters: Dict[str, Any] = None
+    parameters: dict[str, Any] = None
     
     def __post_init__(self):
         if self.parameters is None:
@@ -62,7 +62,7 @@ class ProviderConfig:
     quality_score: float = 1.0  # 0.0 to 1.0
     latency_baseline_ms: float = 1000.0  # Expected latency
     error_rate_threshold: float = 0.05  # 5% error rate before considering unhealthy
-    supported_strategies: List[RoutingStrategy] = None
+    supported_strategies: list[RoutingStrategy] = None
     
     def __post_init__(self):
         if self.supported_strategies is None:
@@ -75,8 +75,8 @@ class RoutingPolicy:
     name: str
     description: str = ""
     default_strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN
-    strategy_map: Dict[str, RoutingStrategy] = None  # context -> strategy
-    fallback_chain: List[RoutingStrategy] = None
+    strategy_map: dict[str, RoutingStrategy] = None  # context -> strategy
+    fallback_chain: list[RoutingStrategy] = None
     enabled: bool = True
     
     def __post_init__(self):
@@ -100,13 +100,13 @@ class EnhancedRoutingConfig:
     metrics_window_size: int = 100  # Number of requests to consider for metrics
     
     # Policies
-    policies: Dict[str, RoutingPolicy] = None
+    policies: dict[str, RoutingPolicy] = None
     
     # Provider-specific configurations
-    provider_configs: Dict[str, ProviderConfig] = None
+    provider_configs: dict[str, ProviderConfig] = None
     
     # Strategy configurations
-    strategy_configs: Dict[RoutingStrategy, StrategyConfig] = None
+    strategy_configs: dict[RoutingStrategy, StrategyConfig] = None
     
     # Advanced features
     enable_model_routing: bool = True
@@ -127,7 +127,7 @@ class EnhancedRoutingConfig:
 class ConfigManager:
     """Manages loading, saving, and providing access to routing configuration"""
     
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         if config_dir is None:
             config_dir = os.path.join(
                 os.path.dirname(__file__), 
@@ -138,14 +138,14 @@ class ConfigManager:
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_file = self.config_dir / "routing_config.yaml"
-        self._config: Optional[EnhancedRoutingConfig] = None
+        self._config: EnhancedRoutingConfig | None = None
         self._load_config()
     
     def _load_config(self) -> EnhancedRoutingConfig:
         """Load configuration from file or create default"""
         if self.config_file.exists():
             try:
-                with open(self.config_file, 'r', encoding='utf-8') as f:
+                with open(self.config_file, encoding='utf-8') as f:
                     data = yaml.safe_load(f)
                 self._config = self._dict_to_config(data)
                 return self._config
@@ -293,7 +293,7 @@ class ConfigManager:
         }
         return latency.get(provider_id, 800.0)
     
-    def _dict_to_config(self, data: Dict[str, Any]) -> EnhancedRoutingConfig:
+    def _dict_to_config(self, data: dict[str, Any]) -> EnhancedRoutingConfig:
         """Convert dictionary to EnhancedRoutingConfig"""
         # This is a simplified conversion - in practice you'd want more robust handling
         config = EnhancedRoutingConfig()
@@ -329,7 +329,7 @@ class ConfigManager:
         
         return config
     
-    def _config_to_dict(self, config: EnhancedRoutingConfig) -> Dict[str, Any]:
+    def _config_to_dict(self, config: EnhancedRoutingConfig) -> dict[str, Any]:
         """Convert EnhancedRoutingConfig to dictionary"""
         # Convert to dict with special handling for enums
         result = {
@@ -386,7 +386,7 @@ class ConfigManager:
             self._load_config()
         return self._config
     
-    def save_config(self, config: Optional[EnhancedRoutingConfig] = None):
+    def save_config(self, config: EnhancedRoutingConfig | None = None):
         """Save configuration to file"""
         if config is None:
             config = self.get_config()
@@ -409,12 +409,12 @@ class ConfigManager:
         with open(self.config_file, 'w', encoding='utf-8') as f:
             f.write(yaml_content)
     
-    def get_provider_config(self, provider_id: str) -> Optional[ProviderConfig]:
+    def get_provider_config(self, provider_id: str) -> ProviderConfig | None:
         """Get configuration for specific provider"""
         config = self.get_config()
         return config.provider_configs.get(provider_id)
     
-    def update_provider_config(self, provider_id: str, updates: Dict[str, Any]):
+    def update_provider_config(self, provider_id: str, updates: dict[str, Any]):
         """Update configuration for specific provider"""
         config = self.get_config()
         if provider_id not in config.provider_configs:
@@ -427,19 +427,19 @@ class ConfigManager:
         
         self.save_config(config)
     
-    def get_policy(self, policy_name: str) -> Optional[RoutingPolicy]:
+    def get_policy(self, policy_name: str) -> RoutingPolicy | None:
         """Get routing policy by name"""
         config = self.get_config()
         return config.policies.get(policy_name)
     
-    def get_strategy_config(self, strategy: RoutingStrategy) -> Optional[StrategyConfig]:
+    def get_strategy_config(self, strategy: RoutingStrategy) -> StrategyConfig | None:
         """Get configuration for specific strategy"""
         config = self.get_config()
         return config.strategy_configs.get(strategy)
 
 
 # Global config manager instance
-_config_manager: Optional[ConfigManager] = None
+_config_manager: ConfigManager | None = None
 
 
 def get_config_manager() -> ConfigManager:

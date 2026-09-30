@@ -8,14 +8,13 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from .config import config, get_trigger_patterns
+from .config import config
 from .schema import (
     ConversationProfile,
     IntentSignal,
     QueryMode,
     ResponseGuidance,
 )
-
 
 # Pre-compiled regex patterns for common code indicators
 CODE_FENCE_PATTERN = re.compile(r"```[\s\S]*?```")
@@ -172,9 +171,8 @@ def _is_coding_request(
             if check_exception:
                 if pattern_matches_without_exception(pattern, msg_lower, config.CODING_EXCEPTIONS):
                     return True
-            else:
-                if re.search(pattern, msg_lower):
-                    return True
+            elif re.search(pattern, msg_lower):
+                return True
         # If we only have the exception + incidental triggers (like "error"), don't code
         return False
 

@@ -17,6 +17,10 @@ Public API:
     CapabilityDecision         # Phase 7: Capability decision result
 """
 
+from ..capability_orchestration import (
+    CapabilityDecision,
+    capability_decide,
+)
 from .classification import (
     analyze_request,
     build_conversation_profile,
@@ -33,10 +37,6 @@ from .schema import (
     IntentSignal,
     QueryMode,
     ResponseGuidance,
-)
-from ..capability_orchestration import (
-    capability_decide,
-    CapabilityDecision,
 )
 
 __all__ = [

@@ -8,10 +8,9 @@ import subprocess
 from typing import Any
 
 import httpx
-from ..response_events import FinishReason, UsageInfo, normalize_finish_reason
 
 from ..config import settings
-
+from ..response_events import FinishReason, UsageInfo, normalize_finish_reason
 from .base import BaseProvider, ModelInfo, ProviderStreamChunk
 from .inaccessible import is_inaccessible
 

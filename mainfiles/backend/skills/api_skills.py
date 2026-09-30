@@ -8,6 +8,7 @@ endpoints consumed by the frontend Skills browser.
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from .registry import InvocationType, SkillCategory, get_registry
 from .router import get_router
 

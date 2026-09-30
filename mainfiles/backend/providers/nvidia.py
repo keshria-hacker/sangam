@@ -5,10 +5,9 @@ import json
 from typing import Any
 
 import httpx
-from ..response_events import normalize_finish_reason, normalize_usage
 
 from ..config import settings
-
+from ..response_events import normalize_finish_reason, normalize_usage
 from .base import BaseProvider, ModelInfo, ProviderStreamChunk
 from .inaccessible import track_inaccessible
 

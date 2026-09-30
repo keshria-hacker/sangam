@@ -2,8 +2,8 @@
 Compatibility module - exposes legacy constants from original llm.py
 for backward compatibility with existing code.
 """
-from .base import ModelInfo
 from ..response_events import ModelCapabilities
+from .base import ModelInfo
 
 # Curated models - hardcoded friendly names for popular models
 CURATED_MODELS: dict[str, ModelInfo] = {

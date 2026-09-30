@@ -41,92 +41,120 @@
 ## 2. Directory Structure
 
 ```
-Universal-Ai-Chat-Platform/
+sangam/
 ├── .dockerignore               # Docker build exclusion rules
-├── Dockerfile                  # Multi-stage Docker build (builder + slim runtime)
+├── Dockerfile                  # Backend-only Docker build (builder + slim runtime)
+├── Dockerfile.all              # Backend + frontend in one container (supervisord)
 ├── docker-compose.yml          # Backend + optional Redis/frontend services
-├── backend/                    # FastAPI Python backend
-│   ├── main.py                 # App entrypoint, lifespan, CORS, router mounts
-│   ├── config.py               # Typed settings loaded from .env via pydantic-settings
-│   ├── database.py             # Async SQLAlchemy engine + session factory (SQLite)
-│   ├── models.py               # SQLAlchemy ORM tables (Chat, Message, User, etc.)
-│   ├── schemas.py              # Pydantic request/response validation models
-│   ├── api.py                  # All REST route handlers (health, models, chats, files, stream)
-│   ├── auth.py                 # Local authentication (register, login, logout, sessions)
-│   ├── llm.py                  # Provider registry, model discovery, LiteLLM streaming
-│   ├── security.py             # Fernet field encryption (MASTER_KEY) + CSRF tokens
-│   ├── prompt_injection.py     # Prompt-injection detection
-│   ├── document.py             # File text extraction (PDF, DOCX, XLSX, CSV, PPTX, code, text)
-│   ├── rag.py                  # Document chunking + vector retrieval (RAG with ChromaDB)
-│   ├── websearch.py            # Web search (DuckDuckGo Lite / Tavily / Brave)
-│   ├── ratelimit.py            # Rate limiting middleware
-│   ├── ratelimit_redis.py      # Redis-backed rate limit store
-│   ├── middleware/             # ASGI middleware (request ID, etc.)
-│   ├── migrations/             # Alembic migration scripts
-│   ├── providers/              # Provider adapters + registry (13 modules)
-│   │   ├── __init__.py         # Provider registration, list_models, resolve_api_key
-│   │   ├── base.py             # Abstract provider interface
-│   │   ├── registry.py         # ProviderRegistry + model resolution
-│   │   ├── model_discovery.py  # Live model fetch + curated fallback
-│   │   ├── key_resolver.py     # API key resolution (DB → env)
-│   │   ├── ollama.py           # Native Ollama streaming
-│   │   ├── openai_compatible.py# OpenAI-compatible provider adapter
-│   │   ├── anthropic.py / gemini.py / nvidia.py
-│   │   ├── litellm_fallback.py / compat.py / inaccessible.py
-│   │   └── ...
-│   └── skills/                 # Extensible skills sub-system
-│       ├── __init__.py         # Empty marker
-│       ├── registry.py         # Skill catalog loaded from SKILL.md files
-│       ├── models.py           # SkillExecution + UserSkillPreference ORM tables
-│       ├── router.py           # Skill execution engine with dependency resolution
-│       └── api_skills.py       # FastAPI routes for skills CRUD + execution
-├── frontend/                   # Static frontend (served via Python http.server)
-│   ├── index.html              # Single-page application HTML
-│   ├── css/
-│   │   └── style.css           # Complete design system + all component styles
-│   ├── js/
-│   │   ├── app.js              # Main application bootstrap & global listeners
-│   │   ├── core/state.js       # Central signal-based reactive state store
-│   │   ├── shared/             # Shared utilities
-│   │   │   ├── constants.js    # DEFAULT_SETTINGS, CHAT_BUCKETS, provider colors
-│   │   │   ├── http.js         # Authenticated fetch + SSE helpers
-│   │   │   ├── markdown.js     # Streaming markdown + highlight.js rendering
-│   │   │   ├── toast.js        # Toast notifications
-│   │   │   └── utils.js        # escapeHtml, formatDate, bucketFor, etc.
-│   │   └── features/           # Feature modules (one per UI area)
-│   │       ├── auth/auth.js            # Login/register/forgot password
-│   │       ├── chat/chat.js            # Chat messages, streaming, SSE handling
-│   │       ├── models/models.js        # Model selector, provider status
-│   │       ├── settings/settings.js    # Theme, API keys, preferences
-│   │       ├── skills/skills.js        # Skills modal browser & execution
-│   │       └── sidebar/sidebar.js      # Chat history sidebar (bucketed by date)
-│   └── assets/
-│       └── logo.svg            # Sangam brand logo
-├── config/
-│   ├── providers.yaml          # Reference provider registry (documentation only)
-│   └── skills/                 # Skill definitions (SKILL.md files)
-│       ├── api-design/
-│       ├── coding-standards/
-│       ├── debugging/
-│       └── web-search/
-├── tests/                      # Unit tests (discovered automatically)
-│   ├── test_auth.py            # Authentication hash/validation tests
-│   ├── test_document.py        # Document extraction + truncation tests
-│   ├── test_schemas.py         # Pydantic schema validation tests
-│   ├── test_model_selection.py # Model discovery + filtering tests
-│   ├── test_skills.py          # Skill model selection test
-│   ├── test_skill_registry.py  # SKILL.md loading + parameter validation
-│   ├── test_startup.py         # Launcher (start.py) command construction
-│   ├── test_streaming.py       # SSE event formatting
-│   └── test_websearch.py       # Web search parser + format tests
-├── history/                    # SQLite database storage (gitkeep)
-├── uploads/                    # Uploaded file storage (gitkeep)
+├── docker-compose.all.yml      # Single-container deployment
+├── mainfiles/                  # Application code
+│   ├── backend/                # FastAPI Python backend
+│   │   ├── main.py             # App entrypoint, lifespan, CORS, router mounts
+│   │   ├── config.py           # Typed settings loaded from root .env via pydantic-settings
+│   │   ├── database.py         # Async SQLAlchemy engine + session factory (SQLite)
+│   │   ├── models.py           # SQLAlchemy ORM tables (Chat, Message, User, etc.)
+│   │   ├── schemas.py          # Pydantic request/response validation models
+│   │   ├── api.py              # API facade — mounts api_routes, keeps stable import surface
+│   │   ├── api_routes/         # Route handlers split by resource
+│   │   │   ├── common.py       # SSE framing + upload-content validation helpers
+│   │   │   ├── providers_routes.py  # Provider keys, model refresh, websearch, health
+│   │   │   ├── files_routes.py # Document upload
+│   │   │   ├── chats_routes.py # Chat CRUD, preferences, summary, feedback
+│   │   │   ├── models_routes.py# Model catalogue
+│   │   │   └── chat_stream_routes.py # Chat streaming pipeline + agentic reasoning
+│   │   ├── auth.py             # Local authentication (register, login, logout, sessions)
+│   │   ├── llm.py              # Stable facade over the providers package
+│   │   ├── security.py         # Fernet field encryption (MASTER_KEY) + CSRF tokens
+│   │   ├── prompt_injection.py # Prompt-injection detection
+│   │   ├── document.py         # File text extraction (PDF, DOCX, XLSX, CSV, PPTX, code, text)
+│   │   ├── rag.py              # Document chunking + vector retrieval (RAG with ChromaDB)
+│   │   ├── memory.py           # Cross-session conversation memory (ChromaDB)
+│   │   ├── summarizer.py       # Rolling chat summarization
+│   │   ├── context_manager.py  # Token budgeting + safe context truncation
+│   │   ├── response_events.py  # Canonical response event protocol (SSE)
+│   │   ├── response_intelligence/ # Adaptive guidance (classification, injection)
+│   │   ├── response_postprocessor.py # Uncertainty hedging at persistence time
+│   │   ├── capability_orchestration.py # Clarification gate + capability decisions
+│   │   ├── websearch.py        # Web search (DuckDuckGo Lite / Tavily / Brave)
+│   │   ├── ratelimit.py        # Rate limiting middleware
+│   │   ├── ratelimit_redis.py  # Redis-backed rate limit store
+│   │   ├── middleware/         # ASGI middleware (request ID, etc.)
+│   │   ├── migrations/         # Alembic migration scripts
+│   │   ├── providers/          # Provider adapters + registry
+│   │   │   ├── __init__.py     # Provider registration, list_models, resolve_api_key
+│   │   │   ├── base.py         # Abstract provider interface
+│   │   │   ├── registry.py     # ProviderRegistry + model resolution
+│   │   │   ├── model_discovery.py  # Live model fetch + curated fallback
+│   │   │   ├── key_resolver.py # API key resolution (DB → env)
+│   │   │   ├── ollama.py       # Native Ollama streaming
+│   │   │   ├── openai_compatible.py# OpenAI-compatible provider adapter
+│   │   │   ├── anthropic.py / gemini.py / nvidia.py
+│   │   │   ├── litellm_fallback.py / compat.py / inaccessible.py
+│   │   │   └── enhanced/       # Experimental multi-provider routing (NOT wired at runtime)
+│   │   ├── skills/             # Extensible skills sub-system
+│   │   │   ├── registry.py     # Skill catalog loaded from SKILL.md files
+│   │   │   ├── models.py       # SkillExecution + UserSkillPreference ORM tables
+│   │   │   ├── router.py       # Skill execution engine with dependency resolution
+│   │   │   ├── executor.py     # Skill execution + model invocation
+│   │   │   └── api_skills.py   # FastAPI routes for skills CRUD + execution
+│   │   └── tools/              # Tool-calling infrastructure (schemas, registry, executor)
+│   ├── frontend/               # Static frontend (served via Python http.server)
+│   │   ├── index.html          # Single-page application HTML
+│   │   ├── css/
+│   │   │   └── style.css       # Complete design system + all component styles
+│   │   ├── js/
+│   │   │   ├── app.js          # Main application bootstrap & global listeners
+│   │   │   ├── core/state.js   # Central signal-based reactive state store
+│   │   │   ├── shared/         # Shared utilities
+│   │   │   │   ├── constants.js    # DEFAULT_SETTINGS, CHAT_BUCKETS, provider colors
+│   │   │   │   ├── http.js     # Authenticated fetch + SSE helpers
+│   │   │   │   ├── markdown.js # Streaming markdown + highlight.js rendering
+│   │   │   │   ├── toast.js    # Toast notifications
+│   │   │   │   └── utils.js    # escapeHtml, formatDate, bucketFor, etc.
+│   │   │   └── features/       # Feature modules (one per UI area)
+│   │   │       ├── auth/auth.js                # Login/register/forgot password
+│   │   │       ├── chat/chat.js                # Streaming, sending, composer events
+│   │   │       ├── chat/message_view.js        # Message DOM construction + status widgets
+│   │   │       ├── chat/response_controller.js # Canonical SSE event state machine
+│   │   │       ├── chat/autoscroll.js          # Smart auto-scroll controller
+│   │   │       ├── models/models.js            # Model selector, provider status
+│   │   │       ├── settings/settings.js        # Theme, API keys, preferences
+│   │   │       ├── skills/skills.js            # Skills modal browser & execution
+│   │   │       └── sidebar/sidebar.js          # Chat history sidebar (bucketed by date)
+│   │   └── assets/
+│   │       └── logo.svg        # Sangam brand logo
+│   ├── config/
+│   │   ├── providers.yaml      # Reference provider registry (documentation only)
+│   │   └── skills/             # Skill definitions (SKILL.md files)
+│   ├── history/                # SQLite database storage (runtime, gitignored)
+│   ├── uploads/                # Uploaded file storage (runtime, gitignored)
+│   └── logs/                   # Rotating application logs (runtime, gitignored)
+├── tests/                      # Single consolidated test tree (pytest)
+│   ├── conftest.py             # Shared fixtures (app client, auth, domain objects)
+│   ├── integration/            # API-level integration tests
+│   ├── test_api.py             # Route handlers (all endpoints)
+│   ├── test_auth.py            # Authentication (hashing, sessions, lockout, CSRF)
+│   ├── test_clarification.py   # Clarification gate (streaming interception)
+│   ├── test_memory.py          # Cross-session memory + chat summaries
+│   ├── test_message_feedback.py# Per-message feedback endpoints
+│   ├── test_policy_*.py        # Adaptive response policy layer
+│   ├── test_preferences.py     # User response-style preferences
+│   ├── test_document.py        # Document extraction + truncation
+│   ├── test_llm.py             # Provider facade + discovery
+│   ├── test_main.py            # App factory, lifespan, health, CSRF middleware
+│   ├── test_models.py          # Model discovery + selection
+│   ├── test_providers.py       # Provider registry + adapters
+│   ├── test_rag.py             # Chunking + vector retrieval
+│   ├── test_websearch.py       # Web search parsers│   └── ...                     # One file per domain
+├── scripts/                    # Developer tooling
+│   ├── quality.sh / quality.ps1# Lint + typecheck + test runner
+│   ├── runtime_verify.py       # Provider tool-calling runtime verification
+│   └── generate_master_key.py  # Fernet key generator
 ├── start.py                    # Launcher: venv, deps, env, then both servers
-├── start.bat                   # Windows one-command start
-├── start.sh                    # Unix one-command start
+├── start.bat / start.sh        # One-command start (Windows / Unix)
 ├── .env                        # Environment configuration (user-created)
 ├── .env.example                # Configuration template
-├── .gitignore                  # Ignore rules
+├── pyproject.toml              # Ruff/mypy/pytest/coverage configuration
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # Project README
 └── ARCHITECTURE.md             # This file
@@ -868,11 +896,12 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 
 ```bash
 # From project root
-venv\Scripts\python.exe -m unittest discover -s tests -v
-
-# Or via start.py (which sets up the venv automatically)
-python start.py
+venv\Scripts\python.exe -m pytest tests/ -v
 ```
+
+The full tree is consolidated under `tests/` (one file per domain, ~950 tests).
+Environment: `TEST_MODE=1` is set automatically by the suite conftest; every
+DB-backed test binds a per-test SQLite file guarded against the production DB.
 
 ### 12.3 CI Pipeline (GitHub Actions)
 

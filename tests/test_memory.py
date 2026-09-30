@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-_MAINFILES = Path(__file__).resolve().parents[2]
+_MAINFILES = Path(__file__).resolve().parents[1]
 if str(_MAINFILES) not in sys.path:
     sys.path.insert(0, str(_MAINFILES))
 

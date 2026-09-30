@@ -3,7 +3,7 @@
 Feature flags, trigger keywords, and thresholds for the 16 adaptive behaviors.
 All values can be overridden via environment variables.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ResponseIntelligenceConfig(BaseModel):

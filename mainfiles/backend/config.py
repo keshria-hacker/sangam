@@ -11,14 +11,19 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent          # <root>/mainfiles
+PROJECT_ROOT = BASE_DIR.parent                              # repository root
 
 # Default workspace root is the project root (parent of backend)
 DEFAULT_WORKSPACE_ROOT = BASE_DIR
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=BASE_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(PROJECT_ROOT / ".env"),  # the launcher (start.py) writes .env at the repo root
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # --- App ---
     APP_NAME: str = "UniversalAI"

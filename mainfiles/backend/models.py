@@ -5,11 +5,12 @@ in schemas.py; keep persistence and validation concerns separate.
 import uuid
 from datetime import UTC, datetime
 
-from .database import Base
-from .security import EncryptionError, decrypt_field, encrypt_field
 from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, Text, func
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .database import Base
+from .security import EncryptionError, decrypt_field, encrypt_field
 
 
 def new_id() -> str:

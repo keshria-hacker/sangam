@@ -4,13 +4,12 @@ Live model discovery - fetches available models from provider APIs.
 import asyncio
 import json
 import logging
-import re
 
 import httpx
 
+from ..response_events import ModelCapabilities
 from .base import NON_CHAT_MARKERS, ModelInfo, ProviderConfig
 from .inaccessible import is_inaccessible
-from ..response_events import ModelCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -277,5 +276,8 @@ async def fetch_ollama_models(base_url: str = "http://localhost:11434") -> list[
     return models
 
 
-# Re-export Ollama process management from ollama.py (single source of truth)
-from .ollama import _ollama_start_attempted, _ollama_process, _cleanup_ollama as cleanup_ollama  # noqa: F401
+# Re-export Ollama process management from ollama.py (single source of truth).
+# Aliased as cleanup_ollama because the providers package and llm facade export
+# it under that public name.
+from .ollama import _cleanup_ollama as cleanup_ollama  # noqa: F401
+from .ollama import _ollama_process, _ollama_start_attempted  # noqa: F401

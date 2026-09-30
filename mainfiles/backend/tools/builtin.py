@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -220,7 +218,7 @@ async def execute_code_handler(code: str, language: str = "python", timeout: int
 
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()
             return {"error": f"Code execution timed out after {timeout}s"}

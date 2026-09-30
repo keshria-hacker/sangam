@@ -8,23 +8,23 @@ import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 
-from .api import public_router
-from .api import router as api_router
-from .auth import get_current_user, verify_csrf
-from .auth import router as auth_router
-from .database import init_db
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # --- Structured Logging (loguru) ---
 from loguru import logger
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from .api import public_router
+from .api import router as api_router
+from .auth import get_current_user, verify_csrf
+from .auth import router as auth_router
+from .config import BASE_DIR, settings
+from .database import init_db
 from .middleware.request_id import RequestIDMiddleware
 from .ratelimit import RateLimitMiddleware
 from .skills.api_skills import router as skills_router
-from starlette.middleware.base import BaseHTTPMiddleware
-
-from .config import BASE_DIR, settings
 
 # Configure loguru for production-ready structured logs
 logger.remove()
@@ -206,8 +206,9 @@ def create_app() -> FastAPI:
     async def health_check():
         """Comprehensive health check with dependency status."""
         import httpx
-        from .database import engine
         from sqlalchemy import text
+
+        from .database import engine
 
         checks = {
             "status": "healthy",

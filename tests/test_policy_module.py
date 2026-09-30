@@ -9,11 +9,7 @@ from unittest.mock import MagicMock, AsyncMock
 from typing import Dict, List, Optional
 
 # Import from conftest
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-
-from mainfiles.backend.tests.conftest import (
+from tests.conftest import (
     ChatMessage,
     ChatRequest,
     ChatResponse,
@@ -27,7 +23,7 @@ from mainfiles.backend.tests.conftest import (
 )
 
 # Import ResponsePolicy from the backend module being tested
-from mainfiles.backend.response_policy import ResponsePolicy
+from backend.response_policy import ResponsePolicy
 
 
 # =============================================================================
@@ -120,7 +116,7 @@ class TestPolicyManager:
 
     def test_get_default_policy(self):
         """Test getting default policy."""
-        from response_policy import PolicyManager
+        from backend.response_policy import PolicyManager
         manager = PolicyManager()
         policy = manager.get_default_policy()
         assert isinstance(policy, ResponsePolicy)

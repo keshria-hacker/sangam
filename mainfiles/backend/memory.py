@@ -15,7 +15,6 @@ import logging
 from typing import Any
 
 import chromadb
-from chromadb.config import Settings as ChromaSettings
 
 from .rag import _get_client  # reuse the persistent client singleton
 

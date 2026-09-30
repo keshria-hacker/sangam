@@ -134,3 +134,125 @@ def mock_httpx_client():
     """Mock httpx.AsyncClient for provider API calls without real network."""
     with MagicMock() as mock:
         yield mock
+
+
+# =============================================================================
+# Phase 4 domain fixtures (adaptive response policy layer)
+#
+# The domain types live in backend.domain / backend.response_policy so that
+# production code and tests share one definition; the fixtures below only
+# construct them.
+# =============================================================================
+
+from backend.domain import (  # noqa: E402
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    LLMProvider,
+    StreamChunk,
+)
+from backend.response_policy import ResponsePolicy  # noqa: E402
+
+
+@pytest.fixture
+def default_policy() -> ResponsePolicy:
+    """Default response policy for testing."""
+    return ResponsePolicy(
+        max_tokens=1024,
+        temperature=0.7,
+        top_p=0.9,
+        stream=True,
+        adaptive_timeout=10.0,
+    )
+
+
+@pytest.fixture
+def reasoning_policy() -> ResponsePolicy:
+    """Policy with reasoning enabled."""
+    return ResponsePolicy(
+        max_tokens=2048,
+        temperature=0.5,
+        top_p=0.95,
+        stream=True,
+        adaptive_timeout=30.0,
+        enable_reasoning=True,
+        reasoning_budget=512,
+    )
+
+
+@pytest.fixture
+def sample_messages() -> list[ChatMessage]:
+    """Sample conversation messages."""
+    return [
+        ChatMessage(role="system", content="You are a helpful assistant."),
+        ChatMessage(role="user", content="Hello, how are you?"),
+        ChatMessage(role="assistant", content="I'm doing well, thank you!"),
+        ChatMessage(role="user", content="What's the weather like?"),
+    ]
+
+
+@pytest.fixture
+def sample_request(sample_messages: list, default_policy: ResponsePolicy) -> ChatRequest:
+    """Sample chat request."""
+    return ChatRequest(
+        messages=sample_messages,
+        model="gpt-4o-mini",
+        policy=default_policy,
+        metadata={"user_id": "test-user", "session_id": "test-session"},
+    )
+
+
+@pytest.fixture
+def mock_provider() -> MagicMock:
+    """Mock LLM provider for testing."""
+    provider = MagicMock(spec=LLMProvider)
+    provider.name = "mock"
+    provider.supported_models = ["gpt-4o-mini", "gpt-4o"]
+
+    async def mock_complete(request: ChatRequest) -> ChatResponse:
+        return ChatResponse(
+            content="This is a mock response.",
+            model=request.model,
+            finish_reason="stop",
+            usage={"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70},
+            request_id=request.request_id,
+            provider="mock",
+            latency_ms=150.0,
+        )
+
+    async def mock_stream(request: ChatRequest):
+        for delta, finish in [
+            ("This ", None),
+            ("is ", None),
+            ("a ", None),
+            ("mock ", None),
+            ("response.", "stop"),
+        ]:
+            yield StreamChunk(delta=delta, finish_reason=finish)
+
+    provider.complete = mock_complete
+    provider.stream = mock_stream
+    provider.health_check = AsyncMock(return_value=True)
+
+    return provider
+
+
+@pytest.fixture
+def failing_provider() -> MagicMock:
+    """Mock provider that fails on every call."""
+    provider = MagicMock(spec=LLMProvider)
+    provider.name = "failing"
+    provider.supported_models = ["gpt-4o-mini"]
+
+    async def mock_complete(request: ChatRequest) -> ChatResponse:
+        raise ConnectionError("Provider unavailable")
+
+    async def mock_stream(request: ChatRequest):
+        raise ConnectionError("Provider unavailable")
+        yield  # pragma: no cover — unreachable, makes this an async generator
+
+    provider.complete = mock_complete
+    provider.stream = mock_stream
+    provider.health_check = AsyncMock(return_value=False)
+
+    return provider

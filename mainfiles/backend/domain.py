@@ -11,7 +11,7 @@ canonical place.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -20,13 +20,13 @@ class ChatMessage:
 
     role: str  # "user" | "assistant" | "system" | "tool"
     content: str
-    name: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    tool_call_id: Optional[str] = None
+    name: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+    tool_call_id: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to provider-compatible dict."""
-        result: Dict[str, Any] = {"role": self.role, "content": self.content}
+        result: dict[str, Any] = {"role": self.role, "content": self.content}
         if self.name:
             result["name"] = self.name
         if self.tool_calls:
@@ -40,10 +40,10 @@ class ChatMessage:
 class ChatRequest:
     """Immutable chat completion request."""
 
-    messages: List[ChatMessage]
+    messages: list[ChatMessage]
     model: str
     policy: Any = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     request_id: str = ""
 
     def __post_init__(self) -> None:
@@ -60,12 +60,12 @@ class ChatResponse:
     content: str
     model: str
     finish_reason: str  # "stop" | "length" | "tool_calls" | "error"
-    usage: Dict[str, int]  # prompt/completion/total tokens
+    usage: dict[str, int]  # prompt/completion/total tokens
     request_id: str
     provider: str
     latency_ms: float
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    reasoning: Optional[str] = None
+    tool_calls: list[dict[str, Any]] | None = None
+    reasoning: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,10 +73,10 @@ class StreamChunk:
     """Single chunk in a streaming response."""
 
     delta: str
-    finish_reason: Optional[str] = None
-    usage: Optional[Dict[str, int]] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    reasoning: Optional[str] = None
+    finish_reason: str | None = None
+    usage: dict[str, int] | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+    reasoning: str | None = None
 
 
 class LLMProvider(Protocol):
@@ -92,4 +92,4 @@ class LLMProvider(Protocol):
     def name(self) -> str: ...
 
     @property
-    def supported_models(self) -> List[str]: ...
+    def supported_models(self) -> list[str]: ...

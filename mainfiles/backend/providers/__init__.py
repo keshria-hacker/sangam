@@ -7,6 +7,22 @@ All external code should import from here, not from individual modules.
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from ..response_events import (
+    FinishReason,
+    ResponseEvent,
+    ResponseEventBuilder,
+    ResponseEventType,
+    normalize_error,
+)
+from ..tools import (
+    ToolCall,
+    ToolResult,
+    executor,
+)
+from ..tools import (
+    registry as tool_registry,
+)
+
 # Import provider implementations to register them
 from . import (
     anthropic,  # noqa: F401
@@ -27,19 +43,6 @@ from .model_discovery import (
     fetch_ollama_models,
 )
 from .registry import init_provider_registry, registry
-from ..tools import (
-    ToolCall,
-    ToolResult,
-    executor,
-    registry as tool_registry,
-)
-from ..response_events import (
-    FinishReason,
-    ResponseEvent,
-    ResponseEventBuilder,
-    ResponseEventType,
-    normalize_error,
-)
 
 # Initialize registry on import
 _init_done = False

@@ -101,7 +101,7 @@ def _mode_str(mode: Any) -> str:
     s = str(mode)
     # If it's the enum representation like "QueryMode.CODING", extract the value
     if '.' in s:
-        s = s.split('.')[-1]
+        s = s.rsplit('.', maxsplit=1)[-1]
     return s.lower()
 
 
@@ -191,7 +191,6 @@ def derive_interpretations(user_message: str, guidance: Any) -> list[str]:
     local-heuristics philosophy. Falls back to a generic open question
     when no specific interpretation patterns match.
     """
-    from .response_intelligence.schema import QueryMode
     msg = user_message.strip()
     msg_lower = msg.lower()
     mode = _mode_str(getattr(guidance, "mode", None))

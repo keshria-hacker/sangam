@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
 
 from .registry import ToolRegistry, registry
 from .schemas import ToolCall, ToolResult
@@ -100,7 +99,7 @@ class ToolExecutor:
                 error=result.get("error") if is_handler_error else None,
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             duration = time.time() - start_time
             logger.warning(f"Tool '{tool_call.name}' timed out after {duration:.2f}s")
             return ToolResult(

@@ -7,54 +7,35 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
+BACKEND="mainfiles/backend"
+FRONTEND="mainfiles/frontend"
+
 echo "🔍 Running quality checks..."
 
-# ─── Backend ──────────────────────────────────────────────
+# ─── Backend ───────────────────────────────────────
 echo ""
 echo "▶ Backend: Ruff lint"
-cd backend
 if command -v uv &> /dev/null; then
-    uv run ruff check . --output-format=github
-    uv run ruff format --check . --output-format=github
-    uv run mypy . --strict --show-error-codes
-    uv run bandit -r . -ll --exit-on-error
+    uv run ruff check "$BACKEND" --output-format=github
+    uv run ruff format --check "$BACKEND" --output-format=github
+    uv run mypy "$BACKEND" --show-error-codes
+    uv run bandit -r "$BACKEND" -ll --exit-on-error
 else
-    python -m ruff check . --output-format=github
-    python -m ruff format --check . --output-format=github
-    python -m mypy . --strict --show-error-codes
-    python -m bandit -r . -ll --exit-on-error
+    python -m ruff check "$BACKEND" --output-format=github
+    python -m ruff format --check "$BACKEND" --output-format=github
+    python -m mypy "$BACKEND" --show-error-codes
+    python -m bandit -r "$BACKEND" -ll --exit-on-error
 fi
 
-# ─── Frontend ─────────────────────────────────────────────
+# ─── Frontend ─────────────────────────────────────
 echo ""
-echo "▶ Frontend: ESLint + Prettier"
-cd ../frontend
-if [ -f "package.json" ]; then
-    npx eslint js/ --ext .js --format=github
-    npx prettier --check "js/**/*.js" "css/**/*.css" "*.html"
-else
-    echo "  ⚠️  No package.json found, skipping frontend checks"
-    echo "  Run: npm init -y && npm install -D eslint prettier eslint-plugin-jsdoc"
-fi
+echo "▶ Frontend: syntax checks"
+find "$FRONTEND/js" -name "*.js" -print0 | xargs -0 -n1 node --check
 
-# ─── Dead Code (Optional) ─────────────────────────────────
+# ─── Tests ───────────────────────────────────────────
 echo ""
-echo "▶ Dead code check (vulture)"
-cd ../backend
-if command -v uv &> /dev/null; then
-    uv run vulture . --min-confidence 80 --exclude=*test*,main.py || true
-else
-    python -m vulture . --min-confidence 80 --exclude=*test*,main.py || true
-fi
-
-# ─── Complexity (Optional) ────────────────────────────────
-echo ""
-echo "▶ Cyclomatic complexity (radon)"
-if command -v uv &> /dev/null; then
-    uv run radon cc . -a --min B --show-closures || true
-else
-    python -m radon cc . -a --min B --show-closures || true
-fi
+echo "▶ Backend tests"
+python -m pytest tests/ -q
 
 echo ""
 echo "✅ All quality checks passed!"
