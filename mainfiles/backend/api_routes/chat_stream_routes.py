@@ -6,6 +6,8 @@ import asyncio
 import sys
 import time
 import uuid
+from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -435,8 +437,9 @@ async def agentic_reasoning_endpoint(
                     for msg in chat.messages
                 ]
 
-        # The agent package lives in `<project root>/.agents`.
-        agents_dir = str(Path(__file__).resolve().parents[2] / ".agents")
+        # The agent package lives in `<project root>/.agents` (file is
+        # mainfiles/backend/api_routes/x.py — parents[3] is the repo root).
+        agents_dir = str(Path(__file__).resolve().parents[3] / ".agents")
         if agents_dir not in sys.path:
             sys.path.append(agents_dir)
 
