@@ -27,6 +27,8 @@ jobs:
       - name: Validate browser scripts
         run: |
           find mainfiles/frontend/js -name "*.js" -print0 | xargs -0 -n1 node --check
+      - name: Validate frontend module graph (parse + link)
+        run: node --experimental-vm-modules scripts/check_frontend_modules.mjs
 
   security:
     runs-on: ubuntu-latest

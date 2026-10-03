@@ -25,7 +25,7 @@ export function bindChatActions({ regenerate, rerender, runGeneration }) {
   _runGeneration = runGeneration;
 }
 
-function getProviderInfo(model) {
+export function getProviderInfo(model) {
   const providerId = model?.provider;
   if (!providerId) return { label: 'Unknown', state: 'offline', color: '#9AA1AC' };
   return {
@@ -36,7 +36,7 @@ function getProviderInfo(model) {
 }
 
 
-function setThinkingPhase(node, phase, elapsedSec = null) {
+export function setThinkingPhase(node, phase, elapsedSec = null) {
   let statusEl = node.querySelector('.msg-phase-status');
   if (!statusEl) {
     statusEl = document.createElement('div');
@@ -74,7 +74,7 @@ function setThinkingPhase(node, phase, elapsedSec = null) {
  * content area. It is ephemeral — not stored in message history.
  * Supports markdown rendering within reasoning blocks (§31).
  */
-function showReasoningInNode(node, text) {
+export function showReasoningInNode(node, text) {
   let section = node.querySelector('.msg-reasoning');
   if (!section) {
     section = document.createElement('div');
@@ -108,7 +108,7 @@ function showReasoningInNode(node, text) {
  * Show or update a tool call section inside an assistant message node.
  * Tool calls are rendered as collapsible blocks with function name and arguments.
  */
-function showToolCallInNode(node, toolCall) {
+export function showToolCallInNode(node, toolCall) {
   let container = node.querySelector(".msg-tool-calls");
   if (!container) {
     container = document.createElement("div");
@@ -159,7 +159,7 @@ function showToolCallInNode(node, toolCall) {
  * Show || update a citation inside an assistant message node.
  * Citations are rendered as inline numbered references with a references list.
  */
-function showCitationInNode(node, citation) {
+export function showCitationInNode(node, citation) {
   let container = node.querySelector(".msg-citations");
   if (!container) {
     container = document.createElement("div");
@@ -194,7 +194,7 @@ function showCitationInNode(node, citation) {
  * Show || update an artifact inside an assistant message node.
  * Artifacts are rendered as separate content blocks (e.g., files, images, code).
  */
-function showArtifactInNode(node, artifact) {
+export function showArtifactInNode(node, artifact) {
   let container = node.querySelector(".msg-artifacts");
   if (!container) {
     container = document.createElement("div");
@@ -233,7 +233,7 @@ function showArtifactInNode(node, artifact) {
 
 /**
  * Get provider display info for a model.
-
+ */
 export function buildMessageNode(msg) {
   const isUser = msg.role === 'user';
 
@@ -429,7 +429,4 @@ export function buildMessageNode(msg) {
 
   return node;
 }
-
-/**
- * Render all messages to the DOM.
 

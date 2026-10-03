@@ -1,0 +1,6 @@
+{
+  "name": "sangam-frontend",
+  "private": true,
+  "type": "module",
+  "description": "Marks frontend JS as ES modules so `node --check` parses files with the correct goal (Node's module syntax detection false-passes some syntax errors for ambiguous .js files)."
+}

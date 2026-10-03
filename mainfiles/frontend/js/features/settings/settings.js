@@ -483,12 +483,9 @@ export function initSettings() {
     }
   });
 
-  // Logout button
-  elements.logoutBtn?.addEventListener('click', async () => {
-    try { await apiFetch('/auth/logout', { method: 'POST' }); } catch (_) {}
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-    window.location.reload();
-  });
+  // NOTE: #logoutBtn is bound by auth.js initProfilePopup() (confirm + logout()
+  // + reload). Binding it here as well fired a second /auth/logout against the
+  // already-deleted session (spurious 401) and double-reloaded the page.
 
   // Focus trap in settings modal
   elements.settingsOverlay?.addEventListener('keydown', (e) => {

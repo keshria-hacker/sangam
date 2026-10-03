@@ -166,6 +166,23 @@ def test_ambiguity_detection(empty_history):
     assert signals.is_ambiguous is True
 
 
+def test_ambiguity_not_flagged_on_clear_short_question():
+    """Regression: triggers match whole words only.
+
+    'or' inside 'short'/'words' must not flag a clear factual request as
+    ambiguous — the substring match used to trigger the clarification gate,
+    which replaced real answers with the canned clarification card.
+    """
+    signals = detect_intent_signals("What is the capital of France? Answer in one short sentence.")
+    assert signals.is_ambiguous is False
+
+
+def test_ambiguity_standalone_or_still_flags():
+    """Standalone 'or' (unclear alternative) is still detected as ambiguous."""
+    signals = detect_intent_signals("Should I use plan A or B?")
+    assert signals.is_ambiguous is True
+
+
 def test_tone_adaptation_formal():
     """Test 7a: Formal language → tone=formal."""
     signals = detect_intent_signals("Could you please explain how this works?")

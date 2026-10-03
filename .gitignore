@@ -96,6 +96,9 @@ graphify-out/
 # --- Package lock files (if not using npm) ---
 package-lock.json
 package.json
+# ...except the frontend one: {"type": "module"} makes `node --check` treat
+# the browser JS as ES modules so CI catches module syntax errors.
+!mainfiles/frontend/package.json
 
 # --- Cookies ---
 cookies.txt

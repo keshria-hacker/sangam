@@ -39,6 +39,9 @@ import {
   isFollowingStream,
   setFollowingStream,
 } from './autoscroll.js';
+
+// Re-exported for app.js, which treats chat.js as the chat feature facade.
+export { buildMessageNode };
 console.log('[Module] chat.js loaded');
 
 
@@ -116,6 +119,8 @@ function setSendButtonState(generating) {
 /**
  * Phase-aware response status helper.
  * Updates the assistant message node with the current response phase.
+ * (Implementation lives in message_view.js: setThinkingPhase et al.)
+ */
 export function renderMessages() {
   const messages = getMessages();
   const container = elements.messages;
@@ -130,6 +135,8 @@ export function renderMessages() {
 }
 
 /**
+ * Render attached-file chips above the composer.
+ */
 export function renderFileChips() {
   const container = elements.fileChips;
   if (!container) return;

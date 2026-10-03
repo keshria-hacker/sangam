@@ -18,17 +18,6 @@ export function initAutoscroll(elemMap) {
   elements = elemMap;
 }
 
- *
- * Hysteresis keeps the flag from flapping on trackpad/touch momentum: we stop
- * following only once the user is clearly away (> THRESHOLD), and re-engage
- * only when they return to the very bottom (< REENGAGE).
- */
-let _followStream = true;             // whether new tokens auto-scroll the view
-let _suppressScrollHandler = false;   // guard for programmatic scrolls
-const AUTO_SCROLL_THRESHOLD_PX = 220; // dist beyond which following stops
-const AUTO_SCROLL_REENGAGE_PX = 60;   // dist within which following resumes
-const SMOOTH_SCROLL_SETTLE_MS = 400;  // how long a smooth scroll fires scroll events
-
 export function nearBottomDist() {
   const scrollEl = elements.chatScroll;
   if (!scrollEl) return 0;
@@ -65,7 +54,7 @@ export function scrollToBottomIfNearBottom() {
  * Show/hide the "↓ Jump to latest" button. Visible only when following has
  * been suspended (user scrolled up) and there is actual overflow.
  */
-function updateJumpBtn() {
+export function updateJumpBtn() {
   const btn = elements.scrollBottomBtn;
   if (!btn) return;
   btn.classList.toggle('hidden', _followStream || nearBottomDist() < AUTO_SCROLL_THRESHOLD_PX);
@@ -100,7 +89,8 @@ export function resumeFollow() {
 }
 
 /**
-
+ * Whether the view is currently following the streaming output.
+ */
 export function isFollowingStream() {
   return _followStream;
 }

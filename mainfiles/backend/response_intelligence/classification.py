@@ -421,8 +421,11 @@ def _has_followup_reference(msg_lower: str, conversation_history: list[dict] | N
 
 def _is_ambiguous(msg_lower: str, conversation_history: list[dict] | None) -> bool:
     """Detect ambiguous/underspecified requests."""
-    # Explicit ambiguity triggers
-    if any(t in msg_lower for t in config.AMBIGUITY_TRIGGERS):
+    # Explicit ambiguity triggers — matched on word boundaries so generic
+    # short tokens (e.g. "or") never fire on substrings of ordinary words
+    # ("short", "words", "before"), which intercepted clear requests and
+    # replaced real answers with the canned clarification card.
+    if any(re.search(rf"\b{re.escape(t)}\b", msg_lower) for t in config.AMBIGUITY_TRIGGERS):
         return True
 
     # Very short query with pronouns but no context
