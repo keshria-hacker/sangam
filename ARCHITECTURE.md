@@ -1113,11 +1113,13 @@ WEB_SEARCH_MAX_RESULTS=5
 The `start.py` launcher:
 1. **Ensure virtual environment** — creates `venv/` if missing
 2. **Install dependencies** — `pip install -r requirements.txt` (with SHA-256 caching)
-3. **Create `.env`** — copies `.env.example` if `.env` doesn't exist
+3. **Bootstrap `.env`** — creates `.env` from `.env.example` if missing and fills in a valid `MASTER_KEY` when the value is blank
 4. **Free stale ports** — kills any process holding port 8001 or 5500
 5. **Start backend** — `python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001` (with `mainfiles/` on `PYTHONPATH`)
 6. **Start frontend** — `python -m http.server 5500` serving `mainfiles/frontend/`
 7. **Monitor** — watches both processes; terminates both on Ctrl+C
+
+This bootstrap behavior is intentional: first-time setup is friction-free, and the generated `MASTER_KEY` is required to encrypt provider API keys safely at rest.
 
 ### 13.5 Ports
 

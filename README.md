@@ -131,21 +131,17 @@ git clone https://github.com/keshria-hacker/sangam.git
 cd sangam
 ```
 
-### 2. Configure Environment (manually optional)
+### 2. Configure Environment
 
-Copy the example environment file:
+On first run, Sangam will automatically create a `.env` file if it is missing and generate a valid `MASTER_KEY` for encrypting provider keys at rest.
 
-```bash
-cp .env.example .env
-```
-
-Add the API keys for the providers you want to use.
+You can still add or edit keys manually afterward:
 
 ```env
 OPENAI_API_KEY=your_key
 ANTHROPIC_API_KEY=your_key
 NVIDIA_NIM_API_KEY=your_key
-GOOGLE_API_KEY=your_key
+GEMINI_API_KEY=your_key
 OPENROUTER_API_KEY=your_key
 GROQ_API_KEY=your_key
 ```
@@ -155,6 +151,8 @@ You don't need to configure every provider.
 API keys can also be managed later from:
 
 **Settings → Provider API Keys**
+
+> If you are running from a restricted Windows path (AppLocker / Application Control), move the repo to a normal user-writable folder before starting. The launcher now detects this and explains the fix.
 
 ### 3. Start Sangam
 
@@ -341,9 +339,10 @@ Contributions, bug reports, feature requests, and improvements are welcome.
 ```bash
 git clone https://github.com/keshria-hacker/sangam.git
 cd sangam
-cp .env.example .env
 python start.py
 ```
+
+The launcher will create the virtual environment, install dependencies, generate `.env` if missing, and populate `MASTER_KEY` automatically on the first run. If you want to edit provider settings manually, update `.env` before starting or open the app and manage keys from the Settings UI.
 
 When contributing, please keep changes focused and follow the existing project structure and coding conventions.
 
