@@ -319,14 +319,11 @@ See [`SECURITY.md`](SECURITY.md) for security and vulnerability reporting inform
 Run the test suite from the project root:
 
 ```bash
-# pytest (recommended — see pyproject.toml for options)
+# pytest (the runner — see pyproject.toml for options)
 venv\Scripts\python.exe -m pytest tests -v
-
-# or unittest
-venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-A second tree lives at `mainfiles/backend/tests/` (with its own `pytest.ini`) covering API integration, clarification, feedback, memory, and provider routing.
+The test suite lives in a single unified tree at `tests/` (unit, `integration/`, `e2e/`, `manual/`), consolidated by the module-split refactor.
 
 Tests cover core functionality including authentication, document processing, model discovery, streaming, response intelligence, Skills, and web search.
 

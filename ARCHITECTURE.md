@@ -53,7 +53,14 @@
 │   │   ├── database.py         # Async SQLAlchemy engine + session factory (SQLite)
 │   │   ├── models.py           # SQLAlchemy ORM tables (Chat, Message, User, UserPreference, AuthSession, …)
 │   │   ├── schemas.py          # Pydantic request/response validation models
-│   │   ├── api.py              # REST route handlers (health, models, chats, files, chat/stream, preferences, feedback)
+│   │   ├── api.py              # HTTP API facade — mounts handlers from api_routes/
+│   │   ├── api_routes/         # Route handlers split by resource
+│   │   │   ├── common.py               # SSE framing + upload-content helpers
+│   │   │   ├── providers_routes.py     # provider keys, model refresh, websearch, health
+│   │   │   ├── files_routes.py         # document upload
+│   │   │   ├── chats_routes.py         # chat CRUD, preferences, summary, feedback
+│   │   │   ├── models_routes.py        # model catalogue
+│   │   │   └── chat_stream_routes.py   # chat streaming pipeline + agentic reasoning
 │   │   ├── auth.py             # Local auth (register, login, logout, forgot/reset, sessions, CSRF, lockout)
 │   │   ├── llm.py              # Facade over providers/: model resolution, streaming
 │   │   ├── capability_orchestration.py  # Clarification gate (should_clarify) + interpretations
@@ -72,7 +79,6 @@
 │   │   ├── middleware/         # ASGI middleware (request ID)
 │   │   ├── migrations/         # Alembic migration scripts
 │   │   ├── tools/              # Tool-calling registry + executor (agentic reasoning)
-│   │   ├── tests/              # Secondary test tree (own pytest.ini): API, clarification, feedback, memory
 │   │   └── providers/          # Provider adapters + registry
 │   │       ├── __init__.py     # Provider registration, list_models, list_provider_status
 │   │       ├── base.py         # Abstract provider interface + non-chat model filtering
@@ -100,6 +106,8 @@
 │   │   │   └── features/       # Feature modules (one per UI area)
 │   │   │       ├── auth/auth.js              # Login/register/forgot/reset, session check, logout
 │   │   │       ├── chat/chat.js              # Send/regenerate/streaming, SSE handling, clarification cards
+│   │   │       ├── chat/message_view.js      # Message DOM construction + in-stream status widgets
+│   │   │       ├── chat/autoscroll.js        # Smart auto-scroll controller (hysteresis + jump-to-latest)
 │   │   │       ├── chat/response_controller.js  # Canonical response_event state machine (client side)
 │   │   │       ├── models/models.js          # Model selector, provider status
 │   │   │       ├── settings/settings.js      # Theme, API keys, preferences
@@ -117,11 +125,14 @@
 │   ├── history/                # SQLite database (sangam.db)
 │   ├── uploads/                # Uploaded file storage
 │   └── logs/                   # Rotating application logs (loguru)
-├── tests/                      # Primary test tree (pytest + unittest discover)
+├── tests/                      # Unified test tree (pytest — unit, integration/, e2e/, manual/)
 │   ├── conftest.py             # Shared fixtures (auth client, tmp DB, path setup)
 │   ├── integration/            # HTTP-level API tests (auth, chat, models, security)
-│   └── test_*.py               # Unit tests per backend module (~40 files)
-├── scripts/                    # Dev utilities (ui_verify_chrome.py, quality.sh/ps1)
+│   ├── e2e/ + manual/          # End-to-end and manually-run checks
+│   └── test_*.py               # Unit tests per backend module (~35 files)
+├── scripts/                    # Dev & CI utilities (quality.sh/ps1, check_frontend_modules.mjs,
+│                               #   e2e_walkthrough.py, runtime_verify.py, ui_verify_chrome.py,
+│                               #   merge_tests.py, generate_master_key.py)
 ├── start.py                    # Launcher: venv, deps, env, then both servers
 ├── start.bat / start.sh        # One-command start (Windows / Unix)
 ├── .env / .env.example         # Environment configuration
@@ -196,6 +207,19 @@ app.include_router(skills_router, prefix=settings.API_PREFIX, dependencies=[Depe
 - **API routes** require a valid bearer token via `get_current_user` dependency
 - **Skills routes** also require authentication
 
+**Route handlers** live in `api_routes/`, split by resource (mounted through the `api.py` facade):
+
+| Module | Endpoints |
+|--------|-----------|
+| `common.py` | SSE framing helpers, upload MIME validation, shared routers |
+| `providers_routes.py` | Provider key CRUD, live model refresh, websearch, `/health`, provider status |
+| `files_routes.py` | Document upload (validation → storage → extraction → RAG index) |
+| `chats_routes.py` | Chat CRUD, user preferences, rolling summary, message feedback |
+| `models_routes.py` | Model catalogue (`/models`, `/models/{provider}`) |
+| `chat_stream_routes.py` | The streaming pipeline (`/chat/stream`) + `/agentic-reasoning` |
+
+`api.py` re-exports every handler so `backend.main` mounts `router`/`public_router` from one stable import surface, and tests can patch `backend.api.*` as before.
+
 ---
 
 ## 4. Frontend Architecture
@@ -248,7 +272,9 @@ The frontend now uses a **feature-based module structure** under `frontend/js/fe
 | `shared/toast.js` | Toast notifications |
 | `shared/utils.js` | `escapeHtml`, `formatDate`, `debounce`, etc. |
 | `features/auth/auth.js` | Login, register, forgot/reset password, session check, logout |
-| `features/chat/chat.js` | Message rendering, SSE streaming, send/regenerate, file attachments, clarification cards |
+| `features/chat/chat.js` | SSE streaming orchestration, send/regenerate, file attachments, clarification cards |
+| `features/chat/message_view.js` | Message DOM construction — assistant/user message nodes and in-stream status widgets (thinking, reasoning, tools, citations, artifacts) |
+| `features/chat/autoscroll.js` | Smart auto-scroll with hysteresis + a "jump to latest" affordance during streaming |
 | `features/chat/response_controller.js` | Client-side state machine for the canonical `response_event` SSE protocol |
 | `features/models/models.js` | Model selector dropdown, provider status badges, "no models" handling |
 | `features/settings/settings.js` | Theme (Paper/Ink/system), font size, chat width, code theme, animations; provider key manager (add/remove keys) |
@@ -506,6 +532,7 @@ def _hash_token(token: str) -> str:
 | Mistral | `mistral` | Cloud | Yes | (none) |
 | Gemini | `gemini` | Cloud | Yes | `gemini/` |
 | Ollama | `ollama` | Local | No | `ollama/` |
+| OmniRoute | `omniroute` | Local proxy | Optional | OpenAI-compatible base URL |
 
 ### 7.2 Model Discovery — Two-Tier System
 
@@ -601,7 +628,7 @@ The request body (`ChatStreamRequest`) includes:
 }
 ```
 
-Processing pipeline (in order, all best-effort steps fail open with a log warning):
+Processing pipeline (implemented in `api_routes/chat_stream_routes.py`; in order, all best-effort steps fail open with a log warning):
 1. **Model validation** — unknown models are rejected with a fast 400 before any resources are allocated
 2. **Web search** (optional) — live results injected as a system message
 3. **Chat resolution** — find existing or create new `Chat` record
@@ -871,41 +898,41 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 
 ### 12.1 Test Suite Overview
 
-The primary tree is `tests/` (run by both pytest and `unittest discover`), with a secondary tree at `mainfiles/backend/tests/` (its own `pytest.ini`, coverage-gated at 80%). ~830 tests collect across both trees, including integration coverage in `tests/integration/`.
+The test suite is a single unified tree at `tests/` (~45 files: unit, `integration/`, `e2e/`, `manual/`) consolidated by the module-split refactor — ~950 tests collect and run under pytest. The backend package is importable via the path setup in `tests/conftest.py` (plus `PYTHONPATH=mainfiles` in CI).
 
 Representative modules:
 
 | Area | Files | Coverage |
 |-----------|-------|----------|
-| Authentication | `test_auth.py`, `test_auth_unit.py`, `test_auth_coverage.py`, `test_auth_lockout.py` | Password hashing, tokens, session lifecycle, brute-force lockout |
-| API surface | `test_api.py`, `test_api_coverage.py`, `tests/integration/test_api_*.py` | Route behavior, auth gates, chat/model/file endpoints |
-| Documents + RAG | `test_document.py`, `test_document_new.py`, `test_document_coverage.py`, `test_rag_*.py` | Extraction, truncation, chunking, retrieval |
-| Models/providers | `test_model_fetch.py`, `test_model_selection.py`, `test_providers.py`, `test_llm.py` | Live fetch, filtering, Ollama discovery, curated fallback, routing |
-| Response intelligence | `test_response_intelligence.py`, `test_capability_orchestration.py`, `test_response_events.py` | Ambiguity triggers (word matching), clarification gate, canonical SSE events |
-| Web search | `test_websearch.py`, `test_websearch_new.py` | DuckDuckGo parser, format_context, providers |
+| Authentication | `test_auth.py`, `test_auth_unit.py` | Password hashing, tokens, session lifecycle, brute-force lockout |
+| API surface | `test_api.py`, `tests/integration/test_api_*.py` | Route behavior, auth gates, chat/model/file endpoints |
+| Documents + RAG | `test_document.py`, `test_rag.py` | Extraction, truncation, chunking, retrieval |
+| Models/providers | `test_models.py`, `test_providers.py`, `test_provider_adapters.py`, `test_llm.py` | Live fetch, filtering, Ollama discovery, curated fallback, routing |
+| Enhanced routing | `test_enhanced_routing.py`, `test_standalone_routing.py` | Provider scoring, resilience, fallback dispatch |
+| Response intelligence | `test_response_intelligence.py`, `test_capability_orchestration.py`, `test_clarification.py`, `test_response_events.py` | Ambiguity triggers, clarification gate, canonical SSE events |
+| Policy + postprocessing | `test_policy_domain.py`, `test_policy_integration.py`, `test_policy_module.py`, `test_postprocessor.py` | Response policy rules, uncertainty hedging |
+| Web search | `test_websearch.py` | DuckDuckGo parser, format_context, providers |
+| Memory + feedback | `test_memory.py`, `test_message_feedback.py`, `test_preferences.py` | Cross-session memory, message feedback, user preferences |
 | Streaming + frontend contract | `test_streaming.py`, `test_frontend_response_controller.py` | SSE frame format, client state machine |
-| Other | `test_startup.py`, `test_schemas.py`, `test_skill_registry.py`, `test_skills.py`, `test_context_manager.py`, `test_prompt_injection_new.py` | Launcher, validation, skills, context truncation, injection detection |
+| Other | `test_startup.py`, `test_schemas.py`, `test_skill_registry.py`, `test_skills.py`, `test_executor_coverage.py`, `test_context_manager.py`, `test_prompt_injection_new.py`, `test_ratelimit_redis.py`, `test_main.py`, `test_e2e.py` | Launcher, validation, skills, context truncation, injection detection, Redis limiter |
 
 ### 12.2 Running Tests
 
 ```bash
-# pytest (recommended — asyncio_mode=auto via pyproject.toml)
+# pytest (the runner — asyncio_mode=auto via pyproject.toml; fixtures in tests/conftest.py)
 venv\Scripts\python.exe -m pytest tests -v
 
-# unittest (works too; some pytest fixtures are skipped)
-venv\Scripts\python.exe -m unittest discover -s tests -v
-
-# Secondary tree (own pytest.ini, expects pytest-cov)
-venv\Scripts\python.exe -m pytest mainfiles/backend/tests -v
+# with coverage (what CI runs)
+PYTHONPATH=mainfiles TEST_MODE=1 python -m pytest tests -q --cov=backend --cov-report=term-missing
 ```
 
 ### 12.3 CI Pipeline (GitHub Actions)
 
 The `.github/workflows/ci.yml` has two jobs:
 
-**verify** — checkout, Python 3.12, Node 22, install deps (root `requirements.txt` + `mainfiles/backend/requirements-dev.txt`), `compileall` on `mainfiles/backend`/`start.py`/`tests`, run the root pytest suite with pytest-cov (`PYTHONPATH=mainfiles`, `TEST_MODE=1`), enforce the coverage gate (61%, see `pyproject.toml`), and `node --check` every file under `mainfiles/frontend/js`.
+**verify** — checkout, Python 3.13, Node 22, install deps (root `requirements.txt` + `mainfiles/backend/requirements-dev.txt`), `compileall` on `mainfiles/backend`/`start.py`/`scripts`/`tests`, run the unified pytest suite with pytest-cov (`PYTHONPATH=mainfiles`, `TEST_MODE=1`), enforce the coverage gate (66%, see `pyproject.toml`), `node --check` every file under `mainfiles/frontend/js`, and validate the frontend module graph with `scripts/check_frontend_modules.mjs`.
 
-> **Note:** the coverage gate is the measured pytest baseline (61.53% on 2026-10-06, 833 tests) rather than the historical 76%, because the response-intelligence and enhanced-provider subsystems landed with little coverage. Raise `fail_under` in `pyproject.toml` (and the workflow) as coverage grows. The secondary test tree (`mainfiles/backend/tests/`) is not run by CI — it imports from the refactored module layout of the `sangam` branch and does not collect against `main`'s code.
+> **Note:** the coverage gate is the measured pytest baseline (66.47% on 2026-10-06, 950 passed / 100 skipped on the unified tree) rather than the historical 76%, because the response-intelligence and enhanced-provider subsystems still have limited coverage. Raise `fail_under` in `pyproject.toml` (and the workflow) as coverage grows.
 
 **security** — Bandit static analysis and Safety dependency scan, uploaded as build artifacts (both non-blocking).
 
@@ -1107,7 +1134,7 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
 │  ┌─────────────────────────┴─────────────────────────────────────────┐ │
 │  │  main.py — FastAPI app + CORS + lifespan                          │ │
 │  │  ├── /api/auth/* — auth.py (register, login, logout, session)     │ │
-│  │  ├── /api/* — api.py (chat, models, files, providers, settings)   │ │
+│  │  ├── /api/* — handlers in api_routes/                          │ │
 │  │  └── /api/skills/* — skills/api_skills.py (skills CRUD + execute) │ │
 │  └─────────────────────────┬─────────────────────────────────────────┘ │
 │                            │                                            │

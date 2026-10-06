@@ -130,10 +130,9 @@ omit = [
 
 [tool.coverage.report]
 # Measured baseline for `PYTHONPATH=mainfiles TEST_MODE=1 python -m pytest
-# tests --cov=backend` (2026-10-06: 61.53%, 833 tests). The previous 76%
-# baseline predated the response-intelligence / enhanced-provider subsystems,
-# which have little coverage yet. Raise this as those gain coverage.
-fail_under = 61
+# tests --cov=backend` on the unified test tree (2026-10-06: 66.47%,
+# 950 passed / 100 skipped). Raise this as coverage grows.
+fail_under = 66
 show_missing = true
 
 [tool.bandit]

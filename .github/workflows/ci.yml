@@ -26,7 +26,7 @@ jobs:
           PYTHONPATH: mainfiles
         run: python -m pytest tests -q --cov=backend --cov-report=term-missing
       - name: Enforce coverage gate
-        run: python -m coverage report --fail-under=61
+        run: python -m coverage report --fail-under=66
       - name: Validate browser scripts
         run: find mainfiles/frontend/js -name "*.js" -print0 | xargs -0 -n1 node --check
       - name: Validate frontend module graph (parse + link)
