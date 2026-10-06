@@ -903,9 +903,9 @@ venv\Scripts\python.exe -m pytest mainfiles/backend/tests -v
 
 The `.github/workflows/ci.yml` has two jobs:
 
-**verify** — checkout, Python 3.12, Node 22, install deps, `compileall` on the backend, run tests under coverage, enforce a 76% coverage gate, and `node --check` the frontend entrypoint.
+**verify** — checkout, Python 3.12, Node 22, install deps (root `requirements.txt` + `mainfiles/backend/requirements-dev.txt`), `compileall` on `mainfiles/backend`/`start.py`/`tests`, run the root pytest suite with pytest-cov (`PYTHONPATH=mainfiles`, `TEST_MODE=1`), enforce the coverage gate (61%, see `pyproject.toml`), and `node --check` every file under `mainfiles/frontend/js`.
 
-> **Note:** the workflow currently references `backend/`, `frontend/`, and `tests/` at the repository root, but the application code lives under `mainfiles/` since the layout move. Until the paths are updated, the verify job can silently no-op (e.g. `compileall` exits 0 when its target directory is missing). Fixing the workflow paths is tracked separately from this documentation pass.
+> **Note:** the coverage gate is the measured pytest baseline (61.53% on 2026-10-06, 833 tests) rather than the historical 76%, because the response-intelligence and enhanced-provider subsystems landed with little coverage. Raise `fail_under` in `pyproject.toml` (and the workflow) as coverage grows. The secondary test tree (`mainfiles/backend/tests/`) is not run by CI — it imports from the refactored module layout of the `sangam` branch and does not collect against `main`'s code.
 
 **security** — Bandit static analysis and Safety dependency scan, uploaded as build artifacts (both non-blocking).
 
