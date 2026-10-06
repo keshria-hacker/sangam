@@ -26,78 +26,64 @@
 
 ### Key Features
 - Multi-provider chat with live model discovery
-- Real-time streaming responses (Server-Sent Events)
+- Real-time streaming responses (Server-Sent Events, canonical `response_event` protocol)
 - Document upload + text extraction (PDF, DOCX, XLSX, code, etc.)
 - Web search augmentation (DuckDuckGo out of the box, Tavily/Brave optional)
 - In-app API key management (no server restarts)
-- Conversation history with bucketed date grouping
+- Conversation history with bucketed date grouping + rolling cross-session summaries
+- Response Intelligence: intent/style classification, clarification gate, uncertainty hedging
 - Paper / Ink theme system (light / dark / system) — monochrome design tokens
 - Extensible Skills system
-- Local authentication (single-user, password-hashed)
-- Ollama auto-detection (auto-starts `ollama serve` when the executable is on PATH)
+- Local authentication (single-user, scrypt password hashing, login lockout, forgot/reset flow)
+- Ollama auto-detection and auto-start (Sangam launches `ollama serve` in the background if installed but not running)
 
 ---
 
 ## 2. Directory Structure
 
 ```
-sangam/
+<repo root>/
 ├── .dockerignore               # Docker build exclusion rules
-├── Dockerfile                  # Backend-only Docker build (builder + slim runtime)
-├── Dockerfile.all              # Backend + frontend in one container (supervisord)
+├── Dockerfile                  # Multi-stage Docker build (builder + slim runtime)
 ├── docker-compose.yml          # Backend + optional Redis/frontend services
-├── docker-compose.all.yml      # Single-container deployment
-├── mainfiles/                  # Application code
-│   ├── backend/                # FastAPI Python backend
-│   │   ├── main.py             # App entrypoint, lifespan, CORS, router mounts
-│   │   ├── config.py           # Typed settings loaded from root .env via pydantic-settings
+├── mainfiles/                  # Application code (backend package + frontend + config)
+│   ├── backend/                # FastAPI Python backend (imported as `backend.*`)
+│   │   ├── main.py             # App entrypoint/factory, lifespan, CORS, CSRF, security headers, router mounts
+│   │   ├── config.py           # Typed settings loaded from .env via pydantic-settings
 │   │   ├── database.py         # Async SQLAlchemy engine + session factory (SQLite)
-│   │   ├── models.py           # SQLAlchemy ORM tables (Chat, Message, User, etc.)
+│   │   ├── models.py           # SQLAlchemy ORM tables (Chat, Message, User, UserPreference, AuthSession, …)
 │   │   ├── schemas.py          # Pydantic request/response validation models
-│   │   ├── api.py              # API facade — mounts api_routes, keeps stable import surface
-│   │   ├── api_routes/         # Route handlers split by resource
-│   │   │   ├── common.py       # SSE framing + upload-content validation helpers
-│   │   │   ├── providers_routes.py  # Provider keys, model refresh, websearch, health
-│   │   │   ├── files_routes.py # Document upload
-│   │   │   ├── chats_routes.py # Chat CRUD, preferences, summary, feedback
-│   │   │   ├── models_routes.py# Model catalogue
-│   │   │   └── chat_stream_routes.py # Chat streaming pipeline + agentic reasoning
-│   │   ├── auth.py             # Local authentication (register, login, logout, sessions)
-│   │   ├── llm.py              # Stable facade over the providers package
+│   │   ├── api.py              # REST route handlers (health, models, chats, files, chat/stream, preferences, feedback)
+│   │   ├── auth.py             # Local auth (register, login, logout, forgot/reset, sessions, CSRF, lockout)
+│   │   ├── llm.py              # Facade over providers/: model resolution, streaming
+│   │   ├── capability_orchestration.py  # Clarification gate (should_clarify) + interpretations
+│   │   ├── response_events.py  # Canonical SSE event model + ResponseEventBuilder
+│   │   ├── response_intelligence/  # Intent/style classification, ambiguity triggers, prompt injection
+│   │   ├── response_postprocessor.py   # Uncertainty hedging at persistence time
+│   │   ├── context_manager.py  # Safe context truncation / token budgeting
+│   │   ├── memory.py           # Cross-session memory store (ChromaDB)
+│   │   ├── summarizer.py       # Rolling chat summarization
 │   │   ├── security.py         # Fernet field encryption (MASTER_KEY) + CSRF tokens
 │   │   ├── prompt_injection.py # Prompt-injection detection
 │   │   ├── document.py         # File text extraction (PDF, DOCX, XLSX, CSV, PPTX, code, text)
-│   │   ├── rag.py              # Document chunking + vector retrieval (RAG with ChromaDB)
-│   │   ├── memory.py           # Cross-session conversation memory (ChromaDB)
-│   │   ├── summarizer.py       # Rolling chat summarization
-│   │   ├── context_manager.py  # Token budgeting + safe context truncation
-│   │   ├── response_events.py  # Canonical response event protocol (SSE)
-│   │   ├── response_intelligence/ # Adaptive guidance (classification, injection)
-│   │   ├── response_postprocessor.py # Uncertainty hedging at persistence time
-│   │   ├── capability_orchestration.py # Clarification gate + capability decisions
+│   │   ├── rag.py              # Document chunking + vector retrieval (ChromaDB)
 │   │   ├── websearch.py        # Web search (DuckDuckGo Lite / Tavily / Brave)
-│   │   ├── ratelimit.py        # Rate limiting middleware
-│   │   ├── ratelimit_redis.py  # Redis-backed rate limit store
-│   │   ├── middleware/         # ASGI middleware (request ID, etc.)
+│   │   ├── ratelimit.py        # Rate limiting middleware (+ ratelimit_redis.py Redis store)
+│   │   ├── middleware/         # ASGI middleware (request ID)
 │   │   ├── migrations/         # Alembic migration scripts
-│   │   ├── providers/          # Provider adapters + registry
-│   │   │   ├── __init__.py     # Provider registration, list_models, resolve_api_key
-│   │   │   ├── base.py         # Abstract provider interface
-│   │   │   ├── registry.py     # ProviderRegistry + model resolution
-│   │   │   ├── model_discovery.py  # Live model fetch + curated fallback
-│   │   │   ├── key_resolver.py # API key resolution (DB → env)
-│   │   │   ├── ollama.py       # Native Ollama streaming
-│   │   │   ├── openai_compatible.py# OpenAI-compatible provider adapter
-│   │   │   ├── anthropic.py / gemini.py / nvidia.py
-│   │   │   ├── litellm_fallback.py / compat.py / inaccessible.py
-│   │   │   └── enhanced/       # Experimental multi-provider routing (NOT wired at runtime)
-│   │   ├── skills/             # Extensible skills sub-system
-│   │   │   ├── registry.py     # Skill catalog loaded from SKILL.md files
-│   │   │   ├── models.py       # SkillExecution + UserSkillPreference ORM tables
-│   │   │   ├── router.py       # Skill execution engine with dependency resolution
-│   │   │   ├── executor.py     # Skill execution + model invocation
-│   │   │   └── api_skills.py   # FastAPI routes for skills CRUD + execution
-│   │   └── tools/              # Tool-calling infrastructure (schemas, registry, executor)
+│   │   ├── tools/              # Tool-calling registry + executor (agentic reasoning)
+│   │   ├── tests/              # Secondary test tree (own pytest.ini): API, clarification, feedback, memory
+│   │   └── providers/          # Provider adapters + registry
+│   │       ├── __init__.py     # Provider registration, list_models, list_provider_status
+│   │       ├── base.py         # Abstract provider interface + non-chat model filtering
+│   │       ├── registry.py     # ProviderRegistry + provider configs
+│   │       ├── model_discovery.py  # Live model fetch (fetch_models_from_provider)
+│   │       ├── key_resolver.py # API key resolution (DB → env)
+│   │       ├── ollama.py       # Native Ollama streaming + auto-start (_try_start_ollama)
+│   │       ├── openai_compatible.py# OpenAI-compatible adapter (Together/Groq/OpenRouter/DeepSeek/Mistral/OmniRoute)
+│   │       ├── anthropic.py / gemini.py / nvidia.py
+│   │       ├── litellm_fallback.py / compat.py / inaccessible.py
+│   │       └── enhanced/       # Intelligent routing layer (cost/latency/capability scores)
 │   ├── frontend/               # Static frontend (served via Python http.server)
 │   │   ├── index.html          # Single-page application HTML
 │   │   ├── css/
@@ -106,55 +92,40 @@ sangam/
 │   │   │   ├── app.js          # Main application bootstrap & global listeners
 │   │   │   ├── core/state.js   # Central signal-based reactive state store
 │   │   │   ├── shared/         # Shared utilities
-│   │   │   │   ├── constants.js    # DEFAULT_SETTINGS, CHAT_BUCKETS, provider colors
-│   │   │   │   ├── http.js     # Authenticated fetch + SSE helpers
-│   │   │   │   ├── markdown.js # Streaming markdown + highlight.js rendering
-│   │   │   │   ├── toast.js    # Toast notifications
-│   │   │   │   └── utils.js    # escapeHtml, formatDate, bucketFor, etc.
+│   │   │   │   ├── constants.js    # DEFAULT_SETTINGS, CHAT_BUCKETS, provider colors, STORAGE_KEYS
+│   │   │   │   ├── http.js         # apiFetch/apiPost/apiPut/apiDelete + streamChatCompletion/parseSSE
+│   │   │   │   ├── markdown.js     # Streaming markdown + highlight.js + KaTeX rendering
+│   │   │   │   ├── toast.js        # Toast notifications
+│   │   │   │   └── utils.js        # escapeHtml, formatDate, bucketFor, etc.
 │   │   │   └── features/       # Feature modules (one per UI area)
-│   │   │       ├── auth/auth.js                # Login/register/forgot password
-│   │   │       ├── chat/chat.js                # Streaming, sending, composer events
-│   │   │       ├── chat/message_view.js        # Message DOM construction + status widgets
-│   │   │       ├── chat/response_controller.js # Canonical SSE event state machine
-│   │   │       ├── chat/autoscroll.js          # Smart auto-scroll controller
-│   │   │       ├── models/models.js            # Model selector, provider status
-│   │   │       ├── settings/settings.js        # Theme, API keys, preferences
-│   │   │       ├── skills/skills.js            # Skills modal browser & execution
-│   │   │       └── sidebar/sidebar.js          # Chat history sidebar (bucketed by date)
-│   │   └── assets/
-│   │       └── logo.svg        # Sangam brand logo
+│   │   │       ├── auth/auth.js              # Login/register/forgot/reset, session check, logout
+│   │   │       ├── chat/chat.js              # Send/regenerate/streaming, SSE handling, clarification cards
+│   │   │       ├── chat/response_controller.js  # Canonical response_event state machine (client side)
+│   │   │       ├── models/models.js          # Model selector, provider status
+│   │   │       ├── settings/settings.js      # Theme, API keys, preferences
+│   │   │       ├── skills/skills.js          # Skills modal browser & execution
+│   │   │       └── sidebar/sidebar.js        # Chat history sidebar (bucketed by date)
+│   │   ├── assets/
+│   │   │   └── logo.png        # Sangam brand logo
+│   │   └── package.json        # {"type": "module"} so node --check parses JS as ESM
 │   ├── config/
 │   │   ├── providers.yaml      # Reference provider registry (documentation only)
 │   │   └── skills/             # Skill definitions (SKILL.md files)
-│   ├── history/                # SQLite database storage (runtime, gitignored)
-│   ├── uploads/                # Uploaded file storage (runtime, gitignored)
-│   └── logs/                   # Rotating application logs (runtime, gitignored)
-├── tests/                      # Single consolidated test tree (pytest)
-│   ├── conftest.py             # Shared fixtures (app client, auth, domain objects)
-│   ├── integration/            # API-level integration tests
-│   ├── test_api.py             # Route handlers (all endpoints)
-│   ├── test_auth.py            # Authentication (hashing, sessions, lockout, CSRF)
-│   ├── test_clarification.py   # Clarification gate (streaming interception)
-│   ├── test_memory.py          # Cross-session memory + chat summaries
-│   ├── test_message_feedback.py# Per-message feedback endpoints
-│   ├── test_policy_*.py        # Adaptive response policy layer
-│   ├── test_preferences.py     # User response-style preferences
-│   ├── test_document.py        # Document extraction + truncation
-│   ├── test_llm.py             # Provider facade + discovery
-│   ├── test_main.py            # App factory, lifespan, health, CSRF middleware
-│   ├── test_models.py          # Model discovery + selection
-│   ├── test_providers.py       # Provider registry + adapters
-│   ├── test_rag.py             # Chunking + vector retrieval│   ├── test_websearch.py       # Web search parsers
-│   └── ...                     # One file per domain
-├── scripts/                    # Developer tooling
-│   ├── quality.sh / quality.ps1# Lint + typecheck + test runner
-│   ├── runtime_verify.py       # Provider tool-calling runtime verification
-│   └── generate_master_key.py  # Fernet key generator
+│   │       ├── api-design/
+│   │       ├── coding-standards/
+│   │       └── web-search/
+│   ├── history/                # SQLite database (sangam.db)
+│   ├── uploads/                # Uploaded file storage
+│   └── logs/                   # Rotating application logs (loguru)
+├── tests/                      # Primary test tree (pytest + unittest discover)
+│   ├── conftest.py             # Shared fixtures (auth client, tmp DB, path setup)
+│   ├── integration/            # HTTP-level API tests (auth, chat, models, security)
+│   └── test_*.py               # Unit tests per backend module (~40 files)
+├── scripts/                    # Dev utilities (ui_verify_chrome.py, quality.sh/ps1)
 ├── start.py                    # Launcher: venv, deps, env, then both servers
 ├── start.bat / start.sh        # One-command start (Windows / Unix)
-├── .env                        # Environment configuration (user-created)
-├── .env.example                # Configuration template
-├── pyproject.toml              # Ruff/mypy/pytest/coverage configuration
+├── .env / .env.example         # Environment configuration
+├── pyproject.toml              # Ruff, mypy, pytest, coverage, bandit config
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # Project README
 └── ARCHITECTURE.md             # This file
@@ -168,13 +139,14 @@ sangam/
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Web Framework | **FastAPI** (0.115) | Async REST API with auto-docs |
+| Web Framework | **FastAPI** (0.141) | Async REST API with auto-docs |
 | ASGI Server | **Uvicorn** (0.34) | Production-grade Python ASGI server |
 | Database | **SQLite + aiosqlite** | Local persistence, zero config |
 | ORM | **SQLAlchemy 2.0** (async) | Type-safe database access |
 | Validation | **Pydantic v2** | Request/response validation |
 | LLM Client | **LiteLLM** (1.56) | Unified API for 100+ LLM providers |
 | HTTP Client | **httpx** (0.27) | Async HTTP for model APIs + web search |
+| Logging | **loguru** | Structured logs to stdout + rotating file (`mainfiles/logs/app.log`) |
 
 ### 3.2 Application Lifespan (`main.py`)
 
@@ -185,63 +157,42 @@ async def lifespan(app: FastAPI):
     (BASE_DIR / "history").mkdir(parents=True, exist_ok=True)
     (BASE_DIR / "logs").mkdir(parents=True, exist_ok=True)
     await init_db()       # Create all SQLAlchemy tables
-    logger.info("Application startup complete")
     yield
-    _cleanup_ollama()             # stop auto-started Ollama, if any
-    await close_rate_limit_store()  # close Redis, if configured
-    logger.info("Application shutdown")
+    _cleanup_ollama()                  # Terminate auto-started Ollama, if any
+    await close_rate_limit_store()     # Close Redis connection, if any
 ```
 
 The lifespan handler runs on startup:
 1. Creates the `uploads/`, `history/`, and `logs/` directories if missing
 2. Runs `Base.metadata.create_all` to create all database tables
 
-On shutdown it cleans up the auto-started Ollama process (if any) and closes
-the Redis rate-limit store (if configured).
+On shutdown it terminates an auto-started Ollama child process and closes the rate-limit store.
 
 ### 3.3 CORS Configuration
 
 ```python
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,  # ["http://localhost:5500", "http://127.0.0.1:5500"]
+    allow_origins=settings.ALLOWED_ORIGINS,  # ["http://localhost:5500", "http://127.0.0.1:5500", "http://localhost:3000"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 ```
 
-The CORS middleware allows the frontend (running on port 5500) to call the backend (port 8001).
+The CORS middleware allows the frontend (running on port 5500) to call the backend (port 8001). Additional middleware stacks on top of CORS (request order): `RequestIDMiddleware` → `RequestLoggingMiddleware` → `SecurityHeadersMiddleware` (CSP, `X-Frame-Options`, HSTS in production) → `RateLimitMiddleware` → CORS → CSRF validation.
 
-### 3.4 API Layering
-
-Route handlers live in `mainfiles/backend/api_routes/`, split by resource:
-
-| Module | Endpoints |
-|--------|-----------|
-| `common.py` | SSE framing helpers, upload MIME validation, shared routers |
-| `providers_routes.py` | Provider key CRUD, live model refresh, websearch, `/health`, provider status |
-| `files_routes.py` | Document upload (validation → storage → extraction → RAG index) |
-| `chats_routes.py` | Chat CRUD, user preferences, rolling summary, message feedback |
-| `models_routes.py` | Model catalogue (`/models`, `/models/{provider}`) |
-| `chat_stream_routes.py` | The streaming pipeline (`/chat/stream`) + `/agentic-reasoning` |
-
-`mainfiles/backend/api.py` is a thin **facade**: it imports the route modules
-(which register their endpoints on the shared routers) and re-exports every
-handler plus the shared module objects (`llm`, `websearch`, `settings`, ...).
-`main.py` mounts `router`/`public_router` from `api.py`, and tests patch
-`backend.api.llm.*` exactly as before — the route modules import the same
-module objects, so a patch on either path affects both.
-
-### 3.5 Router Mounting
+### 3.4 Router Mounting
 
 ```python
-app.include_router(auth_router, prefix=settings.API_PREFIX)                    # /api/auth/*
+app.include_router(public_router, prefix=settings.API_PREFIX)                # /api/health
+app.include_router(auth_router, prefix=settings.API_PREFIX)                  # /api/auth/*
 app.include_router(api_router, prefix=settings.API_PREFIX, dependencies=[Depends(get_current_user)])  # /api/*
 app.include_router(skills_router, prefix=settings.API_PREFIX, dependencies=[Depends(get_current_user)])  # /api/skills/*
 ```
 
-- **Auth routes** are unprotected (registration/login)
+- **Health** is public (`/api/health`)
+- **Auth routes** are unprotected (registration/login/forgot-password)
 - **API routes** require a valid bearer token via `get_current_user` dependency
 - **Skills routes** also require authentication
 
@@ -253,13 +204,15 @@ app.include_router(skills_router, prefix=settings.API_PREFIX, dependencies=[Depe
 
 The frontend is a vanilla JS SPA served as static files. There is no build step, no framework — just HTML, CSS, and JS loaded directly.
 
-**Libraries (loaded from CDN):**
+**Libraries (loaded from CDN, pinned with SRI hashes where supported):**
 | Library | Version | Purpose |
 |---------|---------|---------|
 | Font Awesome | 6.5.1 | Icons (free tier) |
 | Google Fonts | — | Sora (display), Inter (body), JetBrains Mono (code) |
-| Highlight.js | 11.9.0 | Code syntax highlighting |
-| Marked | 12.0.1 | Markdown → HTML rendering |
+| Highlight.js | 11.11.0 | Code syntax highlighting |
+| Marked | 15.0.7 | Markdown → HTML rendering |
+| DOMPurify | 3.2.4 | HTML sanitization |
+| KaTeX | 0.16.9 | LaTeX math rendering (with SRI integrity hashes) |
 
 ### 4.2 Layout Structure
 
@@ -284,31 +237,30 @@ The frontend is a vanilla JS SPA served as static files. There is no build step,
 
 ### 4.3 Module Organization
 
-The frontend now uses a **feature-based module structure** under `mainfiles/frontend/js/features/` — each feature owns its own DOM, state, and logic:
+The frontend now uses a **feature-based module structure** under `frontend/js/features/` — each feature owns its own DOM, state, and logic:
 
 | Module | Responsibility |
 |--------|----------------|
-| `core/state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings (persisted to `localStorage` as `sangam-settings`), etc. |
-| `shared/constants.js` | `DEFAULT_SETTINGS`, `CHAT_BUCKETS`, provider color/label maps |
-| `shared/http.js` | `apiFetch`, `apiPost`, `apiDelete`, `streamChat` — authenticated requests + SSE |
-| `shared/markdown.js` | Streaming-safe markdown → HTML rendering (marked + highlight.js) |
+| `core/state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, agenticReasoningEnabled, settings (persisted to `localStorage` as `sangam-settings`), etc. Also `createComputed` / `createSyncedSignal` helpers |
+| `shared/constants.js` | `DEFAULT_SETTINGS`, `CHAT_BUCKETS`, `STORAGE_KEYS`, provider color/label maps |
+| `shared/http.js` | `apiFetch`, `apiGet/apiPost/apiPut/apiDelete`, `apiPostForm`, `streamChatCompletion`, `parseSSE` — authenticated requests + SSE parsing |
+| `shared/markdown.js` | Streaming-safe markdown → HTML rendering (marked + highlight.js + KaTeX) |
 | `shared/toast.js` | Toast notifications |
 | `shared/utils.js` | `escapeHtml`, `formatDate`, `debounce`, etc. |
-| `features/auth/auth.js` | Login, register, forgot password, session check |
-| `features/chat/chat.js` | Streaming pipeline, send/regenerate, composer + file attachments |
-| `features/chat/message_view.js` | Message DOM construction + in-stream status widgets (thinking phase, reasoning, tools, citations, artifacts) |
-| `features/chat/response_controller.js` | Canonical SSE event state machine (sequence/ordering enforcement, buffering) |
-| `features/chat/autoscroll.js` | Smart auto-scroll with hysteresis + "↓ Jump to latest" |
+| `features/auth/auth.js` | Login, register, forgot/reset password, session check, logout |
+| `features/chat/chat.js` | Message rendering, SSE streaming, send/regenerate, file attachments, clarification cards |
+| `features/chat/response_controller.js` | Client-side state machine for the canonical `response_event` SSE protocol |
 | `features/models/models.js` | Model selector dropdown, provider status badges, "no models" handling |
 | `features/settings/settings.js` | Theme (Paper/Ink/system), font size, chat width, code theme, animations; provider key manager (add/remove keys) |
 | `features/skills/skills.js` | Skills modal: search, category/invocation filters, detail panel, execution |
 | `features/sidebar/sidebar.js` | Chat history list (bucketed by date), new chat, delete chat |
 
-**Boot sequence (`app.js`):**
-1. Initialize global state (`state.js`)
-2. Load persisted settings from `localStorage` (`state.js` → `sangam-settings`, applied by `settings.js`)
-3. Initialize feature modules in dependency order: auth → settings → sidebar → models → chat → skills
-4. Call `initGlobalListeners()` for topbar controls (temperature, tokens, reasoning, web search, shortcuts)
+**Boot sequence (`app.js` `init()`):**
+1. Initialize DOM references and inject the markdown CSP
+2. Initialize global state (`state.js`) — persisted settings are loaded from `localStorage` (`sangam-settings`)
+3. Initialize feature modules in dependency order: auth → settings → models → chat → sidebar
+4. Call `initGlobalListeners()` for topbar controls (temperature, tokens, reasoning, web search, shortcuts) and `initSkills()`
+5. `initializeAuth()` — validates the stored session, then invokes the `startApplication` callback on success
 
 ### 4.4 State Management
 
@@ -387,7 +339,7 @@ Design rules:
 - **Interaction states** — every control defines default / hover / focus-visible / active / disabled; micro-interactions run at 120 ms (fast) / 200 ms (medium) on `cubic-bezier(.4,0,.2,1)`.
 - **Motion & contrast** — `prefers-reduced-motion` collapses animation; `forced-colors` keeps focus rings visible under Windows High Contrast.
 
-Design tokens live directly in `mainfiles/frontend/css/style.css` (the `:root` / `[data-theme]` variable blocks).
+The full token reference lives in the design tokens section at the top of `frontend/css/style.css`.
 
 ---
 
@@ -404,27 +356,31 @@ USER                   FRONTEND                         BACKEND                 
  │                        │───────────────────────────────>│                              │
  │                        │                                │  Validate auth token         │
  │                        │                                │  Validate message schema     │
+ │                        │                                │  Resolve model (400 if unknown) │
  │                        │                                │                              │
  │                        │                                │  [Optional] Web search       │
- │                        │                                │  [Optional] File extraction  │
+ │                        │                                │  [Optional] File RAG context │
+ │                        │                                │  [Optional] Response Intel:  │
+ │                        │                                │   intent/style guidance,     │
+ │                        │                                │   clarification gate,        │
+ │                        │                                │   cross-session memory,      │
+ │                        │                                │   context truncation         │
  │                        │                                │                              │
  │                        │                                │  If new chat:                │
  │                        │                                │    - Create Chat row in DB   │
- │                        │                                │  Persist user message in DB  │
  │                        │                                │                              │
- │                        │                                │  Call LLM provider           │
- │                        │                                │──────────────────────────────>│
- │                        │                                │                              │
- │                        │   SSE: event=chat_id           │    Stream tokens            │
+ │                        │   SSE: chat_id frame           │                              │
+ │                        │<───────────────────────────────│   Call LLM provider          │
+ │                        │   SSE: response_event          │──────────────────────────────>│
+ │                        │<───────────────────────────────│   (message_start, text_delta, │
+ │                        │   SSE: response_event          │    reasoning_delta, …)        │
  │                        │<───────────────────────────────│<──────────────────────────────│
- │                        │   SSE: data=<token>           │                              │
- │                        │<───────────────────────────────│                              │
- │                        │   SSE: data=<token>           │                              │
- │                        │<───────────────────────────────│                              │
  │                        │   ...                         │                              │
- │                        │   SSE: data=[DONE]            │                              │
+ │                        │   SSE: response_event          │                              │
+ │                        │   (message_end + usage)         │                              │
  │                        │<───────────────────────────────│                              │
- │                        │                                │  Persist assistant message  │
+ │                        │   SSE: data=[DONE]            │   Persist user+assistant      │
+ │                        │<───────────────────────────────│   messages atomically         │
  │                        │                                │                              │
  │  See streaming text    │                                │                              │
  │<───────────────────────│                                │                              │
@@ -432,45 +388,45 @@ USER                   FRONTEND                         BACKEND                 
 
 ### 5.2 SSE Event Protocol
 
-The backend uses Server-Sent Events (text/event-stream) with a custom frame format:
+The backend uses Server-Sent Events (text/event-stream) with two frame categories:
+
+**1. Legacy/plain frames** (compatibility + lifecycle):
 
 ```
 event: chat_id
 data: abc123def456
 
-data: Hello, how can I
-
-data:  help you today?
-
 event: error
 data: Provider API key not linked
+
+: heartbeat 1728153600        (SSE comment — sent during long silent stretches)
 
 data: [DONE]
 ```
 
-**Event types:**
 - `chat_id` (sent once): The database ID of the chat (useful when creating a new chat)
-- `message` (default, no event line): Streaming token data
-- `error`: Fatal error — streaming terminated
+- `error`: Fatal error — streaming terminated (also emitted alongside the canonical error event)
 - `[DONE]` data: Signal that streaming completed successfully
+- Heartbeat comments (`: heartbeat <ts>`) keep the connection alive during long provider stalls
+
+**2. Canonical `response_event` frames** (the primary protocol, built by `ResponseEventBuilder` in `response_events.py`):
+
+```
+event: response_event
+data: {"type": "message_start", "sequence": 0, "message_id": "…", "request_id": "…", "provider": "ollama", "model": "…"}
+
+event: response_event
+data: {"type": "text_delta", "sequence": 1, "message_id": "…", "content": "Hello"}
+
+event: response_event
+data: {"type": "message_end", "sequence": 9, "finish_reason": "stop", "usage": {…}}
+```
+
+Every frame carries a monotonic `sequence` number plus `message_id`/`request_id` correlation IDs. Event types (`ResponseEventType`): `message_start`, `text_start`, `text_delta`, `text_end`, `reasoning_start/delta/end`, `tool_start/input_delta/end/result`, `citation`, `clarification_request`, `artifact_start/delta/end`, `usage`, `message_end`, `error`. The builder enforces lifecycle invariants (e.g. `message_start` must be first; the client controller enforces the same rule).
 
 ### 5.3 SSE Parsing in Frontend
 
-```javascript
-let buffer = '';
-while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let frameEnd;
-    while ((frameEnd = buffer.indexOf('\n\n')) !== -1) {
-        const frame = buffer.slice(0, frameEnd);
-        buffer = buffer.slice(frameEnd + 2);
-        // Parse event type and data from the frame
-        // Handle: error, chat_id, [DONE], or regular token
-    }
-}
-```
+The frontend parses frames with an async generator (`parseSSE()` in `shared/http.js`) that normalizes CRLF line endings, splits frames on blank lines, and yields `{ event, data }` objects. `features/chat/response_controller.js` consumes them: `response_event` payloads drive a client-side state machine (message/text/reasoning/tool/clarification/artifact lifecycle), while legacy `chat_id`/`error`/`[DONE]` frames are handled for compatibility.
 
 ---
 
@@ -478,7 +434,7 @@ while (true) {
 
 ### 6.1 Design
 
-Single-user, local-only authentication. No OAuth, no third-party identity providers. The first user to register creates the account; subsequent visitors are prompted to sign in.
+Single-user, local-only authentication. No OAuth, no third-party identity providers. The first user to register creates the account (`registration_open` is true only while the `users` table is empty); subsequent visitors are prompted to sign in. Includes brute-force login lockout (sliding-window rate limit after consecutive failures) and a forgot-password / reset-token flow (single-use tokens, 30-minute expiry).
 
 ### 6.2 Password Hashing
 
@@ -506,7 +462,7 @@ def _hash_token(token: str) -> str:
 - Token is issued to the client once (stored in `localStorage`)
 - Only the SHA-256 hash is stored in the database
 - Sessions expire after 30 days
-- CSRF protection via double-submit cookie (`csrf_token` cookie + `X-CSRF-Token` header)
+- CSRF protection via double-submit cookie (`sangam_csrf` cookie + `X-CSRF-Token` header) — enforced for cookie-based sessions; Bearer-token clients skip CSRF (they are not cookie-exposed)
 
 ### 6.4 Auth Flow
 
@@ -543,7 +499,7 @@ def _hash_token(token: str) -> str:
 | Anthropic | `anthropic` | Cloud | Yes | `anthropic/` |
 | OpenAI | `openai` | Cloud | Yes | `openai/` |
 | NVIDIA NIM | `nvidia` | Cloud | Yes | `nvidia_nim/` |
-| Together AI | `together` | Cloud | Yes | (none) |
+| Together AI | `together` | Cloud | Yes | `together_ai/` |
 | Groq | `groq` | Cloud | Yes | (none) |
 | OpenRouter | `openrouter` | Cloud | Yes | (none) |
 | DeepSeek | `deepseek` | Cloud | Yes | `deepseek/` |
@@ -553,7 +509,7 @@ def _hash_token(token: str) -> str:
 
 ### 7.2 Model Discovery — Two-Tier System
 
-**Tier 1: Live API Fetch** (`_fetch_provider_models`)
+**Tier 1: Live API Fetch** (`fetch_models_from_provider` in `providers/model_discovery.py`)
 
 For each provider with a linked API key, the backend queries the provider's actual model listing endpoint:
 
@@ -574,10 +530,10 @@ If live fetch fails (offline, bad key), curated defaults are shown so the provid
 
 ```python
 CURATED_MODELS = {
-    "claude-sonnet-5":  ModelInfo(id="claude-sonnet-5",  name="Claude Sonnet 5",  provider="anthropic", litellm_id="anthropic/claude-sonnet-5"),
-    "gpt-5":            ModelInfo(id="gpt-5",            name="GPT-5",            provider="openai",   litellm_id="openai/gpt-5"),
-    "nim-llama-3-70b":  ModelInfo(id="nim-llama-3-70b",  name="Llama 3.3 70B",    provider="nvidia",   litellm_id="nvidia_nim/meta/llama-3.3-70b-instruct"),
-    # ... etc
+    "claude-sonnet-4":   ModelInfo(id="claude-sonnet-4", …, litellm_id="anthropic/claude-sonnet-4"),
+    "gpt-4o":            ModelInfo(id="gpt-4o", …, litellm_id="openai/gpt-4o"),
+    "nim-llama-3-3-70b": ModelInfo(id="nim-llama-3-3-70b", …, litellm_id="nvidia_nim/meta/llama-3.3-70b-instruct"),
+    # ... (full list in providers/compat.py)
 }
 ```
 
@@ -586,28 +542,24 @@ CURATED_MODELS = {
 Ollama gets special treatment:
 
 ```python
-async def fetch_ollama_models(base_url):
+async def list_ollama_models():
     # 1. Query local Ollama server: GET /api/tags
-    # 2. If unreachable, auto-start `ollama serve` in the background
+    # 2. If unreachable, try to auto-start `ollama serve` in background
     # 3. Query again after a delay
     # 4. Return real pulled models only
 ```
 
-`_try_start_ollama()` (in `providers/ollama.py`) spawns a detached
-`ollama serve` process when the server is unreachable and an `ollama`
-executable is on `PATH`; `_cleanup_ollama()` terminates it on shutdown. If
-Ollama is not installed, discovery simply returns no local models — users
-can also run `ollama serve` manually.
+The `_try_start_ollama()` function in `providers/ollama.py` **actually spawns** a detached `ollama serve` process (located via `shutil.which("ollama")`) when the server is unreachable and the binary is installed. It runs at most once per backend process; the child handle is tracked globally and terminated by `_cleanup_ollama()` on application shutdown (see the `main.py` lifespan). If Ollama is not installed, discovery simply returns no local models — you can still run `ollama serve` manually if you prefer.
 
 ### 7.4 Model Resolution
 
 Model IDs flow through the system in this format:
 
-- **Ollama models:** `ollama:llama3.2` → resolved as provider="ollama", litellm_id="ollama/llama3.2"
-- **Dynamic cloud models:** `openai::openai/gpt-4o` → uses `::` separator between provider_id and litellm_id
-- **Curated models:** Direct lookup in `MODELS` dict
+- **Ollama models:** `ollama:llama3.2` (accepted input) → resolved to `ollama::llama3.2` with `litellm_id="ollama/llama3.2"`
+- **Dynamic cloud models:** `openai::openai/gpt-4o` → `::` separator between provider_id and litellm_id (this is the format `/api/models` returns)
+- **Curated models:** `::`-prefixed IDs matched against `CURATED_MODELS` by litellm_id
 
-The `_resolve_model()` function handles all three formats and raises `ValueError` for unknown models.
+The `_resolve_model()` function in `llm.py` handles all three formats; unknown IDs make `/api/chat/stream` fail fast with a 400 `Unknown model`.
 
 ### 7.5 Provider Key Management
 
@@ -617,11 +569,14 @@ Users can link API keys entirely from the Settings UI — no `.env` editing requ
 - **DELETE** `/api/settings/providers/{id}/key` — Remove a saved key
 - **GET** `/api/settings/providers` — List all providers with masked key status
 
-The `resolve_api_key()` function checks runtime keys first, then falls back to `.env` values:
+The `resolve_api_key()` function checks database keys first (Fernet-encrypted `provider_keys` table), then falls back to `.env` values:
 
 ```python
 async def resolve_api_key(provider_id: str, db: AsyncSession) -> str | None:
-    return (await get_db_keys(db)).get(provider_id) or PROVIDERS[provider_id]["env_key"]
+    db_keys = await get_db_keys(db)
+    if provider_id in db_keys:
+        return db_keys[provider_id]
+    return get_static_env_key(provider_id)
 ```
 
 ---
@@ -635,48 +590,51 @@ The request body (`ChatStreamRequest`) includes:
 ```json
 {
     "chat_id": null,         // null = create new chat
-    "model": "claude-sonnet-5",
+    "model": "openai::openai/gpt-4o",
     "messages": [{"role": "user", "content": "Hello"}],
     "file_ids": [],
     "temperature": 0.7,
     "max_tokens": 1024,
     "regenerate": false,
-    "web_search": false
+    "web_search": false,
+    "reasoning_effort": "medium"
 }
 ```
 
-Processing pipeline (implemented in `api_routes/chat_stream_routes.py`):
-1. **Model validation** — resolve the model up front; unknown models fail fast with 400
-2. **Web search** (optional) — inject live web results as a system message
+Processing pipeline (in order, all best-effort steps fail open with a log warning):
+1. **Model validation** — unknown models are rejected with a fast 400 before any resources are allocated
+2. **Web search** (optional) — live results injected as a system message
 3. **Chat resolution** — find existing or create new `Chat` record
-4. **File context** — attach retrieved RAG chunks from uploaded files
-5. **Response intelligence** — analyze the request and inject style guidance; stored user preferences override detected signals
-6. **Clarification gate** — ambiguous short requests are intercepted with a clarification_request event instead of calling the provider
-7. **Cross-session memory** — inject relevant past-conversation summaries
-8. **Context truncation** — token-budget the message list to the model's window
-9. **Stream** — emit canonical response events (`message_start` → deltas → `message_end` → `[DONE]`) with heartbeats
-10. **Persist** — save user + assistant messages atomically; trigger rolling summarization in the background
+4. **File context** — RAG retrieval over attached files, folded into the latest user message
+5. **Response Intelligence** — intent/style analysis → system-prompt guidance; user's stored preferences override detected style
+6. **Clarification gate** — ambiguous short requests short-circuit into a `clarification_request` event with interpretation options (no provider call)
+7. **Cross-session memory** — relevant past-chat summaries injected as context
+8. **Safe context truncation** — token budgeting before provider routing
+9. **Stream** — `llm.stream_response_events()` yields canonical response events; SSE heartbeats keep the connection alive
+10. **Persist atomically** — user + assistant messages saved in one commit (orphaned-chat cleanup on disconnect/error); rolling summarization fires in the background
+11. **Uncertainty post-processing** — hedges are applied to the *stored* text only, never the live stream
 
-### 8.2 Provider Routing (`stream_completion`)
+### 8.2 Provider Routing (`stream_response_events`)
 
-The provider package routes each model to its adapter (Ollama streams
-natively; cloud providers stream through LiteLLM):
+`llm.py` is a facade over the `providers/` package. `stream_response_events()` (and the chunk-level `stream_completion()`) delegate to `providers/__init__.py`, where the enhanced routing layer (`providers/enhanced/`) scores providers on cost/latency/capability before dispatching:
 
 ```python
-# mainfiles/backend/providers/__init__.py — stream_completion()
-provider_id, litellm_id = _resolve_model(model_id)   # "ollama::x" -> ("ollama", "ollama/x")
-provider_class = registry.get_provider_class(provider_id) or LiteLLMProvider
-provider = provider_class(config, await resolve_api_key(provider_id, db))
-async for chunk in provider.stream_completion(model_id=model_id, messages=messages, ...):
-    yield chunk
+async def stream_response_events(model_id, messages, db, temperature, max_tokens, reasoning_effort, message_id, request_id):
+    model = _resolve_model(model_id)  # Convert app model_id → ModelInfo
+    if model.provider_id == "ollama":
+        async for event in ollama_provider.stream_response_events(...):
+            yield event
+        return
+
+    # Cloud provider: OpenAI-compatible adapter or LiteLLM fallback
+    api_key = await resolve_api_key(model.provider_id, db)
+    async for event in provider.stream_response_events(...):
+        yield event
 ```
 
-The canonical event stream (`stream_response_events`) wraps this with
-`message_start` / `text_delta` / `message_end` lifecycle events, tool-call
-execution, and error normalization — see `response_events.py`.
+Events are built by `ResponseEventBuilder` (`response_events.py`), which normalizes provider-specific chunks (including reasoning content) into the canonical event stream. Unknown/inaccessible models are filtered through `inaccessible.py` markers.
 
-**Ollama streaming** uses its native `/api/chat` endpoint with JSON-line
-parsing for better support of reasoning models:
+**Ollama streaming** uses its native `/api/chat` endpoint with SSE parsing for better support of reasoning models:
 
 ```python
 payload = {"model": model.name, "messages": messages, "stream": True, "options": {...}}
@@ -768,7 +726,7 @@ The skills modal (`features/skills/skills.js`) provides:
 - **Detail panel** — parameters with validation, dependencies, execute button, copy command
 - **Execution** — runs `/api/skills/execute`, shows result in modal
 
-**Fixed Issues (v1.0.0):**
+**Fixed Issues (v1.1):**
 - CSS completely rewritten to match actual HTML structure (`.skills-layout`, `.skills-sidebar`, `.skills-search-wrap`, `.skills-categories`, `.skills-invocations`, `.skills-list`, `.skills-detail`)
 - `loadSkills()` moved from `init()` to `openSkillsModal()` so it runs after authentication (fixes 401 on first load)
 - Category filter buttons now match backend `SkillCategory` enum values
@@ -892,7 +850,7 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 [relevant chunk]
 ```
 
-**RAG Pipeline (mainfiles/backend/rag.py):**
+**RAG Pipeline (backend/rag.py):**
 
 | Step | Function | Description |
 |------|----------|-------------|
@@ -903,10 +861,9 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 
 **Key properties:**
 - ChromaDB runs in embedded mode — no external service required
-- Vector index stored on disk at `.chromadb/`
+- Vector index stored on disk at `mainfiles/.chromadb/` (overridable via `CHROMA_DB_PATH`)
 - All RAG operations catch exceptions and log warnings; chat never breaks
 - Configurable chunk size (`CHUNK_SIZE`), overlap (`CHUNK_OVERLAP`), and top-k (`TOP_K`)
-- Vector DB path overridable via `CHROMA_DB_PATH` env var (used in tests)
 
 ---
 
@@ -914,57 +871,43 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 
 ### 12.1 Test Suite Overview
 
-Single consolidated tree under `tests/` — one file per domain, unit tests at
-the top level and API-level integration tests under `tests/integration/`.
-~1,000 tests total (948 root + 38 integration as of the 2026-09 refactor).
+The primary tree is `tests/` (run by both pytest and `unittest discover`), with a secondary tree at `mainfiles/backend/tests/` (its own `pytest.ini`, coverage-gated at 80%). ~830 tests collect across both trees, including integration coverage in `tests/integration/`.
 
-| Test File | Tests | Coverage |
+Representative modules:
+
+| Area | Files | Coverage |
 |-----------|-------|----------|
-| `test_document.py` | 129 | Text extraction (PDF/DOCX/CSV/XLSX/PPTX/OCR), truncation |
-| `test_auth.py` | 88 | Hashing, sessions, CSRF, lockout, endpoints, production mode |
-| `test_llm.py` | 69 | Provider facade, model resolution, discovery wrappers |
-| `test_rag.py` | 68 | Chunking, indexing, retrieval, cleanup |
-| `test_websearch.py` | 57 | DuckDuckGo parsing, context formatting, providers |
-| `test_prompt_injection_new.py` | 54 | Injection detection, log sanitization, validation |
-| `test_api.py` | 53 | Route handlers (all endpoints, patch-level) |
-| `test_provider_adapters.py` | 52 | Provider base/registry/adapter protocol |
-| `test_providers.py` | 47 | Provider registry facade (list/status/stream) |
-| `test_response_intelligence.py` | 46 | Request analysis, guidance, prompt additions |
-| `test_policy_domain.py` | 42 | Response policy + domain dataclasses |
-| `test_policy_integration.py` | 39 | Policy integration with chat flow |
-| `test_policy_module.py` | 37 | Policy selector/adapter/manager |
-| `test_context_manager.py` | 37 | Token budgeting, safe truncation |
-| `test_models.py` | 36 | Model discovery + selection |
-| `test_executor_coverage.py` | 31 | Skills executor |
-| `test_main.py` | 29 | App factory, lifespan, health, CSRF middleware |
-| `test_capability_orchestration.py` | 16 | Clarification heuristics, capability decisions |
-| `test_response_events.py` | 11 | Canonical event builder/serialization |
-| `test_postprocessor.py` | 11 | Uncertainty hedging |
-| `test_preferences.py` / `test_clarification.py` / `test_message_feedback.py` / `test_memory.py` | 9/9/8/8 | Preferences, clarification gate, feedback, memory/summaries |
-| `tests/integration/` | 38 | Auth, models, chat, security (HTTP-level) |
+| Authentication | `test_auth.py`, `test_auth_unit.py`, `test_auth_coverage.py`, `test_auth_lockout.py` | Password hashing, tokens, session lifecycle, brute-force lockout |
+| API surface | `test_api.py`, `test_api_coverage.py`, `tests/integration/test_api_*.py` | Route behavior, auth gates, chat/model/file endpoints |
+| Documents + RAG | `test_document.py`, `test_document_new.py`, `test_document_coverage.py`, `test_rag_*.py` | Extraction, truncation, chunking, retrieval |
+| Models/providers | `test_model_fetch.py`, `test_model_selection.py`, `test_providers.py`, `test_llm.py` | Live fetch, filtering, Ollama discovery, curated fallback, routing |
+| Response intelligence | `test_response_intelligence.py`, `test_capability_orchestration.py`, `test_response_events.py` | Ambiguity triggers (word matching), clarification gate, canonical SSE events |
+| Web search | `test_websearch.py`, `test_websearch_new.py` | DuckDuckGo parser, format_context, providers |
+| Streaming + frontend contract | `test_streaming.py`, `test_frontend_response_controller.py` | SSE frame format, client state machine |
+| Other | `test_startup.py`, `test_schemas.py`, `test_skill_registry.py`, `test_skills.py`, `test_context_manager.py`, `test_prompt_injection_new.py` | Launcher, validation, skills, context truncation, injection detection |
 
 ### 12.2 Running Tests
 
 ```bash
-# From project root
-venv\Scripts\python.exe -m pytest tests/ -v
-```
+# pytest (recommended — asyncio_mode=auto via pyproject.toml)
+venv\Scripts\python.exe -m pytest tests -v
 
-The full tree is consolidated under `tests/` (one file per domain, ~950 tests).
-Environment: `TEST_MODE=1` is set automatically by the suite conftest; every
-DB-backed test binds a per-test SQLite file guarded against the production DB.
+# unittest (works too; some pytest fixtures are skipped)
+venv\Scripts\python.exe -m unittest discover -s tests -v
+
+# Secondary tree (own pytest.ini, expects pytest-cov)
+venv\Scripts\python.exe -m pytest mainfiles/backend/tests -v
+```
 
 ### 12.3 CI Pipeline (GitHub Actions)
 
-The `.github/workflows/ci.yml` runs on push to `main`/`sangam` and on PRs:
-1. Checkout + setup Python 3.13 + Node.js 22
-2. Install Python dependencies
-3. `compileall` check on backend, scripts, and tests
-4. Run the full pytest suite (`TEST_MODE=1`)
-5. `node --check` on every frontend JS file
+The `.github/workflows/ci.yml` has two jobs:
 
-A second `security` job runs Bandit (static analysis) and Safety (dependency
-vulnerabilities) and uploads the reports as artifacts.
+**verify** — checkout, Python 3.12, Node 22, install deps, `compileall` on the backend, run tests under coverage, enforce a 76% coverage gate, and `node --check` the frontend entrypoint.
+
+> **Note:** the workflow currently references `backend/`, `frontend/`, and `tests/` at the repository root, but the application code lives under `mainfiles/` since the layout move. Until the paths are updated, the verify job can silently no-op (e.g. `compileall` exits 0 when its target directory is missing). Fixing the workflow paths is tracked separately from this documentation pass.
+
+**security** — Bandit static analysis and Safety dependency scan, uploaded as build artifacts (both non-blocking).
 
 ---
 
@@ -975,14 +918,14 @@ vulnerabilities) and uploads the reports as artifacts.
 ```dotenv
 # --- Application ---
 APP_NAME=UniversalAI                          # App title in API responses
-ENV=development                                # environment
-APP_DEBUG=true                                 # SQLAlchemy echo + FastAPI debug
+ENV=development                                # development | production (enables HSTS)
+APP_DEBUG=false                                # FastAPI debug (maps to settings.DEBUG)
 API_PREFIX=/api                                # URL prefix for all routes
-ALLOWED_ORIGINS=["http://localhost:5500","http://127.0.0.1:5500"]
+ALLOWED_ORIGINS=["http://localhost:5500","http://127.0.0.1:5500","http://localhost:3000"]
 
 # --- Security ---
-MASTER_KEY=                                   # Fernet key for provider-key encryption at rest.
-                                              # start.py auto-generates one on first run if blank.
+MASTER_KEY=                                    # Fernet key for encrypting provider keys at rest
+                                               # (start.py generates this automatically on first run)
 
 # --- Storage ---
 MAX_UPLOAD_SIZE_MB=25                          # File upload limit
@@ -997,15 +940,12 @@ OPENROUTER_API_KEY=sk-or-...
 DEEPSEEK_API_KEY=sk-...
 MISTRAL_API_KEY=...
 GEMINI_API_KEY=AIza...
+OMNIROUTE_API_KEY=...                          # optional (local proxy)
 
 # --- Local Runtimes ---
 OLLAMA_BASE_URL=http://localhost:11434
 LM_STUDIO_BASE_URL=http://localhost:1234/v1
 VLLM_BASE_URL=http://localhost:8001/v1
-
-# --- OpenAI-compatible custom providers ---
-OMNIROUTE_API_KEY=                            # optional
-OMNIROUTE_BASE_URL=http://localhost:20128/v1
 
 # --- Web Search (optional, DuckDuckGo is default) ---
 WEB_SEARCH_PROVIDER=          # tavily, brave, or blank for DuckDuckGo
@@ -1020,36 +960,40 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/health` | **No** | Health check (public) |
 | GET | `/api/websearch?q=...` | Yes | Direct web search |
 | GET | `/api/models` | Yes | Available models (live + curated fallback) |
+| GET | `/api/models/{provider}` | Yes | Per-provider model listing |
+| POST | `/api/models/inaccessible/clear` | Yes | Reset inaccessible-model markers |
 | GET | `/api/providers` | Yes | Provider status |
 | POST | `/api/chat/stream` | Yes | Stream chat response (SSE) |
-| GET | `/api/chats` | Yes | List all chats |
+| POST | `/api/agentic-reasoning` | Yes | Tool-calling reasoning endpoint |
+| GET | `/api/chats` | Yes | List all chats (with summaries) |
+| POST | `/api/chats` | Yes | Create a chat |
 | GET | `/api/chats/{id}` | Yes | Get chat with messages |
 | DELETE | `/api/chats/{id}` | Yes | Delete chat |
+| GET | `/api/chats/{id}/summary` | Yes | Rolling summary + topics (Phase 5) |
+| POST | `/api/messages/{id}/feedback` | Yes | Message quality feedback (up/down + note) |
 | POST | `/api/files` | Yes | Upload document |
+| GET | `/api/user/preferences` | Yes | Response style preferences |
+| PUT | `/api/user/preferences` | Yes | Update response style preferences |
 | GET | `/api/settings/providers` | Yes | Provider key status |
 | PUT | `/api/settings/providers/{id}/key` | Yes | Save API key |
 | DELETE | `/api/settings/providers/{id}/key` | Yes | Remove API key |
+| GET | `/api/settings/providers/{id}/models/refresh` | Yes | Re-fetch models for one provider |
 | GET | `/api/auth/status` | No | Registration open? |
 | POST | `/api/auth/register` | No | Create account |
 | POST | `/api/auth/login` | No | Sign in |
+| POST | `/api/auth/forgot-password` | No | Request reset token |
+| POST | `/api/auth/reset-password` | No | Reset with token |
 | POST | `/api/auth/logout` | Yes | Sign out |
 | GET | `/api/auth/me` | Yes | Current user |
 | GET | `/api/skills/` | Yes | List skills |
+| GET | `/api/skills/categories` | Yes | List categories |
 | GET | `/api/skills/{id}` | Yes | Skill detail |
 | POST | `/api/skills/execute` | Yes | Execute skill |
 | POST | `/api/skills/chain` | Yes | Chain skills |
 | POST | `/api/skills/auto-suggest` | Yes | Suggest skills |
-| GET | `/api/chats/{id}/summary` | Yes | Rolling summary + key topics |
-| POST | `/api/messages/{id}/feedback` | Yes | Thumbs up/down feedback |
-| GET/PUT | `/api/user/preferences` | Yes | Response-style preferences |
-| GET | `/api/settings/providers/{id}/models/refresh` | Yes | Live model catalogue fetch |
-| POST | `/api/models/inaccessible/clear` | Yes | Reset inaccessible-model flags |
-| POST | `/api/agentic-reasoning` | Yes | Enhance message with reasoning + tools |
-| GET | `/health` (no prefix) | No | Deep health check (DB + Ollama) |
 
 ### 13.3 Database Schema
 
-```
 ┌───────────────────┐       ┌───────────────────┐
 │       users       │       │   auth_sessions   │
 ├───────────────────┤       ├───────────────────┤
@@ -1060,50 +1004,52 @@ WEB_SEARCH_MAX_RESULTS=5
 │ created_at        │       │ created_at        │
 └───────────────────┘       └───────────────────┘
 
-┌───────────────────┐       ┌───────────────────┐
-│       chats       │       │     messages      │
-├───────────────────┤       ├───────────────────┤
-│ id (PK)           │──┐    │ id (PK)           │
-│ title             │  └───>│ chat_id (FK)      │
-│ model             │       │ role              │
-│ created_at        │       │ content (TEXT)     │
-│ updated_at        │       │ model             │
-└───────────────────┘       │ file_ids          │
-                            │ created_at        │
-┌───────────────────┐       └───────────────────┘
+┌────────────────────────────┐
+│  password_reset_tokens     │
+├────────────────────────────┤
+│ id (PK)                    │
+│ user_id (FK)               │
+│ token_hash (idx)           │
+│ used (single-use flag)     │
+│ expires_at (idx, 30 min)   │
+│ created_at                 │
+└────────────────────────────┘
+
+┌──────────────────────┐       ┌────────────────────────┐
+│       chats          │       │     messages           │
+├──────────────────────┤       ├────────────────────────┤
+│ id (PK)              │──┐    │ id (PK)                │
+│ title                │  └───>│ chat_id (FK)           │
+│ model                │       │ role                   │
+│ summary (rolling)    │       │ content (TEXT)         │
+│ key_topics           │       │ model                  │
+│ summarized_at        │       │ file_ids (comma-sep)   │
+│ created_at           │       │ response_time          │
+│ updated_at           │       │ feedback (up|down)     │
+└──────────────────────┘       │ feedback_note          │
+                               │ created_at             │
+┌───────────────────┐          └────────────────────────┘
 │   uploaded_files  │
 ├───────────────────┤       ┌───────────────────┐
 │ id (PK)           │       │  provider_keys    │
 │ filename          │       ├───────────────────┤
 │ stored_path       │       │ provider_id (PK)  │
-│ extension         │       │ api_key           │
-│ size_bytes        │       │ updated_at        │
-│ extracted_text    │       └───────────────────┘
-│ created_at        │
+│ extension         │       │ api_key_encrypted │
+│ size_bytes        │       │   (LargeBinary)   │
+│ extracted_text    │       │ updated_at        │
+│ created_at        │       └───────────────────┘
 └───────────────────┘
 
-┌───────────────────────────┐
-│    skill_executions       │
-├───────────────────────────┤
-│ id (PK)                   │
-│ skill_id (idx)            │
-│ skill_name                │
-│ params (JSON)             │
-│ result (TEXT)             │
-│ error (TEXT)              │
-│ invocation_type           │
-│ duration_ms               │
-│ created_at                │
-└───────────────────────────┘
-
 ┌───────────────────────────────┐
-│   user_skill_preferences      │
+│      user_preferences         │
 ├───────────────────────────────┤
-│ id (PK)                       │
-│ skill_id (idx)                │
-│ enabled (bool)                │
-│ auto_invoke (bool)            │
-│ custom_params (JSON)          │
+│ user_id (PK, FK → users)      │
+│ response_style (concise|      │
+│   balanced|detailed)          │
+│ formality (casual|neutral|    │
+│   formal)                     │
+│ expertise_level (beginner|    │
+│   general|expert)             │
 │ updated_at                    │
 └───────────────────────────────┘
 ```
@@ -1115,8 +1061,8 @@ The `start.py` launcher:
 2. **Install dependencies** — `pip install -r requirements.txt` (with SHA-256 caching)
 3. **Bootstrap `.env`** — creates `.env` from `.env.example` if missing and fills in a valid `MASTER_KEY` when the value is blank
 4. **Free stale ports** — kills any process holding port 8001 or 5500
-5. **Start backend** — `python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001` (with `mainfiles/` on `PYTHONPATH`)
-6. **Start frontend** — `python -m http.server 5500` serving `mainfiles/frontend/`
+5. **Start frontend first** — `python -m http.server 5500` serving `mainfiles/frontend/` (started before the backend so the backend's stdout pipe is not inherited)
+6. **Start backend** — `uvicorn backend.main:app --host 127.0.0.1 --port 8001` with `mainfiles/` on `PYTHONPATH`, stdout piped through the launcher
 7. **Monitor** — watches both processes; terminates both on Ctrl+C
 
 This bootstrap behavior is intentional: first-time setup is friction-free, and the generated `MASTER_KEY` is required to encrypt provider API keys safely at rest.
@@ -1151,7 +1097,7 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
 │  │  └────────────┘ └────────────┘ └────────────┘ └─────────────┘  │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                            │                                            │
-│                      apiFetch() / streamChat()                          │
+│              apiFetch() / streamChatCompletion() / parseSSE()            │
 │                            │                                            │
 └────────────────────────────┼───────────────────────────────────────────┘
                              │
@@ -1161,24 +1107,23 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
 │  ┌─────────────────────────┴─────────────────────────────────────────┐ │
 │  │  main.py — FastAPI app + CORS + lifespan                          │ │
 │  │  ├── /api/auth/* — auth.py (register, login, logout, session)     │ │
-│  │  ├── /api/* — api.py facade -> api_routes/ (chat, models,          │ │
-│  │  │    files, providers, settings)                                 │ │
+│  │  ├── /api/* — api.py (chat, models, files, providers, settings)   │ │
 │  │  └── /api/skills/* — skills/api_skills.py (skills CRUD + execute) │ │
 │  └─────────────────────────┬─────────────────────────────────────────┘ │
 │                            │                                            │
 │  ┌─────────────────────────┴─────────────────────────────────────────┐ │
-│  │  LLM Layer (llm.py facade -> providers/)                           │ │
+│  │  LLM Layer (llm.py)                                               │ │
 │  │  ├── list_models() → live API fetch + curated fallback            │ │
 │  │  ├── list_provider_status() → online/offline/needs_key per provider│ │
-│  │  ├── stream_completion() → provider adapters (Ollama/LiteLLM)     │ │
+│  │  ├── stream_response_events() → provider adapters or LiteLLM     │ │
 │  │  └── resolve_api_key() → DB keys (Fernet) or .env fallback       │ │
 │  └─────────────────────────┬─────────────────────────────────────────┘ │
 │                            │                                            │
 │  ┌──────────┐  ┌──────────┴──────────┐  ┌───────────────────────────┐  │
 │  │ SQLite   │  │ Document Extraction  │  │ Web Search                │  │
-│  │ (history │  │ (document.py)        │  │ (websearch.py)            │  │
-│  │ /sangam   │  │ PDF  DOCX  XLSX     │  │ DuckDuckGo  Tavily  Brave │  │
-│  │  .db)    │  │ CSV  PPTX  Code     │  │                           │  │
+│  │(mainfiles│  │ (document.py)        │  │ (websearch.py)            │  │
+│  │/history/ │  │ PDF  DOCX  XLSX     │  │ DuckDuckGo  Tavily  Brave │  │
+│  │sangam.db)│  │ CSV  PPTX  Code     │  │                           │  │
 │  └──────────┘  └─────────────────────┘  └───────────────────────────┘  │
 │                            │                                            │
 └────────────────────────────┼───────────────────────────────────────────┘

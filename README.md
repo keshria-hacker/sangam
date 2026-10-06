@@ -16,7 +16,7 @@ A privacy-first AI workspace for chatting with cloud and local LLMs from a singl
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-orange)]()
-[![Version](https://img.shields.io/badge/Version-v1.0.0-3A342B)]()
+[![Version](https://img.shields.io/badge/Version-v1.1-3A342B)]()
 
 </div>
 
@@ -30,7 +30,7 @@ Connect cloud providers such as **OpenAI, Anthropic, Gemini, NVIDIA NIM, Groq, M
 
 Switch models, upload documents, use RAG, search the web, manage provider keys, and keep your conversations in one place.
 
-> **Sangam v1.0.0 is the current release.** Features and APIs are stable in this version.
+> **Sangam v1.1 is under active development.** Features and APIs may evolve as the project grows.
 
 ---
 
@@ -133,9 +133,13 @@ cd sangam
 
 ### 2. Configure Environment
 
-On first run, Sangam will automatically create a `.env` file if it is missing and generate a valid `MASTER_KEY` for encrypting provider keys at rest.
+On first run, `start.py` automatically creates `.env` from `.env.example` and generates a valid `MASTER_KEY` (used to encrypt provider API keys at rest). You can also create it manually:
 
-You can still add or edit keys manually afterward:
+```bash
+cp .env.example .env
+```
+
+Add the API keys for the providers you want to use.
 
 ```env
 OPENAI_API_KEY=your_key
@@ -151,8 +155,6 @@ You don't need to configure every provider.
 API keys can also be managed later from:
 
 **Settings → Provider API Keys**
-
-> If you are running from a restricted Windows path (AppLocker / Application Control), move the repo to a normal user-writable folder before starting. The launcher now detects this and explains the fix.
 
 ### 3. Start Sangam
 
@@ -248,7 +250,7 @@ To use another Ollama server:
 OLLAMA_BASE_URL=http://your-ollama-host:11434
 ```
 
-> Ollama currently needs to be started manually.
+> If Ollama is installed but not running, Sangam will attempt to start `ollama serve` automatically in the background the first time it needs a local model.
 
 ---
 
@@ -314,19 +316,19 @@ See [`SECURITY.md`](SECURITY.md) for security and vulnerability reporting inform
 
 ## 🧪 Testing
 
-```bash
-# From project root
-venv\Scripts\python.exe -m pytest tests/ -v
+Run the test suite from the project root:
 
-# Quality checks (lint + typecheck + tests)
-./scripts/quality.sh      # Linux / macOS
-.\scripts\quality.ps1     # Windows
+```bash
+# pytest (recommended — see pyproject.toml for options)
+venv\Scripts\python.exe -m pytest tests -v
+
+# or unittest
+venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The suite lives in a single `tests/` tree (~1,000 tests across unit and
-integration layers, one file per domain). `TEST_MODE=1` is set automatically
-by the conftest; every DB-backed test binds a per-test SQLite file with a
-hard guard against the production database.
+A second tree lives at `mainfiles/backend/tests/` (with its own `pytest.ini`) covering API integration, clarification, feedback, memory, and provider routing.
+
+Tests cover core functionality including authentication, document processing, model discovery, streaming, response intelligence, Skills, and web search.
 
 ---
 
@@ -339,10 +341,9 @@ Contributions, bug reports, feature requests, and improvements are welcome.
 ```bash
 git clone https://github.com/keshria-hacker/sangam.git
 cd sangam
+cp .env.example .env
 python start.py
 ```
-
-The launcher will create the virtual environment, install dependencies, generate `.env` if missing, and populate `MASTER_KEY` automatically on the first run. If you want to edit provider settings manually, update `.env` before starting or open the app and manage keys from the Settings UI.
 
 When contributing, please keep changes focused and follow the existing project structure and coding conventions.
 
