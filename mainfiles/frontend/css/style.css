@@ -32,6 +32,16 @@ html{transition:background var(--dur-med) var(--ease);}
   --font-scale:1;
   --chat-max-w:760px;
 
+  /* Compatibility aliases used by feature styles below. */
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --text-xs:11px;
+  --text-sm:13px;
+  --bg-secondary:var(--bg-surface);
+  --bg-tertiary:var(--bg-elevated-2);
+  --shadow-lg:var(--shadow-3);
+
   /* Surface hierarchy — semantic aliases so raised/sunken layers stay
      consistent across the chrome, cards, popovers and dialogs (§7). */
   --surface-page:var(--bg-base);        /* page ground */
@@ -2112,6 +2122,11 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   .sidebar-scrim.show{display:block;}
   .expand-btn{display:none !important;}
   .topbar{padding:8px 12px;}
+  .topbar{min-height:56px; overflow:visible;}
+  .model-selector{min-width:0; max-width:calc(100vw - 92px);}
+  .model-selector-btn{max-width:100%; overflow:hidden;}
+  .model-provider{display:none;}
+  .model-selector-btn .status-dot{margin-left:auto;}
   .icon-btn{width:40px; height:40px;}
   .icon-btn.ghost{width:36px; height:36px;}
   .model-name{display:none;}
@@ -2119,6 +2134,11 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   .chat-column{padding:18px 14px 8px;}
   .suggestion-grid{grid-template-columns:1fr;}
   .composer-wrap{padding:0 10px 12px;}
+  .composer{border-radius:18px; padding:9px 10px 7px;}
+  .composer-controls{gap:6px; padding-left:2px; padding-right:2px;}
+  .composer-hint{display:none;}
+  .composer-select{max-width:42vw;}
+  .composer-select .select-btn{max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .welcome-screen h1{font-size:24px;}
   .welcome-keyhints{font-size:10px; gap:4px;}
   .onboarding-card{flex-direction:column; align-items:center; text-align:center; padding:14px;}

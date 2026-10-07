@@ -119,6 +119,11 @@ def chunk_text(
         Non-empty chunk strings in order.  Returns ``[text]`` when the input
         is shorter than one chunk; returns ``[]`` for empty/whitespace input.
     """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than zero")
+    if overlap < 0 or overlap >= chunk_size:
+        raise ValueError("overlap must be between zero and chunk_size - 1")
+
     text = text.strip()
     if not text:
         return []
@@ -209,6 +214,10 @@ def index_document(file_id: str, text: str, filename: str) -> int:
             for i in range(len(chunks))
         ]
 
+        # Re-indexing a file is a normal operation (for example after a
+        # replaced upload).  Remove stale chunks first so the existing
+        # collection API can safely add the replacement IDs.
+        collection.delete(where={"file_id": file_id})
         collection.add(
             documents=chunks,
             ids=ids,
@@ -252,7 +261,7 @@ def retrieve_relevant_chunks(
         L2 distance; lower is more similar).  Empty list on any error or
         when no data is available.
     """
-    if not query or not file_ids:
+    if not query or not file_ids or top_k <= 0:
         return []
 
     try:

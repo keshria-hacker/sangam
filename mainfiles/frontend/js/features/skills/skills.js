@@ -172,7 +172,7 @@ async function copyCommand() {
 async function loadSkills() {
   elements.list.innerHTML = '<div class="loading">Loading skills…</div>';
   try {
-    const skillsRes = await apiFetch('/skills');
+    const skillsRes = await apiFetch('/skills/');
     state.skills = await skillsRes.json();
     applyFilters();
     renderList();

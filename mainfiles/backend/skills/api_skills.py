@@ -25,7 +25,8 @@ class SkillChainRequest(BaseModel):
     chain: list[dict]
 
 
-@router.get("/")
+@router.get("")
+@router.get("/", include_in_schema=False)
 async def list_skills(
     cat: str | None = None,
     inv: str | None = None,
@@ -60,38 +61,6 @@ async def list_skills(
 async def list_categories():
     """Return all known skill categories."""
     return [c.value for c in SkillCategory]
-
-
-@router.get("/{sid}")
-async def get_skill(sid: str):
-    """Return full detail for a single skill, excluding the full prompt template."""
-    rg = get_registry()
-    sk = rg.get(sid)
-    if not sk:
-        raise HTTPException(404, f"Skill not found: {sid}")
-
-    prompt = sk.prompt_template
-    return {
-        "id": sk.id,
-        "name": sk.name,
-        "cat": sk.category.value,
-        "inv": sk.invocation.value,
-        "desc": sk.description,
-        "params": [
-            {
-                "n": p.name,
-                "t": p.type,
-                "d": p.description,
-                "r": p.required,
-                "def": p.default,
-            }
-            for p in sk.parameters
-        ],
-        "deps": sk.dependencies,
-        "tags": sk.tags,
-        "src": sk.source_repo,
-        "prompt": (prompt[:500] + "...") if len(prompt) > 500 else prompt,
-    }
 
 
 @router.post("/execute")
@@ -154,4 +123,36 @@ async def suggest_skills(ctx: dict):
             {"id": s.id, "name": s.name, "cat": s.category.value}
             for s in user[:10]
         ],
+    }
+
+
+@router.get("/{sid}")
+async def get_skill(sid: str):
+    """Return full detail for a single skill, excluding the full prompt template."""
+    rg = get_registry()
+    sk = rg.get(sid)
+    if not sk:
+        raise HTTPException(404, f"Skill not found: {sid}")
+
+    prompt = sk.prompt_template
+    return {
+        "id": sk.id,
+        "name": sk.name,
+        "cat": sk.category.value,
+        "inv": sk.invocation.value,
+        "desc": sk.description,
+        "params": [
+            {
+                "n": p.name,
+                "t": p.type,
+                "d": p.description,
+                "r": p.required,
+                "def": p.default,
+            }
+            for p in sk.parameters
+        ],
+        "deps": sk.dependencies,
+        "tags": sk.tags,
+        "src": sk.source_repo,
+        "prompt": (prompt[:500] + "...") if len(prompt) > 500 else prompt,
     }

@@ -231,7 +231,15 @@ class ContextManager:
             # Check for assistant with tool_calls (start of tool interaction)
             if role == "assistant" and msg.get("tool_calls"):
                 # Find all corresponding tool results
-                tool_call_ids = {tc["id"] for tc in msg["tool_calls"]}
+                tool_call_ids = {
+                    tc.get("id")
+                    for tc in msg["tool_calls"]
+                    if isinstance(tc, dict) and tc.get("id")
+                }
+                if not tool_call_ids:
+                    truncatable.append(msg)
+                    i += 1
+                    continue
                 tool_results = []
 
                 # Look ahead for tool results
@@ -258,6 +266,15 @@ class ContextManager:
             i += 1
 
         return preserved_tools, truncatable
+
+    @staticmethod
+    def _restore_message_order(
+        selected: list[dict[str, Any]],
+        original: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Return selected messages in the provider-facing chronological order."""
+        positions = {id(message): index for index, message in enumerate(original)}
+        return sorted(selected, key=lambda message: positions.get(id(message), len(original)))
 
     def truncate(
         self,
@@ -365,7 +382,10 @@ class ContextManager:
                 last_user_tokens, available, self.model_info.id
             )
             # Return only essential system + current user (even though it exceeds budget)
-            result_messages = essential_system + [last_user]
+            result_messages = self._restore_message_order(
+                essential_system + [last_user],
+                messages,
+            )
             return TruncationResult(
                 messages=result_messages,
                 truncated=True,
@@ -392,7 +412,7 @@ class ContextManager:
                 mandatory_tokens, available, self.model_info.id
             )
             return TruncationResult(
-                messages=mandatory,
+                messages=self._restore_message_order(mandatory, messages),
                 truncated=True,
                 original_token_count=original_count,
                 final_token_count=mandatory_tokens,
@@ -444,6 +464,7 @@ class ContextManager:
             web_insert_idx += 1
             current_tokens += msg_tokens
 
+        result_messages = self._restore_message_order(result_messages, messages)
         final_count = current_tokens
         truncated = final_count < original_count
         removed_count = len(messages) - len(result_messages)
