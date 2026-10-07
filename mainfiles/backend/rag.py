@@ -328,3 +328,15 @@ def close_client() -> None:
     global _client, _collection
     _client = None
     _collection = None
+    # chromadb caches its underlying System per (path, settings) for the
+    # lifetime of the process.  Leaving that entry alive keeps an open
+    # SQLite handle: on Windows the tmpdir cleanup then silently fails
+    # (ignore_cleanup_errors), but on Linux the delete succeeds and any
+    # later client reusing the same path inherits the dead handle and
+    # fails with "attempt to write a readonly database".  Evict the cache
+    # so the next PersistentClient() rebuilds cleanly.
+    try:
+        from chromadb.api.shared_system_client import SharedSystemClient
+        SharedSystemClient.clear_system_cache()
+    except Exception:
+        logger.debug("could not clear chromadb system cache", exc_info=True)

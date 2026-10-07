@@ -932,7 +932,7 @@ The `.github/workflows/ci.yml` has two jobs:
 
 **verify** — checkout, Python 3.13, Node 22, install deps (root `requirements.txt` + `mainfiles/backend/requirements-dev.txt`), `compileall` on `mainfiles/backend`/`start.py`/`scripts`/`tests`, run the unified pytest suite with pytest-cov (`PYTHONPATH=mainfiles`, `TEST_MODE=1`), enforce the coverage gate (66%, see `pyproject.toml`), `node --check` every file under `mainfiles/frontend/js`, and validate the frontend module graph with `scripts/check_frontend_modules.mjs`.
 
-> **Note:** the coverage gate is the measured pytest baseline (66.47% on 2026-10-06, 950 passed / 100 skipped on the unified tree) rather than the historical 76%, because the response-intelligence and enhanced-provider subsystems still have limited coverage. Raise `fail_under` in `pyproject.toml` (and the workflow) as coverage grows.
+> **Note:** the coverage gate is the measured pytest baseline (66.27% on Linux/CI, 66.47% on Windows, as of 2026-10-07, 950 passed / 100 skipped on the unified tree) rather than the historical 76%, because the response-intelligence and enhanced-provider subsystems still have limited coverage. Raise `fail_under` in `pyproject.toml` (and the workflow) as coverage grows.
 
 **security** — Bandit static analysis and Safety dependency scan, uploaded as build artifacts (both non-blocking).
 

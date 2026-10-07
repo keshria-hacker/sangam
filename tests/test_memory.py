@@ -94,6 +94,21 @@ async def auth_client(client):
 
 
 async def test_memory_roundtrip(tmp_path):
+    # Isolate from ambient chroma state: other test modules (e.g.
+    # test_document.py) rebind rag's client to a path they delete in
+    # teardown, which leaves any later same-path client with a dead
+    # SQLite handle.  Bind this test to its own ChromaDB dir instead.
+    import importlib
+    import backend.rag as rag_mod
+    from backend import memory as memory_mod
+
+    os.environ["CHROMA_DB_PATH"] = str(tmp_path / "chroma")
+    rag_mod._client = None
+    rag_mod._collection = None
+    memory_mod.reset_memory_for_testing()
+    importlib.reload(rag_mod)
+    memory_mod.reset_memory_for_testing()
+
     from backend.memory import retrieve_memories, store_memory
 
     ok = await store_memory("chatAAA", "Discussed FastAPI streaming and SSE formats.", ["fastapi", "streaming"], user_id="u1")
