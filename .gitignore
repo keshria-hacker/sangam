@@ -42,6 +42,8 @@ mainfiles/uploads/*
 *.log
 *.debug
 debug*/
+# ...but keep the tracked debugging skill under config/skills
+!mainfiles/config/skills/debugging/
 tmp/
 
 # --- Node (if you add tooling later) ---
