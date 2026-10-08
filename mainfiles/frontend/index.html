@@ -548,6 +548,18 @@ if (location.protocol === 'file:') {
             <h3>API Keys</h3>
             <div id="providerKeyManager"><!-- Populated by JS --></div>
           </section>
+
+          <!-- Long-term Memory -->
+          <section class="settings-section">
+            <h3>Memory</h3>
+            <p class="settings-hint">What Sangam remembers across conversations. Delete anything you'd rather it forget.</p>
+            <div class="memory-stats" id="memoryStats"><!-- Populated by JS --></div>
+            <div class="memory-controls">
+              <input type="search" id="memorySearch" class="provider-key-input" placeholder="Search memories&hellip;" aria-label="Search memories" autocomplete="off">
+              <button class="btn-secondary btn-sm" id="memoryConsolidateBtn" type="button" title="Decay stale memories and prune dead ones">Tidy up</button>
+            </div>
+            <div class="memory-list" id="memoryList"><!-- Populated by JS --></div>
+          </section>
         </div>
 
       </div>

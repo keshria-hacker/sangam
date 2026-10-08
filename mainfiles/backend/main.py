@@ -117,6 +117,13 @@ def create_app() -> FastAPI:
             logger.info("Extensions initialized")
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Extension init skipped: {exc}")
+        # Memory++: project long-term memory into the extension registry.
+        try:
+            from .memory import register_memory_extension
+            if register_memory_extension():
+                logger.info("Memory extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Memory extension skipped: {exc}")
         # Foundation F3: connect configured MCP servers (best-effort).
         if settings.FEATURE_MCP:
             try:

@@ -22,7 +22,7 @@ from ..capability_orchestration import derive_interpretations, should_clarify
 from ..context_manager import create_context_manager
 from ..database import AsyncSessionLocal, get_db
 from ..domain import ChatMessage
-from ..memory import retrieve_memories
+from ..memory import extract_from_turn_background, recall
 from ..models import Chat, Message, UploadedFile, UserPreference
 from ..rag import TOP_K as RAG_TOP_K
 from ..rag import retrieve_relevant_chunks
@@ -240,25 +240,26 @@ async def chat_stream(  # noqa: PLR0912
         return StreamingResponse(clarification_generator(), media_type="text/event-stream")
 
     # --- Phase 5: Cross-session memory ---
-    # Retrieve relevant past-conversation summaries and inject as provider
-    # context. Placed AFTER response-intelligence analysis and the
-    # clarification gate: injecting earlier would pollute the conversation
-    # history that the ambiguity heuristic reads (a system message at index 0
-    # makes history non-empty, disabling the no-context branch) and the
-    # clarification path never calls the provider so it needs no memory.
-    # Degrades to no-op on any ChromaDB error (retrieve_memories never raises).
+    # Retrieve relevant long-term memories and inject as provider context.
+    # Placed AFTER response-intelligence analysis and the clarification gate:
+    # injecting earlier would pollute the conversation history that the
+    # ambiguity heuristic reads (a system message at index 0 makes history
+    # non-empty, disabling the no-context branch) and the clarification path
+    # never calls the provider so it needs no memory.
+    # Ranked recall (similarity × recency × importance × access); the current
+    # chat's own memories are excluded. Degrades to no-op on any ChromaDB
+    # error (recall never raises).
     if not payload.regenerate:
         try:
             last_user_content = payload.messages[-1].content
-            memories = await retrieve_memories(last_user_content, top_k=2)
-            memories = [m for m in memories if (chat.summary or "") not in (m, )] if chat.summary else memories
-            if memories:
-                memory_context = "\n".join(f"- {m}" for m in memories)
+            records = await recall(last_user_content, top_k=3, exclude_chat_id=chat.id)
+            if records:
+                memory_context = "\n".join(f"- {r.content}" for r in records)
                 messages.insert(0, {
                     "role": "system",
                     "content": f"[Long-term memory — relevant past conversations]\n{memory_context}",
                 })
-                logger.debug("Injected %d long-term memories", len(memories))
+                logger.debug("Injected %d long-term memories", len(records))
         except Exception as exc:  # noqa: BLE001 — memory must never break chat
             logger.warning("Memory retrieval failed: %s", exc)
 
@@ -361,6 +362,14 @@ async def chat_stream(  # noqa: PLR0912
                 chat.updated_at = datetime.now(UTC)
                 await stream_db.merge(chat)
                 await stream_db.commit()
+
+                # Memory++: fire-and-forget extraction of durable facts from
+                # this turn (preferences, corrections, "remember this").
+                # Offline heuristics; never blocks the response.
+                if not payload.regenerate:
+                    extract_from_turn_background(
+                        payload.messages[-1].content, chat_id=chat.id
+                    )
 
                 # Phase 5: fire-and-forget rolling summarization. Checked every
                 # threshold crossing; failures are logged inside summarize_chat.

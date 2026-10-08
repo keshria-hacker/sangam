@@ -58,4 +58,7 @@ integrations, then implement capabilities drawn from 22 reference repos.
 
 ## Status
 - [x] F1–F7 foundation — DONE on branch `foundation/phase-0` (see integration-program/FOUNDATION.md)
-- [ ] Theme 2–10 integrations (scoped per theme before build)
+- [x] Theme 2 — Memory++ (2026-10-08, branch `memory-plus`): typed memories
+  (episodic/semantic/procedural), importance-ranked recall, auto-extraction,
+  consolidation, memory management API, Settings UI. See MEMORY_UPGRADE.md.
+- [ ] Theme 3–10 integrations (scoped per theme before build)

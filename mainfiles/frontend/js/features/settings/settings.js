@@ -176,6 +176,11 @@ export function openSettings() {
   elements.settingsOverlay?.classList.remove('hidden');
   updateBodyScrollLock();
   setTimeout(() => elements.closeSettings?.focus(), 0);
+  // Memory section (lazy import to keep settings.js lean)
+  import('./memory-ui.js').then((m) => {
+    m.initMemorySettings();
+    m.refreshMemorySection();
+  }).catch(() => {});
 }
 
 /**

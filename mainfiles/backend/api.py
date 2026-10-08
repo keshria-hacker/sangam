@@ -63,6 +63,13 @@ from .api_routes.media_routes import (  # noqa: F401
     load_media_attachment,
     upload_media,
 )
+from .api_routes.memory_routes import (  # noqa: F401
+    create_memory,
+    get_memory_stats,
+    remove_memory,
+    run_consolidation,
+    search_memories,
+)
 from .api_routes.models_routes import (  # noqa: F401
     _to_model_info,
     get_models,
