@@ -3,6 +3,7 @@ api_routes/chat_stream_routes.py — the chat streaming pipeline (SSE) and the
 agentic-reasoning enhancement endpoint.
 """
 import asyncio
+import json
 import sys
 import time
 import uuid
@@ -42,6 +43,7 @@ from .common import (
     sse_event,
     sse_response_event,
 )
+from .media_routes import media_content_parts, resolve_media_json
 
 # SSE heartbeat interval (seconds) — keeps proxies/load-balancers from timing out
 # long-lived streaming connections during slow model generations.
@@ -111,6 +113,26 @@ async def chat_stream(  # noqa: PLR0912
     if web_context and messages:
         # Inject as a system message so the model sees the sources.
         messages.insert(0, {"role": "system", "content": web_context})
+
+    # 2b. Media attachments (image/audio). Persisted on the user message as
+    #     media_json; vision-capable models additionally receive OpenAI-style
+    #     content_parts, other models get a textual note so nothing breaks.
+    user_media_json = resolve_media_json(getattr(payload, "media_ids", None))
+    if user_media_json and messages:
+        last_user_idx = next(
+            (i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"),
+            None,
+        )
+        if last_user_idx is not None:
+            parts = media_content_parts(user_media_json, messages[last_user_idx]["content"])
+            vision = bool(getattr(getattr(model_info, "capabilities", None), "vision", False))
+            if parts and vision:
+                messages[last_user_idx]["content_parts"] = parts
+            else:
+                names = ", ".join(
+                    a.get("filename", "?") for a in json.loads(user_media_json)
+                )
+                messages[last_user_idx]["content"] += f"\n\n[Attached media: {names}]"
 
     # --- Phase 6: Response Intelligence ---
     # Analyze request and inject guidance as system prompt additions.
@@ -187,6 +209,7 @@ async def chat_stream(  # noqa: PLR0912
                             role="user",
                             content=payload.messages[-1].content,
                             file_ids=",".join(payload.file_ids) or None,
+                            media_json=user_media_json,
                         ))
                         await clarify_db.commit()
                     # Lifecycle: message_start must precede any content event
@@ -328,7 +351,8 @@ async def chat_stream(  # noqa: PLR0912
                 if not payload.regenerate:
                     stream_db.add(Message(chat_id=chat.id, role="user",
                                    content=payload.messages[-1].content,
-                                   file_ids=",".join(payload.file_ids) or None))
+                                   file_ids=",".join(payload.file_ids) or None,
+                                   media_json=user_media_json))
                 stream_db.add(Message(id=response_message_id, chat_id=chat.id, role="assistant", content=collected,
                                model=payload.model, response_time=response_time))
                 # Merge the chat into the new session so the model/updated_at

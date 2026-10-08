@@ -100,6 +100,47 @@ class Settings(BaseSettings):
     WEB_SEARCH_API_KEY: str | None = None
     WEB_SEARCH_MAX_RESULTS: int = 5
 
+    # --- Feature flags (foundation for upcoming integrations) ---
+    # Each flag gates a capability end-to-end (backend + UI). Override via env,
+    # e.g. FEATURE_VOICE=true. The GET /api/features endpoint exposes them.
+    FEATURE_VOICE: bool = False          # VoiceStudio-style local TTS/STT
+    FEATURE_IMAGE_GEN: bool = False      # Fooocus-style local image generation
+    FEATURE_MCP: bool = True             # MCP client: consume external MCP servers
+    FEATURE_MULTI_AGENT: bool = False    # munder-difflin/orca-style agent teams
+    FEATURE_ANALYTICS: bool = False      # openpanel-style opt-in analytics
+    FEATURE_SPEC_KIT: bool = False       # spec-kit style spec-driven workflows
+
+    # --- MCP servers (JSON list, e.g. '[{"name":"codebase","command":["codebase-memory-mcp"]}]') ---
+    MCP_SERVERS_JSON: str | None = Field(
+        default=None,
+        description="JSON list of MCP server configs: {name, command|url, args, env}",
+    )
+
+    # --- API ---
+    API_VERSION: str = "v1"
+
+    def feature_flags(self) -> dict[str, bool]:
+        return {
+            "voice": self.FEATURE_VOICE,
+            "image_gen": self.FEATURE_IMAGE_GEN,
+            "mcp": self.FEATURE_MCP,
+            "multi_agent": self.FEATURE_MULTI_AGENT,
+            "analytics": self.FEATURE_ANALYTICS,
+            "spec_kit": self.FEATURE_SPEC_KIT,
+        }
+
+    def mcp_server_configs(self) -> list[dict]:
+        """Parse MCP_SERVERS_JSON into a list of server config dicts."""
+        if not self.MCP_SERVERS_JSON:
+            return []
+        import json
+
+        try:
+            parsed = json.loads(self.MCP_SERVERS_JSON)
+            return parsed if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
 
 @lru_cache
 def get_settings() -> Settings:

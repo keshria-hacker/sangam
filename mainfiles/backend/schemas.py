@@ -4,20 +4,52 @@ Kept separate from models.py (SQLAlchemy) so persistence and the wire
 format can evolve independently.
 """
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+import json
+
 from .response_events import ModelCapabilities
+
+
+class MessageContentPart(BaseModel):
+    """One multimodal content part: text, image, or audio.
+
+    Binary payloads are referenced by URL (served from /api/media/...) rather
+    than inlined, keeping request bodies small. `data` may carry a data-URI
+    for small inline payloads.
+    """
+
+    type: Literal["text", "image", "audio"]
+    text: str | None = None
+    url: str | None = None
+    data: str | None = None            # data-URI for small inline payloads
+    mime_type: str | None = None       # e.g. "image/png", "audio/webm"
+
+
+class MediaAttachment(BaseModel):
+    """A persisted media file attached to a message (image or audio)."""
+
+    id: str
+    kind: Literal["image", "audio"]
+    filename: str
+    mime_type: str
+    size_bytes: int
+    url: str                           # GET /api/media/{id}
+    created_at: datetime | None = None
 
 
 class ChatMessageIn(BaseModel):
     role: str = Field(pattern="^(user|assistant|system)$")
     content: str = Field(min_length=1, max_length=100_000, description="Message content (max 100k chars)")
+    # Optional multimodal parts (foundation for voice/image). When present,
+    # providers that support vision/audio receive them as content parts.
+    parts: list[MessageContentPart] | None = Field(default=None, max_length=10)
 
     @model_validator(mode="after")
     def content_not_empty(self) -> "ChatMessageIn":
-        if not self.content.strip():
+        if not self.content.strip() and not self.parts:
             raise ValueError("Message content cannot be empty or whitespace-only")
         return self
 
@@ -32,6 +64,7 @@ class ChatStreamRequest(BaseModel):
     regenerate: bool = False                   # True => resend without re-persisting the user turn
     web_search: bool = False                   # True => augment the prompt with live web results
     reasoning_effort: str | None = Field(default=None, description="Reasoning effort: low, medium, high, etc.")
+    media_ids: list[str] = Field(default_factory=list, max_length=10, description="Media attachment IDs (image/audio)")
 
     @model_validator(mode="after")
     def final_message_must_be_user(self) -> "ChatStreamRequest":
@@ -51,6 +84,37 @@ class MessageOut(BaseModel):
     feedback: str | None = None
     feedback_note: str | None = None
     created_at: datetime
+    # Multimodal attachments (image/audio). Serialized from Message.media_json.
+    media: list[MediaAttachment] = Field(default_factory=list)
+    content_type: str = "text"           # "text" | "multimodal"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_media(cls, data: Any) -> Any:
+        """Hydrate `media`/`content_type` from the ORM Message.media_json column."""
+        if isinstance(data, dict):
+            return data
+        attachments: list[dict] = []
+        media_json = getattr(data, "media_json", None)
+        if media_json:
+            try:
+                parsed = json.loads(media_json)
+                if isinstance(parsed, list):
+                    attachments = parsed
+            except (ValueError, TypeError):
+                attachments = []
+        return {
+            "id": getattr(data, "id", None),
+            "role": getattr(data, "role", None),
+            "content": getattr(data, "content", None),
+            "model": getattr(data, "model", None),
+            "response_time": getattr(data, "response_time", None),
+            "feedback": getattr(data, "feedback", None),
+            "feedback_note": getattr(data, "feedback_note", None),
+            "created_at": getattr(data, "created_at", None),
+            "media": attachments,
+            "content_type": "multimodal" if attachments else "text",
+        }
 
 
 class ChatOut(BaseModel):

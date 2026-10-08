@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -8,6 +9,11 @@ from typing import Any
 import yaml
 
 SKILLS_ROOT = Path(__file__).resolve().parents[2] / "config" / "skills"
+
+
+def _slugify(value: str) -> str:
+    """Lowercase slug: runs of non-alphanumeric characters become '-'."""
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "skill"
 
 
 class SkillCategory(str, Enum):
@@ -65,6 +71,11 @@ class SkillRegistry:
             if skill:
                 self.skills[skill.id] = skill
 
+    def reload(self) -> None:
+        """Clear and re-load all skills from disk (picks up new SKILL.md files)."""
+        self.skills.clear()
+        self._load_all()
+
     def _parse(self, skill_file: Path) -> SkillDefinition | None:
         try:
             content = skill_file.read_text(encoding="utf-8")
@@ -72,8 +83,15 @@ class SkillRegistry:
                 return None
             _, front_matter, body = content.split("---", 2)
             metadata = yaml.safe_load(front_matter) or {}
+            # Claude-style frontmatter tolerance: `id` may be absent while
+            # `name` is present (e.g. "name: my-skill"); fall back to a
+            # slugified name so such files still load. Unknown keys are
+            # ignored gracefully via .get() defaults below.
+            raw_id = metadata.get("id") or _slugify(
+                str(metadata.get("name") or skill_file.parent.name)
+            )
             return SkillDefinition(
-                id=metadata.get("id", skill_file.parent.name),
+                id=raw_id,
                 name=metadata.get("name", skill_file.parent.name),
                 category=SkillCategory(metadata.get("category", "misc")),
                 invocation=InvocationType(metadata.get("invocation", "both")),
@@ -138,3 +156,8 @@ def get_registry() -> SkillRegistry:
     if _registry is None:
         _registry = SkillRegistry()
     return _registry
+
+
+def reload_registry() -> SkillRegistry:
+    """Force a fresh reload of all skills from disk and return the registry."""
+    return get_registry().reload() or get_registry()

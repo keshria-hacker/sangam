@@ -32,6 +32,11 @@ class ResponseEventType(StrEnum):
     ARTIFACT_START = "artifact_start"
     ARTIFACT_DELTA = "artifact_delta"
     ARTIFACT_END = "artifact_end"
+    # Media events (foundation for voice/image generation integrations):
+    # a media block streams one attachment (image/audio) as it is produced.
+    MEDIA_START = "media_start"
+    MEDIA_DELTA = "media_delta"
+    MEDIA_END = "media_end"
     USAGE = "usage"
     MESSAGE_END = "message_end"
     ERROR = "error"
@@ -132,6 +137,7 @@ class ResponseEventBuilder:
         self._message_terminal = False
         self._text_open = False
         self._reasoning_open = False
+        self._media_open = False
 
     def event(self, event_type: ResponseEventType, **kwargs: Any) -> ResponseEvent:
         if self._message_terminal:
@@ -198,11 +204,37 @@ class ResponseEventBuilder:
         self._reasoning_open = False
         return self.event(ResponseEventType.REASONING_END)
 
+    def media_start(self, kind: str, metadata: dict[str, Any] | None = None) -> ResponseEvent:
+        """Open a media block for one streamed attachment (kind: "image"|"audio")."""
+        if self._media_open:
+            raise RuntimeError("Media block already open")
+        self._media_open = True
+        return self.event(
+            ResponseEventType.MEDIA_START,
+            metadata={"media_kind": kind, **(metadata or {})},
+        )
+
+    def media_delta(self, content: str, metadata: dict[str, Any] | None = None) -> ResponseEvent:
+        """Stream a media chunk (base64 data or a partial data-URI)."""
+        if not self._media_open:
+            raise RuntimeError("media_delta outside a media block")
+        return self.event(ResponseEventType.MEDIA_DELTA, content=content, metadata=metadata or {})
+
+    def media_end(self, url: str | None = None, metadata: dict[str, Any] | None = None) -> ResponseEvent:
+        """Close the media block; url points at the finished attachment."""
+        if not self._media_open:
+            raise RuntimeError("media_end without media_start")
+        self._media_open = False
+        return self.event(
+            ResponseEventType.MEDIA_END,
+            metadata={"media_url": url, **(metadata or {})} if url else (metadata or {}),
+        )
+
     def usage(self, usage: UsageInfo) -> ResponseEvent:
         return self.event(ResponseEventType.USAGE, usage=usage)
 
     def message_end(self, finish_reason: FinishReason = FinishReason.STOP, metadata: dict[str, Any] | None = None) -> ResponseEvent:
-        if self._reasoning_open or self._text_open:
+        if self._reasoning_open or self._text_open or self._media_open:
             raise RuntimeError("Open response blocks must end before message_end")
         return self.event(ResponseEventType.MESSAGE_END, finish_reason=finish_reason, metadata=metadata or {})
 

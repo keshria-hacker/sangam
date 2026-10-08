@@ -110,3 +110,7 @@ cookies.txt
 mainfiles/history/
 history/
 
+
+# Foundation: extension enable/disable state + agent venvs
+mainfiles/extensions_state.json
+.venv-res/

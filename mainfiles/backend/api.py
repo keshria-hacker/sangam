@@ -52,6 +52,17 @@ from .api_routes.common import (  # noqa: F401
     sse_response_event,
 )
 from .api_routes.files_routes import upload_file  # noqa: F401
+from .api_routes.features_routes import get_features  # noqa: F401
+from .api_routes.extensions_routes import (  # noqa: F401
+    disable_extension,
+    enable_extension,
+    list_extensions,
+)
+from .api_routes.media_routes import (  # noqa: F401
+    get_media,
+    load_media_attachment,
+    upload_media,
+)
 from .api_routes.models_routes import (  # noqa: F401
     _to_model_info,
     get_models,

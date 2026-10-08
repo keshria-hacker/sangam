@@ -16,6 +16,7 @@
  * - Handles CITATION
  * - Handles ARTIFACT_START, ARTIFACT_DELTA, ARTIFACT_END
  * - Handles REASONING_START, REASONING_DELTA, REASONING_END
+ * - Handles MEDIA_START, MEDIA_DELTA, MEDIA_END (streamed image/audio attachments)
  */
 
 export const RESPONSE_EVENT_TYPES = Object.freeze({
@@ -35,6 +36,9 @@ export const RESPONSE_EVENT_TYPES = Object.freeze({
   ARTIFACT_START: "artifact_start",
   ARTIFACT_DELTA: "artifact_delta",
   ARTIFACT_END: "artifact_end",
+  MEDIA_START: "media_start",
+  MEDIA_DELTA: "media_delta",
+  MEDIA_END: "media_end",
   USAGE: "usage",
   MESSAGE_END: "message_end",
   ERROR: "error",
@@ -99,7 +103,9 @@ export function createResponseController(handlers = {}, options = {}) {
   let textOpen = false;
   let reasoningOpen = false;
   let toolOpen = false;
+  let mediaOpen = false;
   let currentToolId = null;
+  let currentMediaKind = null;
   let finalized = false; // true after flush() called on terminal/abort
 
   function emit(name, payload) {
@@ -347,11 +353,43 @@ export function createResponseController(handlers = {}, options = {}) {
       case RESPONSE_EVENT_TYPES.ARTIFACT_END:
         emit("artifactEnd", event);
         break;
+      case RESPONSE_EVENT_TYPES.MEDIA_START:
+        if (mediaOpen) {
+          emit("warning", "Ignored duplicate media_start event.");
+          return;
+        }
+        mediaOpen = true;
+        currentMediaKind = event.metadata?.media_kind || "image";
+        emit("mediaStart", { kind: currentMediaKind, metadata: event.metadata || {}, event });
+        break;
+      case RESPONSE_EVENT_TYPES.MEDIA_DELTA:
+        if (!mediaOpen) {
+          emit("warning", "Ignored media_delta outside a media block.");
+          return;
+        }
+        if (event.content) {
+          emit("mediaDelta", { kind: currentMediaKind, content: event.content, event });
+        }
+        break;
+      case RESPONSE_EVENT_TYPES.MEDIA_END:
+        if (!mediaOpen) {
+          emit("warning", "Ignored media_end without media_start.");
+          return;
+        }
+        mediaOpen = false;
+        emit("mediaEnd", {
+          kind: currentMediaKind,
+          url: event.metadata?.media_url || null,
+          metadata: event.metadata || {},
+          event,
+        });
+        currentMediaKind = null;
+        break;
       case RESPONSE_EVENT_TYPES.USAGE:
         emit("usage", event.usage || {}, event);
         break;
       case RESPONSE_EVENT_TYPES.MESSAGE_END:
-        if (textOpen || reasoningOpen || toolOpen) {
+        if (textOpen || reasoningOpen || toolOpen || mediaOpen) {
           emit("error", {
             category: "stream_error",
             message: "Response ended with an incomplete content block.",

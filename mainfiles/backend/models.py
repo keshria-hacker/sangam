@@ -49,6 +49,9 @@ class Message(Base):
     # feedback_note holds an optional free-text reason accompanying "down".
     feedback: Mapped[str | None] = mapped_column(String(8), nullable=True)
     feedback_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON list of MediaAttachment dicts (image/audio), foundation for
+    # voice + image-generation integrations. NULL => text-only message.
+    media_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")
