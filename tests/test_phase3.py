@@ -29,8 +29,11 @@ def test_build_knowledge_graph():
     assert g["stats"]["memories"] == 1
     assert g["stats"]["documents"] == 1
     assert g["stats"]["chats"] == 1
-    # Keyword linking should connect python-related nodes
-    assert len(g["nodes"]) == 3
+    # 3 content nodes + 1 memory wing node (Phase 6: wings group by kind)
+    assert len(g["nodes"]) == 4
+    wing = next((n for n in g["nodes"] if n["type"] == "wing"), None)
+    assert wing is not None
+    assert wing["id"] == "wing:semantic"
 
 
 def test_knowledge_endpoints_registered():
