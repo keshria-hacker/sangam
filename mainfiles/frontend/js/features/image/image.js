@@ -50,31 +50,40 @@ async function loadStyles() {
 }
 
 function openImageDialog() {
-  if (document.getElementById('imageGenOverlay')) return;
+  const existing = document.getElementById('imageGenOverlay');
+  if (existing) {
+    existing.classList.remove('hidden');
+    setTimeout(() => existing.querySelector('#imageGenPrompt')?.focus(), 0);
+    return;
+  }
   const overlay = document.createElement('div');
   overlay.id = 'imageGenOverlay';
-  overlay.className = 'image-gen-overlay';
+  overlay.className = 'modal-overlay hidden';
   overlay.innerHTML = `
-    <div class="image-gen-dialog" role="dialog" aria-modal="true" aria-labelledby="imageGenTitle">
-      <h3 id="imageGenTitle">Generate image</h3>
-      <textarea id="imageGenPrompt" rows="3" placeholder="Describe the image…" aria-label="Image prompt"></textarea>
-      <div class="image-gen-row">
-        <select id="imageGenStyle" class="provider-key-input" aria-label="Style"><option value="none">Loading styles…</option></select>
-        <select id="imageGenSize" class="provider-key-input" aria-label="Size">
-          <option value="1024x1024">Square 1024</option>
-          <option value="1792x1024">Wide 1792×1024</option>
-          <option value="1024x1792">Tall 1024×1792</option>
-        </select>
+    <div class="modal image-gen-modal" role="dialog" aria-modal="true" aria-labelledby="imageGenTitle">
+      <div class="modal-header">
+        <h2 id="imageGenTitle"><i class="fa-solid fa-image"></i> Generate image</h2>
+        <button class="icon-btn ghost" id="imageGenCancel" aria-label="Close image generator"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="image-gen-actions">
-        <button class="btn-secondary" id="imageGenCancel" type="button">Cancel</button>
-        <button class="btn-primary" id="imageGenGo" type="button">Generate</button>
+      <div class="image-gen-body">
+        <textarea id="imageGenPrompt" rows="3" placeholder="Describe the image…" aria-label="Image prompt"></textarea>
+        <div class="image-gen-row">
+          <select id="imageGenStyle" class="provider-key-input" aria-label="Style"><option value="none">Loading styles…</option></select>
+          <select id="imageGenSize" class="provider-key-input" aria-label="Size">
+            <option value="1024x1024">Square 1024</option>
+            <option value="1792x1024">Wide 1792×1024</option>
+            <option value="1024x1792">Tall 1024×1792</option>
+          </select>
+        </div>
+        <div class="image-gen-actions">
+          <button class="btn-primary" id="imageGenGo" type="button">Generate</button>
+        </div>
+        <div class="image-gen-status hidden" id="imageGenStatus">Generating… this can take a minute.</div>
       </div>
-      <div class="image-gen-status hidden" id="imageGenStatus">Generating… this can take a minute.</div>
     </div>`;
   document.body.appendChild(overlay);
 
-  const close = () => overlay.remove();
+  const close = () => overlay.classList.add('hidden');
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   overlay.querySelector('#imageGenCancel').addEventListener('click', close);
   const promptEl = overlay.querySelector('#imageGenPrompt');
