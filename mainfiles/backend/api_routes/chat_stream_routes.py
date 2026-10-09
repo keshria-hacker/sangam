@@ -60,6 +60,23 @@ async def chat_stream(  # noqa: PLR0912
     if model_info is None:
         raise HTTPException(status_code=400, detail=f"Unknown model: {payload.model}")
 
+    # Prompt injection detection (warn-only mode — logs but never blocks).
+    # See backend/prompt_injection.py for the heuristic detector.
+    try:
+        from ..prompt_injection import detect_injection
+        import logging
+        _pi_logger = logging.getLogger("sangam.prompt_injection")
+        for m in payload.messages:
+            if m.role == "user" and m.content:
+                flagged, score, reasons = detect_injection(m.content)
+                if flagged:
+                    _pi_logger.warning(
+                        "Prompt injection detected (score=%.2f): %s",
+                        score, "; ".join(reasons[:3]),
+                    )
+    except Exception:
+        pass  # Detector must never break the chat flow
+
     # Optional web-search augmentation: when the client requests it, fetch live
     # results for the latest user turn and inject them as context so the model
     # can answer with current information. Failures never break the chat — they

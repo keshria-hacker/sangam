@@ -4,8 +4,8 @@
  * Minimal: chat only. Standard: balanced. Studio: everything on.
  * Focus: minimal distractions. Developer: code-first. Student: learning-first.
  */
-import { setSetting } from '../shared/settings_store.js';
-import { showToast } from '../shared/toast.js';
+import { setSetting } from '../../shared/settings_store.js';
+import { showToast } from '../../shared/toast.js';
 
 console.log('[Module] presets.js loaded');
 
