@@ -53,6 +53,18 @@ export function renderCodeAgentTab(bodyEl) {
       <div class="ca-log" id="caLog">
         <div class="no-results">The agent will inspect your workspace, edit files, and run commands here. Nothing runs until you press Run.</div>
       </div>
+      <details class="ca-explore">
+        <summary><i class="fa-solid fa-diagram-project"></i> Explore code map</summary>
+        <div class="ca-explore-row">
+          <select id="caMapQuery" class="provider-key-input">
+            <option value="explain">What calls / uses…</option>
+            <option value="path">How do A and B connect…</option>
+          </select>
+          <input type="text" id="caMapTarget" class="provider-key-input" placeholder="symbol name, or 'A -> B'">
+          <button class="btn-secondary btn-sm" id="caMapGo" type="button">Ask</button>
+        </div>
+        <pre class="ca-map-out hidden" id="caMapOut"></pre>
+      </details>
     </div>`;
 
   const taskEl = bodyEl.querySelector('#caTask');
@@ -114,5 +126,27 @@ export function renderCodeAgentTab(bodyEl) {
   });
 
   stopBtn.addEventListener('click', () => { abort?.abort(); });
+
+  // Code map explorer
+  bodyEl.querySelector('#caMapGo').addEventListener('click', async () => {
+    const query = bodyEl.querySelector('#caMapQuery').value;
+    const target = bodyEl.querySelector('#caMapTarget').value.trim();
+    const out = bodyEl.querySelector('#caMapOut');
+    if (!target) { showToast({ type: 'info', message: 'Enter a symbol name.' }); return; }
+    out.classList.remove('hidden');
+    out.textContent = 'Analyzing…';
+    try {
+      const res = await apiFetch('/code-agent/code-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, target }),
+      });
+      const data = await res.json();
+      out.textContent = JSON.stringify(data, null, 2).slice(0, 4000);
+    } catch (err) {
+      out.textContent = 'Error: ' + (err?.message || err);
+    }
+  });
+
   setTimeout(() => taskEl.focus(), 0);
 }

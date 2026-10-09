@@ -329,10 +329,9 @@ def register_builtin_tools() -> None:
     registry.register(write_file_tool)
     registry.register(edit_file_tool)
     registry.register(run_bash_tool)
+    registry.register(code_map_tool)
 
 
-# Auto-register on import
-register_builtin_tools()
 
 
 async def write_file_handler(path: str, content: str) -> dict[str, Any]:
@@ -464,3 +463,46 @@ run_bash_tool = ToolDefinition(
     read_only=False,
     requires_confirmation=False,
 )
+
+
+
+_code_graph_cache: dict | None = None
+
+
+async def code_map_handler(query: str, target: str = "") -> dict[str, Any]:
+    """Query the AST code map: explain a symbol or trace a path between two symbols."""
+    global _code_graph_cache
+    from ..code_graph import build_graph, explain, find_path
+    if _code_graph_cache is None:
+        _code_graph_cache = build_graph()
+    if query == "explain":
+        return explain(target, _code_graph_cache)
+    if query == "path" and "->" in target:
+        a, b = [s.strip() for s in target.split("->", 1)]
+        return find_path(a, b, _code_graph_cache)
+    return {"error": "query must be 'explain' or 'path'; for path use target='A -> B'"}
+
+
+code_map_tool = ToolDefinition(
+    name="code_map",
+    description="Query the codebase map (AST-based, no LLM cost). query='explain', target='symbol_name' shows what calls it. query='path', target='A -> B' traces how A connects to B.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "enum": ["explain", "path"]},
+            "target": {"type": "string", "description": "Symbol name, or 'A -> B' for path"},
+        },
+        "required": ["query", "target"],
+        "additionalProperties": False,
+    },
+    handler=code_map_handler,
+    capabilities=["code_analysis"],
+    category="code",
+    safety_level="safe",
+    read_only=True,
+    requires_confirmation=False,
+)
+
+
+# Auto-register on import
+register_builtin_tools()

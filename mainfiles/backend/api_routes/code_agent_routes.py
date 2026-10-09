@@ -67,3 +67,15 @@ async def serve_design_file(project_id: str, filename: str):
         raise HTTPException(status_code=404, detail="Not found")
     media = "text/html" if target.suffix == ".html" else None
     return FileResponse(str(target), media_type=media)
+
+
+class CodeMapIn(BaseModel):
+    query: str  # 'explain' | 'path'
+    target: str
+
+
+@router.post("/code-agent/code-map")
+async def code_agent_code_map(payload: CodeMapIn):
+    """Direct code-map query (explain a symbol or trace A -> B)."""
+    from ..tools.builtin import code_map_handler
+    return await code_map_handler(payload.query, payload.target)

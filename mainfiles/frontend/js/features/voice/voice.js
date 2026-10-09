@@ -203,7 +203,7 @@ export async function refreshVoiceSettings() {
         <span class="switch-track"><span class="switch-thumb"></span></span>
       </label>
     </div>
-    ${!ttsEngine && !sttEngine ? '<p class="settings-hint">No voice engine installed. Install <code>kokoro</code> + <code>faster-whisper</code>, or point VOICE_OPENAI_BASE_URL at a VoiceStudio server.</p>' : ''}`;
+    ${!ttsEngine && !sttEngine ? '<p class="settings-hint">No voice engine installed. Install <code>kokoro</code> + <code>faster-whisper</code>, or point VOICE_OPENAI_BASE_URL at an OpenAI-compatible voice server.</p>' : ''}`;
 
   section.querySelector('#voiceAutoSpeakToggle')?.addEventListener('change', (e) => {
     setSettings({ ...getSettings(), voiceAutoSpeak: e.target.checked });

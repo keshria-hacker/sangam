@@ -361,6 +361,11 @@ a{color:var(--accent);}
 .ca-tool-name{font-family:var(--font-mono); color:var(--text-tertiary);}
 .ca-done{color:var(--success); font-weight:500;}
 .ca-error-msg{color:var(--danger);}
+.ca-explore{border:1px solid var(--border-soft); border-radius:var(--radius-sm); padding:10px 12px; background:var(--surface);}
+.ca-explore summary{cursor:pointer; font-size:13px; font-weight:600; color:var(--text-secondary);}
+.ca-explore-row{display:flex; gap:8px; margin-top:10px;}
+.ca-explore-row input{flex:1;}
+.ca-map-out{margin-top:10px; font-size:11px; max-height:250px; overflow-y:auto; background:var(--surface-sunken); padding:10px; border-radius:6px; white-space:pre-wrap;}
 
 /* ---------- Image Studio tab ---------- */
 .image-studio{display:flex; flex-direction:column; gap:16px; max-width:900px;}

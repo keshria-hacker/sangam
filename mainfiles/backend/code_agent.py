@@ -27,6 +27,7 @@ Available tools:
 - run_bash(command, timeout): run a shell command (tests, builds, git, etc.)
 - execute_code(code, language): run a Python snippet
 - web_search(query): search the web for docs/APIs
+- code_map(query, target): query the AST code map — explain a symbol or trace paths
 
 Rules:
 1. Always inspect before acting — list files and read relevant code first.
@@ -49,7 +50,7 @@ class AgentStep:
 def _tools_schema() -> list[dict]:
     from .tools.registry import registry
     names = ["list_files", "read_file", "write_file", "edit_file",
-             "run_bash", "execute_code", "web_search"]
+             "run_bash", "execute_code", "web_search", "code_map"]
     out = []
     for name in names:
         tool = registry.get(name)
