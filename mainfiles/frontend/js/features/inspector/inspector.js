@@ -4,7 +4,7 @@
  * Shows: current model, context usage, active run details, selected message.
  * Toggle with the inspector button or Ctrl+Shift+I.
  */
-import { getSelectedModel } from '../models/models.js';
+import { getSelectedModel } from '../../core/state.js';
 import { getActiveJobs } from '../../core/jobs.js';
 import { escapeHtml } from '../../shared/utils.js';
 
