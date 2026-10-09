@@ -267,18 +267,26 @@ export async function handleSend() {
         if (answer && !stopped) {
           const asstMsg = { role: 'assistant', content: answer, created_at: new Date().toISOString() };
           setMessages([...getMessages(), asstMsg]);
-          // Persist both messages via the append endpoint
-          const chatId = getActiveChatId();
-          if (chatId) {
-            try {
-              await apiPost(`/chats/${chatId}/messages`, {
-                messages: [
-                  { role: 'user', content: userMsg.content },
-                  { role: 'assistant', content: answer },
-                ],
-              });
-            } catch (e) { console.warn('[Agent] persist failed', e); }
-          }
+          // Persist both messages via the append endpoint (create chat first if new)
+          try {
+            let chatId = getActiveChatId();
+            if (!chatId) {
+              const created = await (await apiPost('/chats', {
+                title: userMsg.content.slice(0, 60) || 'New chat',
+                model: getSelectedModel()?.id || '',
+              })).json();
+              chatId = created.id;
+              setActiveChatId(chatId);
+              const sidebarModule = await import('../sidebar/sidebar.js');
+              sidebarModule.loadChatList?.();
+            }
+            await apiPost(`/chats/${chatId}/messages`, {
+              messages: [
+                { role: 'user', content: userMsg.content },
+                { role: 'assistant', content: answer },
+              ],
+            });
+          } catch (e) { console.warn('[Agent] persist failed', e); }
         }
       },
     });

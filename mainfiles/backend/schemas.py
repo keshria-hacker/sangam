@@ -60,7 +60,7 @@ class ChatStreamRequest(BaseModel):
     messages: list[ChatMessageIn] = Field(min_length=1, max_length=200, description="1-200 messages per request")
     file_ids: list[str] = Field(default_factory=list, max_length=10, description="Max 10 files per request")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=1024, gt=0, le=128_000, description="Max tokens to generate (1-128k)")
+    max_tokens: int | None = Field(default=None, gt=0, le=128_000, description="Max tokens to generate (1-128k); null = provider default")
     regenerate: bool = False                   # True => resend without re-persisting the user turn
     web_search: bool = False                   # True => augment the prompt with live web results
     reasoning_effort: str | None = Field(default=None, description="Reasoning effort: low, medium, high, etc.")
