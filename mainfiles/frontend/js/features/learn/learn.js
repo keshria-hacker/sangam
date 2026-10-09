@@ -122,3 +122,201 @@ async function checkAnswer(container) {
     setBusy(false);
   }
 }
+
+// --- Outline → scenes --------------------------------------------------------
+// No /api/learn/scenes endpoint exists, so scenes are split client-side on
+// H2 (##) headers, falling back to H3 (###).
+
+function splitScenes(markdown) {
+  const lines = (markdown || '').split('\n');
+  const scenes = [];
+  let cur = null;
+  let level = 2; // split on H2; fall back to H3 if no H2 found
+  const push = () => { if (cur && cur.body.trim()) scenes.push(cur); };
+  for (const line of lines) {
+    const h2 = line.match(/^##\s+(.*)/);
+    const h3 = line.match(/^###\s+(.*)/);
+    if (h2) { level = 2; push(); cur = { title: h2[1].trim(), body: '' }; }
+    else if (h3 && (level === 3 || scenes.length === 0)) {
+      if (scenes.length === 0 && !cur) level = 3; // no H2s at all — use H3
+      if (level === 3) { push(); cur = { title: h3[1].trim(), body: '' }; }
+      else if (cur) cur.body += line + '\n';
+    }
+    else if (cur) { cur.body += line + '\n'; }
+  }
+  push();
+  // If no headers at all, chunk by paragraphs into up to 4 scenes
+  if (!scenes.length) {
+    const paras = (markdown || '').split(/\n\s*\n/).filter((p) => p.trim());
+    const per = Math.max(1, Math.ceil(paras.length / 4));
+    for (let i = 0; i < paras.length; i += per) {
+      scenes.push({ title: `Part ${scenes.length + 1}`, body: paras.slice(i, i + per).join('\n\n') });
+    }
+  }
+  return scenes.slice(0, 6);
+}
+
+function breakIntoScenes(container) {
+  const overlay = container || document.getElementById('toolViewBody') || document;
+  const wrap = overlay.querySelector('#learnScenes');
+  if (!wrap || !currentLesson) return;
+  const scenes = splitScenes(currentLesson);
+  if (!scenes.length) {
+    showToast({ type: 'info', title: 'No scenes found', message: 'The lesson has no clear sections to split.' });
+    return;
+  }
+  wrap.innerHTML = `<h4 class="learn-scenes-title">
+      <i class="fa-solid fa-film"></i> ${scenes.length} scenes
+      <span class="settings-hint">— teach each one separately</span></h4>
+    <div class="learn-scene-grid">` + scenes.map((s, i) => `
+      <div class="learn-scene-card" data-scene="${i}">
+        <div class="learn-scene-title">${escapeHtml(s.title)}</div>
+        <div class="learn-scene-excerpt">${escapeHtml(s.body.replace(/[#*`_>\-]/g, '').slice(0, 180).trim())}…</div>
+        <button class="btn-secondary btn-sm" type="button" data-teach="${i}">
+          <i class="fa-solid fa-person-chalkboard"></i> Teach me
+        </button>
+      </div>`).join('') + `</div>`;
+  wrap.classList.remove('hidden');
+  wrap.querySelectorAll('[data-teach]').forEach((btn) => {
+    btn.addEventListener('click', () => teachScene(overlay, scenes[Number(btn.dataset.teach)]));
+  });
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function teachScene(container, scene) {
+  const overlay = container || document.getElementById('toolViewBody') || document;
+  if (!scene) return;
+  currentLesson = `## ${scene.title}\n\n${scene.body}`;
+  const lessonEl = overlay.querySelector('#learnLesson');
+  lessonEl.innerHTML = renderMarkdown(currentLesson)
+    + `<div class="learn-lesson-actions">
+         <button class="btn-secondary btn-sm" id="learnScenesBtn" type="button">
+           <i class="fa-solid fa-scissors"></i> Break into scenes
+         </button>
+       </div>`;
+  lessonEl.querySelector('#learnScenesBtn')?.addEventListener('click', () => breakIntoScenes(overlay));
+  const answerEl = overlay.querySelector('#learnAnswer');
+  if (answerEl) answerEl.value = '';
+  overlay.querySelector('#learnAnswerWrap')?.classList.remove('hidden');
+  lessonEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast({ type: 'info', title: `Scene: ${scene.title}`, message: 'Answer the check question when ready.' });
+}
+
+// --- Skill importer ----------------------------------------------------------
+// No /api/skills/import or POST /api/skills endpoint exists (frontend-only
+// task), so imported skills are validated + previewed, then saved as local
+// drafts until a backend install endpoint lands.
+
+const SKILL_DRAFTS_KEY = 'sangam:skill-drafts';
+
+export function getSkillDrafts() {
+  try { return JSON.parse(localStorage.getItem(SKILL_DRAFTS_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveSkillDraft(draft) {
+  const drafts = getSkillDrafts().filter((d) => d.name !== draft.name);
+  drafts.unshift({ ...draft, savedAt: new Date().toISOString() });
+  try { localStorage.setItem(SKILL_DRAFTS_KEY, JSON.stringify(drafts.slice(0, 50))); } catch {}
+}
+
+function parseSkillName(content) {
+  const fm = (content || '').match(/^---\s*\n([\s\S]*?)\n---/);
+  if (fm) {
+    const nameLine = fm[1].split('\n').find((l) => /^\s*name\s*:/i.test(l));
+    if (nameLine) return nameLine.split(':').slice(1).join(':').trim().replace(/^['"]|['"]$/g, '');
+  }
+  const h1 = (content || '').match(/^#\s+(.+)$/m);
+  if (h1) return h1[1].trim();
+  return '';
+}
+
+export function openSkillImporter(hostEl) {
+  const host = hostEl || document.body;
+  const old = document.getElementById('skillImportModal');
+  if (old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'skillImportModal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal skill-import-modal" role="dialog" aria-label="Import skill">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-import"></i> Import skill</h3>
+        <button class="icon-btn" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <label class="settings-label">From URL <span class="settings-hint">(best effort — some sites block cross-origin fetch)</span></label>
+        <div class="skill-import-urlrow">
+          <input id="skillUrl" class="provider-key-input" placeholder="https://…/SKILL.md" aria-label="Skill URL">
+          <button class="btn-secondary" id="skillFetch" type="button">Fetch</button>
+        </div>
+        <label class="settings-label">Or pick a file</label>
+        <input type="file" id="skillFile" accept=".md,.markdown,text/markdown" class="skill-file-input">
+        <label class="settings-label">Or paste SKILL.md content</label>
+        <textarea id="skillContent" rows="10" class="provider-key-input skill-textarea"
+          placeholder="# my-skill&#10;&#10;Instructions for the agent…"></textarea>
+        <div class="skill-preview hidden" id="skillPreview"></div>
+        <p class="settings-hint">No backend install endpoint exists yet — imports are saved as
+          <strong>local drafts</strong> on this device until then.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close type="button">Cancel</button>
+        <button class="btn-primary" id="skillInstall" type="button" disabled>Save draft</button>
+      </div>
+    </div>`;
+  host.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', close));
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+  const contentEl = modal.querySelector('#skillContent');
+  const previewEl = modal.querySelector('#skillPreview');
+  const installBtn = modal.querySelector('#skillInstall');
+
+  const refreshPreview = () => {
+    const content = contentEl.value.trim();
+    if (content.length < 20) {
+      previewEl.classList.add('hidden');
+      installBtn.disabled = true;
+      return;
+    }
+    const name = parseSkillName(content) || '(unnamed skill)';
+    const lines = content.split('\n').length;
+    previewEl.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i>
+      <strong>${escapeHtml(name)}</strong>
+      <span class="settings-hint">${lines} lines · ${content.length} chars</span>`;
+    previewEl.classList.remove('hidden');
+    installBtn.disabled = false;
+  };
+  contentEl.addEventListener('input', refreshPreview);
+
+  modal.querySelector('#skillFetch').addEventListener('click', async () => {
+    const url = modal.querySelector('#skillUrl').value.trim();
+    if (!url) return;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      contentEl.value = await res.text();
+      refreshPreview();
+      showToast({ type: 'success', title: 'Fetched skill' });
+    } catch (err) {
+      showToast({ type: 'error', title: 'Fetch failed', message: `${err?.message || err} — paste the content instead.` });
+    }
+  });
+
+  modal.querySelector('#skillFile').addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { contentEl.value = String(reader.result || ''); refreshPreview(); };
+    reader.readAsText(file);
+  });
+
+  installBtn.addEventListener('click', () => {
+    const content = contentEl.value.trim();
+    const name = parseSkillName(content) || `skill-${Date.now().toString(36)}`;
+    saveSkillDraft({ name, content });
+    showToast({ type: 'success', title: 'Skill draft saved', message: `${name} — stored locally until backend install lands.` });
+    close();
+  });
+}
