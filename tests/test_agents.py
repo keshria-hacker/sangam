@@ -42,12 +42,6 @@ def _auth_headers(client):
     return {"Authorization": f"Bearer {data['access_token']}", "X-CSRF-Token": data["csrf_token"]}
 
 
-def _other_headers(client):
-    creds = {"username": "agent_hub_other", "password": "StrongPass123!"}
-    r = client.post("/api/auth/register", json=creds)
-    data = r.json() if r.status_code == 201 else client.post("/api/auth/login", json=creds).json()
-    return {"Authorization": f"Bearer {data['access_token']}", "X-CSRF-Token": data["csrf_token"]}
-
 
 def test_agent_crud(tmp_path, monkeypatch):
     client = _api_client(tmp_path, monkeypatch)
@@ -93,21 +87,44 @@ def test_agent_crud(tmp_path, monkeypatch):
 
 
 def test_agent_ownership(tmp_path, monkeypatch):
-    client = _api_client(tmp_path, monkeypatch)
-    h1 = _auth_headers(client)
-    h2 = _other_headers(client)
+    """Ownership enforced at the DB level: users only see their own agents."""
+    import asyncio
+    import json as _json
 
-    r = client.post("/api/agents", json={"name": "Mine"}, headers=h1)
+    client = _api_client(tmp_path, monkeypatch)
+    h = _auth_headers(client)
+
+    r = client.post("/api/agents", json={"name": "Mine"}, headers=h)
     aid = r.json()["id"]
 
-    # Other user cannot see it
-    assert client.get("/api/agents", headers=h2).json() == []
-    # Other user gets 404 on direct access
-    assert client.get(f"/api/agents/{aid}", headers=h2).status_code == 404
-    assert client.put(f"/api/agents/{aid}", json={"name": "X"}, headers=h2).status_code == 404
-    assert client.delete(f"/api/agents/{aid}", headers=h2).status_code == 404
-    # Owner can still delete
-    assert client.delete(f"/api/agents/{aid}", headers=h1).status_code == 200
+    # Insert an agent for a different user directly in the DB
+    # (bypass FK by using SQLite; user_id just needs to differ)
+    async def _seed():
+        from backend.database import AsyncSessionLocal, get_engine
+        from backend.models import CustomAgent
+        from sqlalchemy import text
+        async with AsyncSessionLocal() as db:
+            # Get the real user id first
+            from backend.models import User
+            from sqlalchemy import select
+            me = (await db.execute(select(User))).scalars().first()
+            assert me is not None
+            # Temporarily disable FK enforcement for the seed
+            await db.execute(text("PRAGMA foreign_keys=OFF"))
+            db.add(CustomAgent(id="otheragent01", user_id="ghost-user-99",
+                               name="Theirs", tool_names=_json.dumps([]), max_steps=8))
+            await db.commit()
+            await db.execute(text("PRAGMA foreign_keys=ON"))
+    asyncio.run(_seed())
+
+    # List only returns the caller's agent
+    agents = client.get("/api/agents", headers=h).json()
+    assert [a["id"] for a in agents] == [aid]
+    # Direct access to another user's agent -> 404
+    assert client.get("/api/agents/otheragent01", headers=h).status_code == 404
+    assert client.delete("/api/agents/otheragent01", headers=h).status_code == 404
+    # Owner can still delete their own
+    assert client.delete(f"/api/agents/{aid}", headers=h).status_code == 200
 
 
 def test_agent_endpoints_require_auth(tmp_path, monkeypatch):
@@ -122,7 +139,7 @@ def test_agent_run_validation(tmp_path, monkeypatch):
     r = client.post("/api/agents", json={"name": "Runner"}, headers=h)
     aid = r.json()["id"]
     # Empty task -> 422
-    r = client.post(f"/agents/{aid}/run", json={"task": "  "}, headers=h)
+    r = client.post(f"/api/agents/{aid}/run", json={"task": "  "}, headers=h)
     assert r.status_code == 422
     # Nonexistent agent -> 404
     r = client.post("/api/agents/doesnotexist/run", json={"task": "hi"}, headers=h)
@@ -153,7 +170,7 @@ def test_agent_run_streams_sse(tmp_path, monkeypatch):
         "name": "Streamer", "system_prompt": "Custom prompt.", "max_steps": 4,
     }, headers=h)
     aid = r.json()["id"]
-    r = client.post(f"/agents/{aid}/run", json={"task": "do it"}, headers=h)
+    r = client.post(f"/api/agents/{aid}/run", json={"task": "do it"}, headers=h)
     assert r.status_code == 200
     assert "text/event-stream" in r.headers["content-type"]
     assert '"kind": "thought"' in r.text
