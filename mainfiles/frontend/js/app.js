@@ -406,6 +406,8 @@ export async function startApplication() {
     import('./features/learn/learn.js').then((m) => m.initLearn()).catch(() => {});
     // Analytics: show the usage button only when the flag is on.
     import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
+    // Command palette (Ctrl+P).
+    import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
     showToast({ type: 'success', title: 'Connected', message: `Live backend at ${getApiBaseUrl()}` });
   } catch (err) {
     chatStartNewChat();

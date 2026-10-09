@@ -93,4 +93,10 @@ integrations, then implement capabilities drawn from 22 reference repos.
   analytics (openpanel-style) — event recording across chat/teams/learn/image/
   voice/packs, aggregate-only dashboard API + UI, FEATURE_ANALYTICS gated,
   capability:analytics extension. See ANALYTICS.md.
-- [ ] Theme 10 — Design polish (open-design, open-webui) (scoped before build)
+- [x] Theme 10 — Design polish (2026-10-08, branch `design-polish`): command
+  palette (Ctrl+P) unifying all features, chat export as Markdown
+  (open-webui parity). See DESIGN_POLISH.md.
+
+All 10 integration themes are complete. Remaining reference repos were
+deliberately deprioritized: winutil + claw-code (weak capability fit),
+graphify (documented as MCP-server future work).
