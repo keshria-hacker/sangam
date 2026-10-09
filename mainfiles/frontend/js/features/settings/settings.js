@@ -2,7 +2,7 @@
  * Settings feature - Settings modal, appearance, provider keys, connection.
  */
 
-import { getApiBaseUrl, setApiBaseUrl, apiFetch, apiPost, apiPut, apiDelete } from '../../shared/http.js';
+import { getApiBaseUrl, setApiBaseUrl, apiFetch, apiGet, apiPost, apiPut, apiDelete } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import {
@@ -544,6 +544,7 @@ export function initSettings() {
     document.querySelectorAll('.settings-tabpanel').forEach(p => {
       p.hidden = p.dataset.tabpanel !== tabId;
     });
+    if (tabId === 'features') loadFeatureToggles();
   });
 
   // Backend URL change

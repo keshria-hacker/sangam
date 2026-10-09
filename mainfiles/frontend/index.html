@@ -98,6 +98,21 @@ if (location.protocol === 'file:') {
         <input type="text" id="searchChats" placeholder="Search chats…" autocomplete="off">
       </div>
 
+      <nav class="tools-nav" aria-label="Tools">
+        <button class="tool-nav-item" id="skillsBtn" title="Skills & tools" aria-label="Skills and tools">
+          <i class="fa-solid fa-wand-magic-sparkles"></i><span>Skills</span>
+        </button>
+        <button class="tool-nav-item hidden" id="teamsBtn" title="Agent teams" aria-label="Agent teams">
+          <i class="fa-solid fa-users"></i><span>Agent teams</span>
+        </button>
+        <button class="tool-nav-item hidden" id="learnBtn" title="Learn" aria-label="Learn">
+          <i class="fa-solid fa-graduation-cap"></i><span>Learn</span>
+        </button>
+        <button class="tool-nav-item hidden" id="analyticsBtn" title="Usage analytics" aria-label="Usage analytics">
+          <i class="fa-solid fa-chart-simple"></i><span>Analytics</span>
+        </button>
+      </nav>
+
       <nav class="chat-history" id="chatHistory" aria-label="Chat history">
         <!-- Populated by JS -->
       </nav>
@@ -183,10 +198,6 @@ if (location.protocol === 'file:') {
         <span class="conn-pulse" id="connPulse" title="All linked providers reachable">
           <span class="pulse-dot"></span> Checking providers
         </span>
-        <button class="icon-btn" id="skillsBtn" title="Skills & tools" aria-label="Skills and tools"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-        <button class="icon-btn hidden" id="teamsBtn" title="Agent teams" aria-label="Agent teams"><i class="fa-solid fa-users"></i></button>
-        <button class="icon-btn hidden" id="learnBtn" title="Learn" aria-label="Learn"><i class="fa-solid fa-graduation-cap"></i></button>
-        <button class="icon-btn hidden" id="analyticsBtn" title="Usage analytics" aria-label="Usage analytics"><i class="fa-solid fa-chart-simple"></i></button>
         <button class="icon-btn" id="paletteBtn" title="Command palette (Ctrl+P)" aria-label="Command palette"><i class="fa-solid fa-terminal"></i></button>
         <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
           <i class="fa-solid fa-moon"></i>
@@ -420,6 +431,7 @@ if (location.protocol === 'file:') {
 
     <div class="settings-tabs" role="tablist" aria-label="Settings categories">
       <button class="settings-tab active" role="tab" aria-selected="true" data-tab="general"><i class="fa-solid fa-sliders"></i> General</button>
+      <button class="settings-tab" role="tab" aria-selected="false" data-tab="features"><i class="fa-solid fa-puzzle-piece"></i> Features</button>
       <button class="settings-tab" role="tab" aria-selected="false" data-tab="providers"><i class="fa-solid fa-cloud"></i> Providers</button>
     </div>
 
@@ -439,58 +451,6 @@ if (location.protocol === 'file:') {
               <input type="text" id="backendUrlInput" class="input-mono" placeholder="http://127.0.0.1:8001/api">
               <button class="btn-secondary" id="testBackendBtn" type="button"><i class="fa-solid fa-plug"></i> Test</button>
               <span id="backendTestResult" class="backend-test-result"></span>
-            </div>
-          </div>
-        </section>
-
-        <section class="settings-section">
-          <h3>Features</h3>
-          <p class="settings-hint">Toggle capabilities on or off. Changes apply immediately and are remembered.</p>
-          <div id="featureToggles" class="feature-toggles">
-            <div class="setting-row">
-              <div class="setting-label">
-                <span><i class="fa-solid fa-microphone"></i> Voice</span>
-                <small>Speech-to-text dictation and text-to-speech</small>
-              </div>
-              <div class="setting-control">
-                <button class="pill-control toggle-pill" data-feature="voice" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span><i class="fa-solid fa-image"></i> Image generation</span>
-                <small>Generate images from the composer</small>
-              </div>
-              <div class="setting-control">
-                <button class="pill-control toggle-pill" data-feature="image_gen" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span><i class="fa-solid fa-users"></i> Agent teams</span>
-                <small>Multi-agent research, code and writing teams</small>
-              </div>
-              <div class="setting-control">
-                <button class="pill-control toggle-pill" data-feature="multi_agent" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span><i class="fa-solid fa-graduation-cap"></i> Learning mode</span>
-                <small>Interactive lessons with Socratic feedback</small>
-              </div>
-              <div class="setting-control">
-                <button class="pill-control toggle-pill" data-feature="learning" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span><i class="fa-solid fa-chart-simple"></i> Usage analytics</span>
-                <small>Local-only usage stats (opt-in, nothing leaves your machine)</small>
-              </div>
-              <div class="setting-control">
-                <button class="pill-control toggle-pill" data-feature="analytics" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
-              </div>
             </div>
           </div>
         </section>
@@ -601,6 +561,61 @@ if (location.protocol === 'file:') {
             </div>
           </section>
         </div>
+
+      <!-- Features tabpanel -->
+      <div class="settings-tabpanel" role="tabpanel" data-tabpanel="features" hidden>
+        <section class="settings-section">
+          <h3>Features</h3>
+          <p class="settings-hint">Toggle capabilities on or off. Changes apply immediately and are remembered.</p>
+          <div id="featureToggles" class="feature-toggles">
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-microphone"></i> Voice</span>
+                <small>Speech-to-text dictation and text-to-speech</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="voice" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-image"></i> Image generation</span>
+                <small>Generate images from the composer</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="image_gen" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-users"></i> Agent teams</span>
+                <small>Multi-agent research, code and writing teams</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="multi_agent" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-graduation-cap"></i> Learning mode</span>
+                <small>Interactive lessons with Socratic feedback</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="learning" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-chart-simple"></i> Usage analytics</span>
+                <small>Local-only usage stats (opt-in, nothing leaves your machine)</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="analytics" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
 
         <!-- Providers tabpanel (Status + API Keys) -->
         <div class="settings-tabpanel" role="tabpanel" data-tabpanel="providers" hidden>
