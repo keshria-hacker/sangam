@@ -145,7 +145,7 @@ def test_message_out_survives_bad_media_json():
 def test_feature_flags_shape():
     s = Settings(_env_file=None)
     flags = s.feature_flags()
-    assert set(flags) == {"voice", "image_gen", "mcp", "multi_agent", "analytics", "spec_kit"}
+    assert set(flags) == {"voice", "image_gen", "mcp", "multi_agent", "analytics", "spec_kit", "learning"}
     assert all(isinstance(v, bool) for v in flags.values())
     assert s.API_VERSION == "v1"
 
