@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     FEATURE_MULTI_AGENT: bool = False    # munder-difflin/orca-style agent teams
     FEATURE_ANALYTICS: bool = False      # openpanel-style opt-in analytics
     FEATURE_SPEC_KIT: bool = False       # spec-kit style spec-driven workflows
+    FEATURE_LEARNING: bool = False       # OpenMAIC-style interactive classroom
 
     # --- MCP servers (JSON list, e.g. '[{"name":"codebase","command":["codebase-memory-mcp"]}]') ---
     MCP_SERVERS_JSON: str | None = Field(
@@ -154,6 +155,7 @@ class Settings(BaseSettings):
             "multi_agent": self.FEATURE_MULTI_AGENT,
             "analytics": self.FEATURE_ANALYTICS,
             "spec_kit": self.FEATURE_SPEC_KIT,
+            "learning": self.FEATURE_LEARNING,
         }
 
     def mcp_server_configs(self) -> list[dict]:

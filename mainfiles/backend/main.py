@@ -153,6 +153,13 @@ def create_app() -> FastAPI:
                 logger.info("Teams extension registered")
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Teams extension skipped: {exc}")
+        # Learning mode: project into the extension registry.
+        try:
+            from .learn import register_learn_extension
+            if register_learn_extension():
+                logger.info("Learn extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Learn extension skipped: {exc}")
         # Foundation F3: connect configured MCP servers (best-effort).
         if settings.FEATURE_MCP:
             try:

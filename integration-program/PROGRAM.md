@@ -81,4 +81,8 @@ integrations, then implement capabilities drawn from 22 reference repos.
   with fan-out/fan-in (research, code, writing), per-agent failure
   isolation, /api/teams/* gated by FEATURE_MULTI_AGENT, Teams modal UI,
   capability:multi_agent extension. See MULTI_AGENT.md.
-- [ ] Theme 7–10 integrations (scoped per theme before build)
+- [x] Theme 7 — Learning mode (2026-10-08, branch `learning-mode`): OpenMAIC
+  classroom — teacher agent lessons + Socratic tutor feedback, research-first
+  (ECC), /api/learn/* gated by FEATURE_LEARNING, Learn modal UI,
+  capability:learning extension. See LEARNING_MODE.md.
+- [ ] Theme 8–10 integrations (scoped per theme before build)

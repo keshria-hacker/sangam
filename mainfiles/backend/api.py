@@ -84,6 +84,10 @@ from .api_routes.teams_routes import (  # noqa: F401
     get_teams,
     run_team_endpoint,
 )
+from .api_routes.learn_routes import (  # noqa: F401
+    answer_feedback,
+    create_lesson,
+)
 from .api_routes.models_routes import (  # noqa: F401
     _to_model_info,
     get_models,

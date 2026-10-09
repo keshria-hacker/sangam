@@ -2085,6 +2085,23 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .team-output{padding:4px 12px 12px; font-size:13px;}
 .team-error{color:var(--danger); font-size:13px;}
 
+/* ---------- Learning mode ---------- */
+.learn-modal{max-width:640px;}
+.learn-body{padding:16px; display:flex; flex-direction:column; gap:14px; max-height:70vh; overflow-y:auto;}
+.learn-controls{display:flex; gap:10px;}
+.learn-controls input{flex:1;}
+.learn-lesson{font-size:13.5px; line-height:1.6;}
+.learn-lesson h2{font-size:15px; margin:12px 0 6px;}
+.learn-answer{display:flex; flex-direction:column; gap:10px;}
+.learn-answer textarea{
+  background:var(--input-bg); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:10px 12px; font-size:13.5px; color:var(--text-primary); resize:vertical; min-height:56px;
+}
+.learn-answer textarea:focus{outline:none; border-color:var(--accent);}
+.learn-answer .btn-secondary{align-self:flex-end;}
+.learn-feedback{border-top:1px solid var(--border-soft); padding-top:10px; font-size:13.5px; line-height:1.6;}
+.learn-feedback h4{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); margin:0 0 8px;}
+
 .skills-detail{flex:1; overflow-y:auto; padding:20px;}
 .skills-detail .placeholder{color:var(--text-tertiary); text-align:center; padding:40px 20px;}
 .skills-detail h3{margin-bottom:8px;}
