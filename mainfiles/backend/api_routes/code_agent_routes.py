@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import llm
+from ..auth import get_current_user
 from ..code_agent import CHAT_AGENT_TOOLS, run_agent, run_code_agent
 from ..database import get_db
 from .common import router
@@ -82,6 +83,8 @@ async def chat_agent_run(payload: ChatAgentIn, db: AsyncSession = Depends(get_db
             data = {"kind": step.kind, "content": step.content}
             if step.tool_name:
                 data["tool"] = step.tool_name
+            if step.approval_id:
+                data["approval_id"] = step.approval_id
             yield f"data: {json.dumps(data)}\n\n"
         yield "data: {\"kind\": \"end\"}\n\n"
 
@@ -118,3 +121,19 @@ async def code_agent_code_map(payload: CodeMapIn):
     """Direct code-map query (explain a symbol or trace A -> B)."""
     from ..tools.builtin import code_map_handler
     return await code_map_handler(payload.query, payload.target)
+
+
+class ApprovalIn(BaseModel):
+    approved: bool
+
+
+@router.post("/agent/approve/{approval_id}")
+async def approve_tool_call(approval_id: str, payload: ApprovalIn,
+                            user=Depends(get_current_user)):
+    """Approve or deny a pending tool call."""
+    from ..code_agent import resolve_approval
+    ok = resolve_approval(approval_id, payload.approved)
+    if not ok:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Approval not found or expired")
+    return {"ok": True, "approved": payload.approved}

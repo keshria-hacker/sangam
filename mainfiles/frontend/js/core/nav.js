@@ -12,7 +12,7 @@ console.log('[Module] nav.js loaded');
 export const NAV_ITEMS = [
   { id: 'home',      label: 'Home',      icon: 'fa-house',            action: 'home',      feature: null },
   { id: 'chat',      label: 'Chat',      icon: 'fa-comment',          action: 'chat',      feature: null },
-  { id: 'agents',    label: 'Agents',    icon: 'fa-users',            action: 'tab:teams', feature: 'multi_agent' },
+  { id: 'agents',    label: 'Agents',    icon: 'fa-robot',            action: 'tab:agents', feature: null },
   { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'tab:knowledge', feature: null },
   { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'tab:images', feature: 'image_gen' },
   { id: 'code',      label: 'Code',      icon: 'fa-code',             action: 'tab:code',   feature: null },

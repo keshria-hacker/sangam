@@ -109,6 +109,9 @@ class User(Base):
     preferences: Mapped["UserPreference | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
+    custom_agents: Mapped[list["CustomAgent"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserPreference(Base):
@@ -133,6 +136,24 @@ class UserPreference(Base):
     settings_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="preferences")
+
+
+class AgentRun(Base):
+    """Agent run history (Phase 3)."""
+
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))  # agent | code-agent | team
+    title: Mapped[str] = mapped_column(String(200))
+    model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="done")
+    tokens: Mapped[int] = mapped_column(default=0)
+    cost_usd: Mapped[float] = mapped_column(default=0.0)
+    steps_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class AuthSession(Base):
@@ -175,3 +196,26 @@ class AnalyticsEvent(Base):
     event_type: Mapped[str] = mapped_column(String(64), index=True)
     properties: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), index=True)
+
+
+class CustomAgent(Base):
+    """User-defined agent configuration (Agent Hub, Phase 3)."""
+
+    __tablename__ = "custom_agents"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    tool_names: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    max_steps: Mapped[int] = mapped_column(default=8)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC)
+    )
+
+    user: Mapped["User"] = relationship(back_populates="custom_agents")
+
+

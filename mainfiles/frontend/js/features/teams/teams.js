@@ -80,8 +80,11 @@ async function runTeam(container) {
   runBtn.disabled = true;
   resultsEl.classList.remove('hidden');
   resultsEl.innerHTML = '<div class="teams-running"><i class="fa-solid fa-circle-notch fa-spin"></i> Specialists working in parallel…</div>';
+  const jobsMod = await import('../../core/jobs.js');
+  const jobId = jobsMod.startJob({ kind: 'team', title: `${teamId}: ${task.slice(0, 50)}` });
   try {
     const result = await (await apiPost('/teams/run', { team_id: teamId, task })).json();
+    jobsMod.finishJob(jobId, 'done');
     const specialists = (result.specialists || []).map((s) => `
       <details class="team-specialist">
         <summary><strong>${escapeHtml(s.role)}</strong>
@@ -92,6 +95,7 @@ async function runTeam(container) {
       <div class="team-synthesis"><h4>Synthesis</h4>${renderMarkdown(result.synthesis || '_No synthesis produced._')}</div>
       <div class="team-specialists"><h4>Specialists (${result.elapsed_s}s total)</h4>${specialists}</div>`;
   } catch (err) {
+    jobsMod.finishJob(jobId, 'failed', String(err?.message || err));
     resultsEl.innerHTML = `<p class="team-error">Team run failed: ${escapeHtml(err?.message || String(err))}</p>`;
   } finally {
     runBtn.disabled = false;

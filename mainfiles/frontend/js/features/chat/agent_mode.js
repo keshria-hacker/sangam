@@ -7,6 +7,7 @@
 import { apiFetch } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
+import { appendStep } from '../../shared/runlog.js';
 import {
   getAbortController, setAbortController,
   getSelectedModel, getActiveChatId,
@@ -14,21 +15,13 @@ import {
 
 console.log('[Module] agent_mode.js loaded');
 
+// Use shared RunLog (includes approval cards)
 function stepCard(step) {
   const div = document.createElement('div');
-  div.className = `agent-step agent-${step.kind}`;
-  if (step.kind === 'thought' && step.content && step.content !== 'Agent starting…') {
-    div.innerHTML = `<div class="agent-thought"><i class="fa-solid fa-brain"></i> ${escapeHtml(step.content).slice(0, 500)}</div>`;
-  } else if (step.kind === 'tool_call') {
-    div.innerHTML = `<div class="agent-tool"><i class="fa-solid fa-wrench"></i> <code>${escapeHtml(step.tool || '')}</code></div>`;
-  } else if (step.kind === 'tool_result') {
-    const ok = !step.content.includes('"error"');
-    div.innerHTML = `<details class="agent-result ${ok ? '' : 'agent-error'}">`
-      + `<summary>${ok ? 'Result' : 'Error'} · ${escapeHtml(step.tool || '')}</summary>`
-      + `<pre>${escapeHtml(step.content.slice(0, 2000))}</pre></details>`;
-  } else if (step.kind === 'error') {
-    div.innerHTML = `<div class="agent-error-msg"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(step.content)}</div>`;
-  }
+  // appendStep returns the element and handles all kinds including approval_needed
+  const tmp = document.createElement('div');
+  appendStep(tmp, step);
+  if (tmp.firstChild) div.appendChild(tmp.firstChild);
   return div;
 }
 

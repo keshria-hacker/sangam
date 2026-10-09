@@ -549,6 +549,10 @@ async function init() {
     const { renderKnowledgeTab } = await import('./features/knowledge/knowledge.js');
     renderKnowledgeTab(bodyEl);
   });
+  registerTabRenderer('agents', async (bodyEl) => {
+    const { renderAgentHub } = await import('./features/agents/hub.js');
+    renderAgentHub(bodyEl);
+  });
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

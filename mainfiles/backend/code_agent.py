@@ -46,10 +46,11 @@ CHAT_AGENT_TOOLS = ["web_search", "read_file", "list_files", "execute_code",
 
 @dataclass
 class AgentStep:
-    kind: str  # 'thought' | 'tool_call' | 'tool_result' | 'answer' | 'done' | 'error'
+    kind: str  # 'thought' | 'tool_call' | 'tool_result' | 'answer' | 'done' | 'error' | 'approval_needed'
     content: str
     tool_name: str = ""
     tool_args: dict = field(default_factory=dict)
+    approval_id: str = ""
 
 
 def _tools_schema(names: list[str]) -> list[dict]:
@@ -103,11 +104,40 @@ async def _llm_with_tools(model_id: str, messages: list[dict],
     )
 
 
+# In-memory approval gates: approval_id -> {event, decision}
+_approval_gates: dict[str, dict] = {}
+
+# Tools that require approval by default (user can customize via settings)
+DEFAULT_APPROVAL_TOOLS = {"write_file", "edit_file", "run_bash", "execute_code"}
+
+
+def create_approval_gate(approval_id: str) -> dict:
+    """Create an approval gate. Returns {event, decision}."""
+    import asyncio
+    gate = {"event": asyncio.Event(), "decision": None}
+    _approval_gates[approval_id] = gate
+    return gate
+
+
+def resolve_approval(approval_id: str, approved: bool) -> bool:
+    """Resolve a pending approval. Returns True if the gate existed."""
+    gate = _approval_gates.pop(approval_id, None)
+    if not gate:
+        return False
+    gate["decision"] = approved
+    gate["event"].set()
+    return True
+
+
 async def run_agent(task: str, model_id: str, db: Any,
                     tool_names: list[str] | None = None,
                     system_prompt: str = CHAT_AGENT_SYSTEM,
                     max_iterations: int = 8,
-                    extra_system: str = ""):
+                    extra_system: str = "",
+                    require_approval: list[str] | None = None,
+                    approval_timeout: float = 120.0,
+                    max_cost_usd: float = 0.0,
+                    on_usage: Any = None):
     """Generalized agent loop. Yields AgentStep events for SSE streaming."""
     from .instincts import get_relevant_instincts
 
@@ -126,7 +156,13 @@ async def run_agent(task: str, model_id: str, db: Any,
 
     yield AgentStep(kind="thought", content="Agent starting…")
 
+    total_tokens = 0
     for _ in range(max_iterations):
+        # Budget check (rough: $0.01 per 1K tokens)
+        if max_cost_usd > 0 and total_tokens * 0.01 / 1000 > max_cost_usd:
+            yield AgentStep(kind="error",
+                            content=f"Budget exceeded (${max_cost_usd:.2f}). Stopping.")
+            return
         try:
             resp = await _llm_with_tools(model_id, messages, tools, db)
         except Exception as exc:
@@ -136,6 +172,13 @@ async def run_agent(task: str, model_id: str, db: Any,
         msg = resp.choices[0].message
         text = msg.get("content") or ""
         tool_calls = msg.get("tool_calls") or []
+        # Rough token estimate
+        total_tokens += len(text) // 4 + 100
+        if on_usage:
+            try:
+                on_usage(total_tokens)
+            except Exception:
+                pass
 
         if text:
             yield AgentStep(kind="thought", content=text)
@@ -151,6 +194,35 @@ async def run_agent(task: str, model_id: str, db: Any,
                 fargs = json.loads(tc["function"].get("arguments") or "{}")
             except json.JSONDecodeError:
                 fargs = {}
+            # Approval gate for sensitive tools
+            needs_approval = (require_approval is None and fname in DEFAULT_APPROVAL_TOOLS) or \
+                             (require_approval is not None and fname in require_approval)
+            if needs_approval:
+                import asyncio, uuid
+                approval_id = f"appr-{uuid.uuid4().hex[:12]}"
+                gate = create_approval_gate(approval_id)
+                yield AgentStep(kind="approval_needed",
+                                content=f"Approval needed: {fname}({json.dumps(fargs)[:200]})",
+                                tool_name=fname, tool_args=fargs,
+                                approval_id=approval_id)
+                try:
+                    await asyncio.wait_for(gate["event"].wait(), timeout=approval_timeout)
+                except asyncio.TimeoutError:
+                    _approval_gates.pop(approval_id, None)
+                    yield AgentStep(kind="error", content=f"Approval timed out for {fname} — skipped.")
+                    messages.append({
+                        "role": "tool", "tool_call_id": tc.get("id", ""), "name": fname,
+                        "content": json.dumps({"error": "User did not approve in time. Tool skipped."}),
+                    })
+                    continue
+                if not gate["decision"]:
+                    yield AgentStep(kind="tool_result", content="Denied by user.",
+                                    tool_name=fname)
+                    messages.append({
+                        "role": "tool", "tool_call_id": tc.get("id", ""), "name": fname,
+                        "content": json.dumps({"error": "User denied this action."}),
+                    })
+                    continue
             yield AgentStep(kind="tool_call", content=f"{fname}({json.dumps(fargs)[:200]})",
                             tool_name=fname, tool_args=fargs)
             result = await _execute_tool(fname, fargs)

@@ -32,6 +32,33 @@ export function appendStep(logEl, step) {
     div.innerHTML = `<div class="rl-done"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
   } else if (step.kind === 'error') {
     div.innerHTML = `<div class="rl-error-msg"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(text)}</div>`;
+  } else if (step.kind === 'approval_needed') {
+    div.innerHTML = `<div class="rl-approval">
+      <i class="fa-solid fa-shield-halved"></i>
+      <span><strong>Approval needed:</strong> <code>${escapeHtml(step.tool || '')}</code>
+      <span class="rl-args">${escapeHtml(text.slice(0, 160))}</span></span>
+      <span class="rl-approval-btns">
+        <button class="btn-primary btn-sm" data-approve="1" data-id="${escapeHtml(step.approval_id || '')}">Approve</button>
+        <button class="btn-secondary btn-sm" data-approve="0" data-id="${escapeHtml(step.approval_id || '')}">Deny</button>
+      </span></div>`;
+    div.querySelectorAll('[data-approve]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const approved = btn.dataset.approve === '1';
+        btn.disabled = true;
+        try {
+          const { apiFetch } = await import('./http.js');
+          await apiFetch(`/agent/approve/${btn.dataset.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved }),
+          });
+          div.querySelector('.rl-approval').innerHTML =
+            `<i class="fa-solid ${approved ? 'fa-check' : 'fa-xmark'}"></i> ${approved ? 'Approved' : 'Denied'}`;
+        } catch (e) {
+          btn.disabled = false;
+        }
+      });
+    });
   }
   if (div.innerHTML) {
     logEl.appendChild(div);

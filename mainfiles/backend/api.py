@@ -31,6 +31,15 @@ from .api_routes.settings_routes import (  # noqa: F401
     get_user_settings,
     put_user_settings,
 )
+from .api_routes.knowledge_routes import (  # noqa: F401
+    get_knowledge_graph,
+    search_knowledge,
+)
+from .api_routes.runs_routes import (  # noqa: F401
+    get_run,
+    list_runs,
+    record_run,
+)
 from .api_routes.chats_routes import (  # noqa: F401
     append_messages,
     create_chat,
@@ -114,6 +123,14 @@ from .api_routes.omniroute_routes import (  # noqa: F401
     omniroute_config,
     omniroute_status,
     omniroute_sync,
+)
+from .api_routes.agents_routes import (  # noqa: F401
+    create_agent,
+    delete_agent,
+    get_agent,
+    list_agents,
+    run_custom_agent,
+    update_agent,
 )
 from .api_routes.code_agent_routes import (  # noqa: F401
     chat_agent_run,
