@@ -2305,6 +2305,42 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .team-meta{font-size:11px; color:var(--text-tertiary);}
 .team-output{padding:4px 12px 12px; font-size:13px;}
 .team-error{color:var(--danger); font-size:13px;}
+.teams-actions{display:flex; gap:8px; justify-content:flex-end;}
+.team-card{border:1px solid var(--border-soft); border-radius:var(--radius-sm); margin-bottom:8px; overflow:hidden;}
+.team-card-head{display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--surface-sunken); font-size:13px;}
+.team-card-head strong{flex:1;}
+.team-card-status{font-size:11px; color:var(--text-tertiary);}
+.team-card-status.team-done{color:var(--success);}
+.team-card-status.team-failed{color:var(--danger);}
+.team-card-status.team-stopped{color:var(--warning);}
+.team-card-actions{display:flex; gap:6px;}
+.team-card-body{padding:8px 12px; font-size:13px; max-height:320px; overflow-y:auto; white-space:pre-wrap;}
+.team-card-body:empty{display:none;}
+
+/* ---------- Compare / Arena ---------- */
+.compare-tab{display:flex; flex-direction:column; gap:16px; padding:16px; max-width:1200px;}
+.compare-controls{display:flex; flex-direction:column; gap:10px;}
+.compare-controls textarea{background:var(--input-bg); border:1px solid var(--border-soft); border-radius:var(--radius-sm); padding:10px 12px; font-size:14px; color:var(--text-primary); resize:vertical; min-height:64px;}
+.cmp-model-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.cmp-models{display:flex; gap:8px; flex-wrap:wrap;}
+.cmp-model-picker{display:flex; gap:4px; align-items:center;}
+.cmp-model-picker select{background:var(--input-bg); border:1px solid var(--border-soft); border-radius:var(--radius-sm); padding:6px 8px; font-size:13px; color:var(--text-primary); max-width:220px;}
+.cmp-actions{display:flex; gap:8px; justify-content:flex-end;}
+.cmp-results.hidden{display:none;}
+.cmp-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px;}
+.cmp-card{border:1px solid var(--border-soft); border-radius:var(--radius-sm); overflow:hidden; display:flex; flex-direction:column;}
+.cmp-card-head{display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--surface-sunken); font-size:13px;}
+.cmp-card-head strong{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.cmp-status{font-size:11px; color:var(--text-tertiary);}
+.cmp-card-body{padding:8px 12px; font-size:13px; max-height:400px; overflow-y:auto; white-space:pre-wrap; flex:1; min-height:120px;}
+.cmp-card-foot{padding:8px 12px; border-top:1px solid var(--border-soft); display:flex; justify-content:flex-end;}
+.cmp-card-foot.hidden{display:none;}
+.cmp-arena{border-top:1px solid var(--border-soft); padding-top:12px;}
+.cmp-arena h4{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); margin:0 0 8px;}
+.cmp-lb{width:100%; border-collapse:collapse; font-size:13px;}
+.cmp-lb th,.cmp-lb td{padding:6px 10px; text-align:left; border-bottom:1px solid var(--border-soft);}
+.cmp-lb th{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary);}
+.cmp-muted{font-size:12px; color:var(--text-tertiary);}
 
 /* ---------- Learning mode ---------- */
 .learn-modal{max-width:640px;}

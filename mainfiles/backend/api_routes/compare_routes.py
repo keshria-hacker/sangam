@@ -8,7 +8,7 @@ import time
 import uuid
 from datetime import datetime, UTC
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,7 @@ async def compare_models(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Run the same prompt against multiple models in parallel."""
+    """Run the same prompt against multiple models in parallel (non-streaming)."""
     from ..llm import stream_completion
 
     async def _run_one(model_id: str) -> dict:
@@ -63,6 +63,66 @@ async def compare_models(
 
     results = await asyncio.gather(*(_run_one(m) for m in payload.models))
     return {"results": list(results)}
+
+
+@router.post("/compare/stream")
+async def compare_models_stream(
+    payload: CompareIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Stream parallel model comparison: per-model chunks as SSE."""
+    from fastapi.responses import StreamingResponse
+    from ..llm import stream_completion
+    import json as _json
+
+    async def _gen():
+        yield f"data: {_json.dumps({'type': 'compare_start', 'models': payload.models})}\n\n"
+
+        async def _stream_one(model_id: str, queue: asyncio.Queue):
+            started = time.monotonic()
+            try:
+                await queue.put({"type": "model_start", "model": model_id})
+                async for chunk in stream_completion(
+                    model_id,
+                    [{"role": "user", "content": payload.prompt}],
+                    db,
+                    max_tokens=payload.max_tokens,
+                ):
+                    text = chunk if isinstance(chunk, str) else getattr(chunk, "text", None)
+                    if text:
+                        await queue.put({"type": "model_chunk", "model": model_id, "text": text})
+                    if await request.is_disconnected():
+                        return
+                await queue.put({
+                    "type": "model_done", "model": model_id,
+                    "elapsed_s": round(time.monotonic() - started, 2),
+                })
+            except Exception as exc:
+                await queue.put({"type": "model_error", "model": model_id, "error": str(exc)})
+            finally:
+                await queue.put(None)
+
+        queue: asyncio.Queue = asyncio.Queue()
+        tasks = [asyncio.create_task(_stream_one(m, queue)) for m in payload.models]
+        active = len(tasks)
+        try:
+            while active:
+                event = await queue.get()
+                if event is None:
+                    active -= 1
+                    continue
+                if await request.is_disconnected():
+                    break
+                yield f"data: {_json.dumps(event)}\n\n"
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+        yield f"data: {_json.dumps({'type': 'compare_done'})}\n\n"
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 class ArenaVoteIn(BaseModel):

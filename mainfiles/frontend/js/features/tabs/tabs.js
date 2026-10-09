@@ -25,6 +25,7 @@ const TOOL_DEFS = {
   images:    { title: 'Image studio',  icon: 'fa-image',               feature: 'image_gen' },
   code:      { title: 'Code agent',    icon: 'fa-code',                feature: null },
   design:    { title: 'Design studio', icon: 'fa-palette',             feature: null },
+  compare:   { title: 'Compare',       icon: 'fa-scale-balanced',      feature: null },
 };
 
 const openTabs = []; // [{ id, tool, title, icon, mounted }]

@@ -594,6 +594,10 @@ async function init() {
     const { renderAutomations } = await import('./features/automations/ui.js');
     renderAutomations(bodyEl);
   });
+  registerTabRenderer('compare', async (bodyEl) => {
+    const { renderCompareTab } = await import('./features/compare/compare.js');
+    renderCompareTab(bodyEl);
+  });
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

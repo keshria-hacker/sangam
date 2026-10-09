@@ -77,8 +77,34 @@ async function loadStats(container) {
       <div class="analytics-cols">
         <div><h4>By type</h4>${types || '<p class="analytics-empty">—</p>'}</div>
         <div><h4>Top models</h4>${models || '<p class="analytics-empty">—</p>'}</div>
-      </div>`;
+      </div>
+      <div id="arenaSection"><h4>Arena leaderboard</h4><div class="loading">Loading…</div></div>`;
+    loadArena(root);
   } catch (err) {
     content.innerHTML = `<p class="analytics-empty">Could not load stats: ${escapeHtml(err?.message || String(err))}</p>`;
+  }
+}
+
+async function loadArena(root) {
+  const section = root.querySelector('#arenaSection');
+  if (!section) return;
+  try {
+    const data = await (await apiFetch('/arena/leaderboard')).json();
+    const board = data.leaderboard || [];
+    if (!board.length) {
+      section.innerHTML = '<h4>Arena leaderboard</h4><p class="analytics-empty">No Arena votes yet. Use Compare to vote.</p>';
+      return;
+    }
+    section.innerHTML = `<h4>Arena leaderboard</h4>
+      <table class="cmp-lb">
+        <thead><tr><th>Model</th><th>Wins</th><th>Losses</th><th>Win rate</th></tr></thead>
+        <tbody>${board.map((r) => `
+          <tr><td>${escapeHtml(r.model)}</td><td>${r.wins}</td><td>${r.losses}</td>
+          <td>${(r.win_rate * 100).toFixed(1)}%</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <p class="cmp-muted">${data.total_votes} votes total</p>`;
+  } catch {
+    section.innerHTML = '<h4>Arena leaderboard</h4><p class="analytics-empty">Could not load.</p>';
   }
 }

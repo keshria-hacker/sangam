@@ -72,20 +72,37 @@ async def run_team_stream_endpoint(
     _require_teams()
     from fastapi.responses import StreamingResponse
     from ..llm import default_model_id
-    from ..teams.streaming import stream_team_run, format_sse
+    from ..teams.streaming import stream_team_run, format_sse, new_run_id
 
     model_id = payload.model or await default_model_id(db)
     if not model_id:
         raise HTTPException(status_code=400, detail="No model available.")
 
+    run_id = new_run_id()
+
     async def _gen():
-        async for event in stream_team_run(payload.team_id, payload.task, model_id, db):
+        async for event in stream_team_run(payload.team_id, payload.task, model_id, db, run_id=run_id):
             # Check if client disconnected
             if await request.is_disconnected():
                 break
             yield format_sse(event)
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+class TeamStopIn(BaseModel):
+    run_id: str = Field(min_length=1)
+    agent_id: str = Field(min_length=1)
+
+
+@router.post("/teams/stop-agent")
+async def stop_agent_endpoint(payload: TeamStopIn):
+    """Stop a single specialist mid-stream via task cancellation."""
+    _require_teams()
+    from ..teams.streaming import stop_specialist
+
+    stopped = stop_specialist(payload.run_id, payload.agent_id)
+    return {"run_id": payload.run_id, "agent_id": payload.agent_id, "stopped": stopped}
 
 
 class TeamRetryIn(BaseModel):

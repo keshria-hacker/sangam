@@ -1,26 +1,47 @@
 """
-teams/streaming.py — SSE streaming for team runs (Phase 6.4a).
+teams/streaming.py — SSE streaming for team runs (Phase 6.4a, Phase 7).
 
 Yields per-specialist output as SSE events:
 - specialist_start: {agent_id, role}
 - specialist_chunk: {agent_id, text}
 - specialist_done: {agent_id, output, elapsed_s}
 - specialist_error: {agent_id, error}
+- specialist_stopped: {agent_id} (when stopped via /teams/stop-agent)
 - synthesis_start / synthesis_chunk / synthesis_done
 - team_done: {elapsed_s}
 
 Supports per-agent stop via task cancellation and single-agent retry.
+Live producer tasks are tracked in _LIVE_TASKS keyed by (run_id, agent_id)
+so /teams/stop-agent can cancel an individual specialist mid-stream.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import time
+import uuid
 from typing import Any, AsyncIterator
 
 from .definitions import AgentSpec, TeamDefinition, get_team
 from .runner import TeamError
 from ..feature_flags import is_enabled
+
+# (run_id, agent_id) -> asyncio.Task for live specialist producers.
+# Entries are removed when the producer finishes or the stream ends.
+_LIVE_TASKS: dict[tuple[str, str], asyncio.Task] = {}
+
+
+def new_run_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+def stop_specialist(run_id: str, agent_id: str) -> bool:
+    """Cancel a live specialist producer. Returns True if a task was cancelled."""
+    task = _LIVE_TASKS.pop((run_id, agent_id), None)
+    if task is None or task.done():
+        return False
+    task.cancel()
+    return True
 
 
 async def _stream_specialist(
@@ -76,8 +97,13 @@ async def stream_team_run(
     task: str,
     model_id: str,
     db: Any,
+    run_id: str | None = None,
 ) -> AsyncIterator[dict]:
-    """Stream a full team run as SSE events."""
+    """Stream a full team run as SSE events.
+
+    run_id identifies this run so /teams/stop-agent can cancel individual
+    specialists. It is yielded in the team_start event.
+    """
     if not is_enabled("multi_agent"):
         yield {"type": "error", "error": "Multi-agent teams are not enabled"}
         return
@@ -92,8 +118,10 @@ async def stream_team_run(
         yield {"type": "error", "error": "Empty task."}
         return
 
+    run_id = run_id or new_run_id()
     started = time.monotonic()
-    yield {"type": "team_start", "team_id": team_id, "specialists": [s.id for s in team.specialists]}
+    yield {"type": "team_start", "team_id": team_id, "run_id": run_id,
+           "specialists": [s.id for s in team.specialists]}
 
     # Fan-out: run specialists concurrently, streaming each
     specialist_outputs: dict[str, str] = {}
@@ -117,6 +145,9 @@ async def stream_team_run(
             await queues[spec.id].put(None)  # Sentinel
 
     producers = [asyncio.create_task(_producer(spec)) for spec in team.specialists]
+    # Register live tasks so /teams/stop-agent can cancel individual specialists.
+    for spec, p in zip(team.specialists, producers):
+        _LIVE_TASKS[(run_id, spec.id)] = p
 
     try:
         # Yield events as they arrive from any specialist
@@ -137,6 +168,8 @@ async def stream_team_run(
         for p in producers:
             if not p.done():
                 p.cancel()
+        for spec in team.specialists:
+            _LIVE_TASKS.pop((run_id, spec.id), None)
 
     # Fan-in: coordinator synthesizes
     succeeded = [sid for sid, out in specialist_outputs.items() if out]
