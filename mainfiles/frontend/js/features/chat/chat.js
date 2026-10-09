@@ -149,8 +149,11 @@ export function renderFileChips() {
     const info = FILE_ICON_MAP[f.ext] || { icon: 'fa-file', color: '#9AA1AC' };
     const chip = document.createElement('div');
     chip.className = 'file-chip';
+    const thumb = f.imageUrl
+      ? `<img class="file-chip-thumb" src="${escapeHtml(f.imageUrl)}" alt="">`
+      : `<span class="file-chip-icon" style="background:${info.color}"><i class="fa-solid ${f.uploading ? 'fa-spinner fa-spin' : info.icon}"></i></span>`;
     chip.innerHTML = `
-      <span class="file-chip-icon" style="background:${info.color}"><i class="fa-solid ${f.uploading ? 'fa-spinner fa-spin' : info.icon}"></i></span>
+      ${thumb}
       <span class="file-chip-info">
         <span class="file-chip-name">${escapeHtml(f.name)}</span>
         <span class="file-chip-size">${f.uploading ? 'Uploading…' : formatBytes(f.size)}</span>
@@ -385,6 +388,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
     model: model.id,
     messages: getMessages().map(({ role, content }) => ({ role, content })),
     file_ids: fileIds,
+    media_ids: getAttachedFiles().map((f) => f.mediaId).filter(Boolean),
     temperature: getTemperature(),
     max_tokens: parseInt(getMaxTokens(), 10),
     reasoning_effort: getReasoningEffort() === 'none' ? null : getReasoningEffort(),

@@ -131,6 +131,13 @@ def create_app() -> FastAPI:
                 logger.info("Voice extension registered")
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Voice extension skipped: {exc}")
+        # Image generation: project into the extension registry.
+        try:
+            from .image_gen import register_image_gen_extension
+            if register_image_gen_extension():
+                logger.info("Image-gen extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Image-gen extension skipped: {exc}")
         # Foundation F3: connect configured MCP servers (best-effort).
         if settings.FEATURE_MCP:
             try:

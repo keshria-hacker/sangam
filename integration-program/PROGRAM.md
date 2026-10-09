@@ -66,4 +66,9 @@ integrations, then implement capabilities drawn from 22 reference repos.
   VoiceStudio server); /api/voice/* endpoints gated by FEATURE_VOICE; mic
   dictation, per-message speak button, auto-speak setting, browser TTS
   fallback. See VOICE.md.
-- [ ] Theme 4–10 integrations (scoped per theme before build)
+- [x] Theme 4 — Image generation (2026-10-08, branch `image-gen`):
+  Fooocus-inspired style presets + prompt enhancement, pluggable engines
+  (OpenAI-compatible, experimental local Fooocus driver), /api/image/*
+  endpoints gated by FEATURE_IMAGE_GEN, generate_image agent tool, composer
+  image button with media_ids attachment. See IMAGE_GEN.md.
+- [ ] Theme 5–10 integrations (scoped per theme before build)

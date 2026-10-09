@@ -49,6 +49,32 @@ def _sidecar_path(media_id: str) -> Path:
     return _media_dir() / f"{media_id}.json"
 
 
+def save_media_file(data: bytes, filename: str, mime_type: str) -> MediaAttachment:
+    """Persist raw bytes as a media attachment (used by voice/image-gen).
+
+    Returns the MediaAttachment; raises ValueError on empty data.
+    """
+    if not data:
+        raise ValueError("Empty media data")
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", Path(filename).name) or "file.bin"
+    extension = (safe_name.rsplit(".", 1)[-1] if "." in safe_name else "").lower()
+    kind = ALLOWED_MEDIA.get(extension, ("image", [mime_type]))[0]
+    media_id = uuid.uuid4().hex[:12]
+    stored = _media_dir() / f"{media_id}.{extension or 'bin'}"
+    stored.write_bytes(data)
+    attachment = MediaAttachment(
+        id=media_id,
+        kind=kind,  # type: ignore[arg-type]
+        filename=safe_name,
+        mime_type=mime_type,
+        size_bytes=len(data),
+        url=f"{settings.API_PREFIX}/media/{media_id}",
+        created_at=datetime.now(UTC),
+    )
+    _sidecar_path(media_id).write_text(attachment.model_dump_json(), encoding="utf-8")
+    return attachment
+
+
 def load_media_attachment(media_id: str) -> MediaAttachment | None:
     """Load a stored media attachment's metadata (used by chat pipeline)."""
     sidecar = _sidecar_path(media_id)
@@ -106,7 +132,7 @@ async def upload_media(request: Request, file: UploadFile):
     if extension not in ALLOWED_MEDIA:
         raise HTTPException(status_code=415, detail=f"Unsupported media type: .{extension}")
 
-    kind, allowed_mimes = ALLOWED_MEDIA[extension]
+    _, allowed_mimes = ALLOWED_MEDIA[extension]
 
     content_length = request.headers.get("content-length")
     if content_length:
@@ -133,21 +159,7 @@ async def upload_media(request: Request, file: UploadFile):
         if detected_mime not in allowed_mimes:
             raise HTTPException(status_code=415, detail=f"MIME mismatch: {detected_mime}")
 
-    media_id = uuid.uuid4().hex[:12]
-    stored = _media_dir() / f"{media_id}.{extension}"
-    stored.write_bytes(contents)
-
-    attachment = MediaAttachment(
-        id=media_id,
-        kind=kind,  # type: ignore[arg-type]
-        filename=filename,
-        mime_type=detected_mime or allowed_mimes[0],
-        size_bytes=len(contents),
-        url=f"{settings.API_PREFIX}/media/{media_id}",
-        created_at=datetime.now(UTC),
-    )
-    _sidecar_path(media_id).write_text(attachment.model_dump_json(), encoding="utf-8")
-    return attachment
+    return save_media_file(contents, filename, detected_mime or allowed_mimes[0])
 
 
 @router.get("/media/{media_id}")

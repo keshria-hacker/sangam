@@ -131,6 +131,18 @@ class Settings(BaseSettings):
     VOICE_WHISPER_MODEL: str = "tiny"       # faster-whisper model size
     VOICE_MAX_TTS_CHARS: int = 2000         # per-request TTS cap
 
+    # --- Image generation ---
+    # Engines: "auto" picks the first available; "openai" forces the
+    # OpenAI-compatible API; "fooocus" drives a local Fooocus Gradio UI
+    # (experimental); "none" disables.
+    IMAGE_GEN_ENGINE: str = "auto"
+    IMAGE_OPENAI_BASE_URL: str = "https://api.openai.com"
+    IMAGE_OPENAI_API_KEY: str | None = None
+    IMAGE_OPENAI_MODEL: str = "dall-e-3"
+    FOOOCUS_URL: str = "http://127.0.0.1:7865"  # local Fooocus --listen UI
+    IMAGE_MAX_IMAGES: int = 2                   # per-request cap
+    IMAGE_DEFAULT_SIZE: str = "1024x1024"
+
     # --- API ---
     API_VERSION: str = "v1"
 
