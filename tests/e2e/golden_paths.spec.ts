@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test';
 const FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://127.0.0.1:5500';
 const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:8001';
 const E2E_USERNAME = process.env.E2E_TEST_USERNAME || 'goldenpath';
-const E2E_PASSWORD = process.env.E2E_TEST_PASSWORD || 'goldenpath123';
+const E2E_PASSWORD = process.env.E2E_TEST_PASSWORD || 'Goldenpath123';
 
 async function login(page: any) {
   await page.goto(FRONTEND_URL);
