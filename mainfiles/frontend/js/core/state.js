@@ -116,9 +116,16 @@ export const [getAbortController, setAbortController] = createSignal(null);
 export const [getLastUserText, setLastUserText] = createSignal('');
 export const [getWebSearchEnabled, setWebSearchEnabled] = createSignal(false);
 export const [getAgentModeEnabled, setAgentModeEnabled] = createSignal(false);
+// Think mode: how to display the Thinking block — 'expand' | 'collapse' | 'hide'
+const _thinkPref = localStorage.getItem('sangam:thinking-display') || 'collapse';
+export const [getThinkingDisplay, setThinkingDisplay] = createSignal(_thinkPref);
+export function setThinkingDisplayPref(v) {
+  setThinkingDisplay(v);
+  try { localStorage.setItem('sangam:thinking-display', v); } catch {}
+}
 export const [getSidebarCollapsed, setSidebarCollapsed] = createSignal(false);
 export const [getBackendReachable, setBackendReachable] = createSignal(null);
-export const [getMaxTokens, setMaxTokens] = createSignal('1024');
+export const [getMaxTokens, setMaxTokens] = createSignal('auto');
 export const [getReasoningEffort, setReasoningEffort] = createSignal('medium');
 export const [getTemperature, setTemperature] = createSignal(0.7);
 
@@ -247,7 +254,7 @@ export function groupModelsByProvider(models) {
 export function selectModel(model, { silent = false } = {}) {
   if (!model) return;
   setSelectedModel(model);
-  setMaxTokens(model.max_tokens || '1024');
+  setMaxTokens(model.max_tokens ? String(model.max_tokens) : 'auto');
 }
 
 /**
@@ -276,7 +283,7 @@ export function resetAllState() {
   setBackendReachable(null);
   setWebSearchEnabled(false);
   setTemperature(0.7);
-  setMaxTokens('1024');
+  setMaxTokens('auto');
   setReasoningEffort('medium');
   // Don't reset settings - those are user preferences
 }

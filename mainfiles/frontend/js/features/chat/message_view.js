@@ -74,13 +74,17 @@ export function setThinkingPhase(node, phase, elapsedSec = null) {
  * content area. It is ephemeral — not stored in message history.
  * Supports markdown rendering within reasoning blocks (§31).
  */
-export function showReasoningInNode(node, text) {
+export function showReasoningInNode(node, text, opts = {}) {
+  const { getThinkingDisplay } = opts.thinkingState || {};
+  const displayPref = getThinkingDisplay ? getThinkingDisplay() : 'collapse';
+  if (displayPref === 'hide') return;
   let section = node.querySelector('.msg-reasoning');
   if (!section) {
     section = document.createElement('div');
     section.className = 'msg-reasoning';
-    section.innerHTML = `<details open>
-      <summary><i class="fa-solid fa-brain"></i> Reasoning</summary>
+    section.dataset.thinkStart = String(Date.now());
+    section.innerHTML = `<details${displayPref === 'expand' ? ' open' : ''}>
+      <summary><i class="fa-solid fa-brain"></i> Thinking <span class="think-elapsed"></span></summary>
       <div class="msg-reasoning-content"></div>
     </details>`;
     const body = node.querySelector('.msg-body');
@@ -91,6 +95,11 @@ export function showReasoningInNode(node, text) {
     } else {
       body.appendChild(section);
     }
+  }
+  const elapsedEl = section.querySelector('.think-elapsed');
+  if (elapsedEl && section.dataset.thinkStart) {
+    const secs = Math.floor((Date.now() - Number(section.dataset.thinkStart)) / 1000);
+    elapsedEl.textContent = secs > 0 ? `· ${secs}s` : '';
   }
   const contentEl = section.querySelector('.msg-reasoning-content');
   if (contentEl) {
@@ -450,15 +459,26 @@ export function buildMessageNode(msg) {
   const regenBtn = node.querySelector('.regenerate-btn');
   regenBtn.addEventListener('click', () => _regenerate && _regenerate());
 
-  // Speak button (voice feature)
+  // Speak button (voice feature) — toggles to Stop while speaking
   const speakBtn = node.querySelector('.speak-msg-btn');
   if (speakBtn) {
+    const baseHtml = speakBtn.innerHTML;
     speakBtn.addEventListener('click', async () => {
       const m = await import('../voice/voice.js');
-      // Strip to plain text for speech: reuse the rendered text content.
       const article = node.querySelector('article.assistant-response');
-      m.speakText(article ? article.innerText : (msg.content || ''));
+      m.speakText(article ? article.innerText : (msg.content || ''), node);
     });
+    // Reflect controller state on this button
+    import('../voice/voice.js').then((m) => {
+      m.onVoiceState((state) => {
+        const active = (state === 'speaking' || state === 'fetching') && m.getSpeakingNode() === node;
+        speakBtn.classList.toggle('speaking', active);
+        speakBtn.innerHTML = active
+          ? '<i class="fa-solid fa-stop"></i> Stop'
+          : baseHtml;
+        speakBtn.setAttribute('aria-pressed', String(active));
+      });
+    }).catch(() => {});
   }
 
   // Feedback buttons (thumbs up/down) — persisted via the messages API.

@@ -258,8 +258,11 @@ export function refreshFeatureButtons(features) {
   show('analyticsBtn', !!features.analytics);
   show('micBtn', !!features.voice);
   show('imageBtn', !!features.image_gen);
+  show('imagesBtn', !!features.image_gen);
   // Voice settings section follows the voice flag.
   document.getElementById('voiceSettingsSectionWrap')?.classList.toggle('hidden', !features.voice);
+  // Tool picker respects flags too
+  import('../tabs/tabs.js').then((m) => m.invalidateFeatureCache?.()).catch(() => {});
 }
 
 /**

@@ -4,30 +4,9 @@
  */
 import { apiFetch } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
-import { escapeHtml } from '../../shared/utils.js';
+import { appendStep, clearLog } from '../../shared/runlog.js';
 
 console.log('[Module] code-agent.js loaded');
-
-function stepNode(step) {
-  const div = document.createElement('div');
-  div.className = `ca-step ca-${step.kind}`;
-  if (step.kind === 'thought') {
-    div.innerHTML = `<div class="ca-thought">${escapeHtml(step.content).replace(/\n/g, '<br>')}</div>`;
-  } else if (step.kind === 'tool_call') {
-    div.innerHTML = `<div class="ca-tool"><i class="fa-solid fa-wrench"></i> <code>${escapeHtml(step.tool || '')}</code></div>`;
-  } else if (step.kind === 'tool_result') {
-    const ok = !step.content.includes('"error"');
-    div.innerHTML = `<details class="ca-result ${ok ? '' : 'ca-error'}">
-      <summary>${ok ? 'Result' : 'Error'} <span class="ca-tool-name">${escapeHtml(step.tool || '')}</span></summary>
-      <pre>${escapeHtml(step.content.slice(0, 3000))}</pre>
-    </details>`;
-  } else if (step.kind === 'done') {
-    div.innerHTML = `<div class="ca-done"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(step.content).replace(/\n/g, '<br>')}</div>`;
-  } else if (step.kind === 'error') {
-    div.innerHTML = `<div class="ca-error-msg"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(step.content)}</div>`;
-  }
-  return div;
-}
 
 /**
  * Render the Code Agent into a tab body.
@@ -73,8 +52,6 @@ export function renderCodeAgentTab(bodyEl) {
   const logEl = bodyEl.querySelector('#caLog');
   let abort = null;
 
-  function scrollLog() { logEl.scrollTop = logEl.scrollHeight; }
-
   runBtn.addEventListener('click', async () => {
     const task = taskEl.value.trim();
     if (!task) { showToast({ type: 'info', message: 'Describe the task first.' }); return; }
@@ -82,7 +59,7 @@ export function renderCodeAgentTab(bodyEl) {
     const tddMode = bodyEl.querySelector('#caTdd').checked;
     runBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
-    logEl.innerHTML = '';
+    clearLog(logEl);
     abort = new AbortController();
 
     try {
@@ -108,15 +85,13 @@ export function renderCodeAgentTab(bodyEl) {
           try {
             const step = JSON.parse(line.slice(5).trim());
             if (step.kind === 'end') continue;
-            logEl.appendChild(stepNode(step));
-            scrollLog();
+            appendStep(logEl, step);
           } catch { /* partial */ }
         }
       }
     } catch (err) {
       if (err?.name !== 'AbortError') {
-        logEl.appendChild(stepNode({ kind: 'error', content: String(err?.message || err) }));
-        scrollLog();
+        appendStep(logEl, { kind: 'error', content: String(err?.message || err) });
       }
     } finally {
       runBtn.classList.remove('hidden');

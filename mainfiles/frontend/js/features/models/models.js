@@ -236,6 +236,8 @@ export function renderProviderFilters() {
 export function selectModel(model, opts = {}) {
   if (!model) return;
   setSelectedModel(model);
+  // Notify listeners (e.g. Think mode gating on reasoning capability)
+  window.dispatchEvent(new CustomEvent('sangam:model-changed', { detail: { model } }));
   const info = getProviderInfo(model.provider);
   elements.modelSelectorBtn.querySelector('.provider-dot').style.setProperty('--dot-color', info.color);
   elements.modelSelectorBtn.querySelector('.model-name').textContent = model.name;

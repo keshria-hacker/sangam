@@ -3,7 +3,7 @@
  * Main entry point - bootstraps all feature modules.
  */
 
-import { initAppState, getMessages, getIsGenerating, getLastUserText, getTemperature, setTemperature, getMaxTokens, setMaxTokens, getReasoningEffort, setReasoningEffort } from './core/state.js';
+import { initAppState, getMessages, getIsGenerating, getLastUserText, getTemperature, setTemperature, getMaxTokens, setMaxTokens, getReasoningEffort, setReasoningEffort, setThinkingDisplayPref, getThinkingDisplay } from './core/state.js';
 import { initElements as initChatElements, initChatEvents, handleSend, regenerate, runGeneration, stopGeneration, autoResizeTextarea, scrollToBottom, buildMessageNode, renderMessages, startNewChat as chatStartNewChat } from './features/chat/chat.js';
 import { initElements as initModelsElements, loadProvidersAndModels, renderModelList, renderProviderFilters, renderProviderStatusList, renderConnPulse, selectModel, openModelDropdown, closeModelDropdown, initModelSelector } from './features/models/models.js';
 import { initElements as initSettingsElements, openSettings, closeSettingsModal, applySettings as settingsApplySettings, loadSettings, syncSettingsUI, initSettings, renderProviderStatusList as settingsRenderProviderStatusList } from './features/settings/settings.js';
@@ -282,7 +282,7 @@ function initGlobalListeners() {
     const btn = e.target.closest('button[data-value]');
     if (!btn) return;
     const val = btn.dataset.value;
-    elements.tokenLabel.textContent = parseInt(val).toLocaleString();
+    elements.tokenLabel.textContent = val === 'auto' ? 'Auto' : parseInt(val, 10).toLocaleString();
     setMaxTokens(val);
     elements.tokenDropdown.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
     btn.classList.add('selected');
@@ -294,9 +294,32 @@ function initGlobalListeners() {
     e.stopPropagation();
     elements.reasoningDropdown?.classList.toggle('hidden');
   });
+  // Think mode: grey out effort control for models without reasoning support
+  window.addEventListener('sangam:model-changed', (e) => {
+    const model = e.detail?.model;
+    const caps = model?.capabilities || {};
+    const supported = !!(caps.reasoning || caps.thinking);
+    const wrap = elements.reasoningSelect;
+    if (wrap) {
+      wrap.classList.toggle('reasoning-unsupported', !supported);
+      wrap.title = supported
+        ? 'Reasoning effort (Think mode)'
+        : `${model?.name || 'This model'} does not support reasoning effort — control disabled`;
+      elements.reasoningBtn.disabled = !supported;
+    }
+  });
+
   elements.reasoningDropdown?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-value]');
+    const btn = e.target.closest('button[data-value],button[data-thinking]');
     if (!btn) return;
+    // Thinking block display preference
+    if (btn.dataset.thinking) {
+      setThinkingDisplayPref(btn.dataset.thinking);
+      elements.reasoningDropdown.querySelectorAll('button[data-thinking]').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      elements.reasoningDropdown.classList.add('hidden');
+      return;
+    }
     const val = btn.dataset.value;
     const labels = { none: 'Auto', low: 'Low', medium: 'Medium', high: 'High', extra_high: 'Extra High' };
     elements.reasoningLabel.textContent = labels[val] || val;
@@ -305,6 +328,13 @@ function initGlobalListeners() {
     btn.classList.add('selected');
     elements.reasoningDropdown.classList.add('hidden');
   });
+  // Init thinking display selection from saved preference
+  {
+    const pref = getThinkingDisplay();
+    elements.reasoningDropdown?.querySelectorAll('button[data-thinking]').forEach((b) =>
+      b.classList.toggle('selected', b.dataset.thinking === pref));
+  }
+
 
   // Close select dropdowns when clicking outside
   document.addEventListener('click', (e) => {

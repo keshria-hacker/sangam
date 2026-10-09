@@ -329,6 +329,10 @@ if (location.protocol === 'file:') {
           <button class="icon-btn hidden" id="micBtn" title="Dictate (speech to text)" aria-label="Dictate message">
             <i class="fa-solid fa-microphone"></i>
           </button>
+          <span class="dict-timer hidden" id="dictTimer" aria-label="Recording time">0s</span>
+          <button class="icon-btn hidden dict-cancel" id="dictCancelBtn" title="Cancel dictation (discard)" aria-label="Cancel dictation">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
           <button class="icon-btn hidden" id="imageBtn" title="Generate image" aria-label="Generate image">
             <i class="fa-solid fa-image"></i>
           </button>
@@ -363,12 +367,13 @@ if (location.protocol === 'file:') {
           <div class="composer-select" id="tokenSelect">
             <i class="fa-solid fa-hashtag"></i>
             <button class="select-btn" id="tokenBtn" aria-label="Max output tokens">
-              <span id="tokenLabel">1,024</span>
+              <span id="tokenLabel">Auto</span>
               <i class="fa-solid fa-chevron-down"></i>
             </button>
             <div class="select-dropdown hidden" id="tokenDropdown">
+              <button type="button" data-value="auto" class="selected">Auto</button>
               <button type="button" data-value="512">512</button>
-              <button type="button" data-value="1024" class="selected">1,024</button>
+              <button type="button" data-value="1024">1,024</button>
               <button type="button" data-value="2048">2,048</button>
               <button type="button" data-value="4096">4,096</button>
               <button type="button" data-value="8192">8,192</button>
@@ -387,6 +392,11 @@ if (location.protocol === 'file:') {
               <button type="button" data-value="medium" class="selected">Medium</button>
               <button type="button" data-value="high">High</button>
               <button type="button" data-value="extra_high">Extra High</button>
+              <div class="dropdown-sep"></div>
+              <div class="dropdown-label">Thinking block</div>
+              <button type="button" data-thinking="expand">Always expand</button>
+              <button type="button" data-thinking="collapse" class="selected">Collapsed</button>
+              <button type="button" data-thinking="hide">Hide</button>
             </div>
           </div>
 

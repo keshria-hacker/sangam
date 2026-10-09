@@ -336,6 +336,16 @@ a{color:var(--accent);}
 
 /* ---------- Agent mode ---------- */
 .msg-agent-badge{display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:600; color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); padding:2px 8px; border-radius:999px; margin-left:8px;}
+/* Think mode */
+.reasoning-unsupported{opacity:.45;}
+.reasoning-unsupported #reasoningBtn{cursor:not-allowed;}
+.dropdown-sep{height:1px; background:var(--border-soft); margin:6px 4px;}
+.dropdown-label{font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); padding:4px 10px 2px;}
+.think-elapsed{font-weight:400; color:var(--text-tertiary); font-size:11px;}
+/* Voice */
+.speak-msg-btn.speaking{color:var(--danger);}
+.dict-timer{font-size:12px; font-weight:600; color:var(--danger); min-width:28px; text-align:center;}
+.dict-cancel{color:var(--danger);}
 .agent-steps{display:flex; flex-direction:column; gap:8px; margin:8px 0;}
 .agent-step{font-size:13px; line-height:1.5;}
 .agent-thought{color:var(--text-secondary); font-size:12px; display:flex; gap:8px;}
@@ -348,6 +358,24 @@ a{color:var(--accent);}
 .agent-result.agent-error{border-color:var(--danger);}
 .agent-error-msg{color:var(--danger); font-size:13px;}
 .msg-stopped{color:var(--text-tertiary); font-style:italic;}
+
+/* ---------- Shared RunLog ---------- */
+.rl-step{font-size:13px; line-height:1.6;}
+.rl-thought{color:var(--text-primary); white-space:pre-wrap;}
+.rl-tool{color:var(--text-secondary); display:flex; gap:8px; align-items:baseline;}
+.rl-tool code{background:var(--bg-elevated); padding:2px 8px; border-radius:6px; font-family:var(--font-mono); font-size:12px;}
+.rl-args{color:var(--text-tertiary); font-size:11px; font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.rl-result{border:1px solid var(--border-soft); border-radius:6px; padding:8px 10px; background:var(--surface);}
+.rl-result summary{cursor:pointer; font-size:12px; color:var(--text-secondary);}
+.rl-result pre{margin:8px 0 0; font-size:11px; white-space:pre-wrap; max-height:300px; overflow-y:auto; color:var(--text-tertiary);}
+.rl-result.rl-error{border-color:var(--danger);}
+.rl-tool-name{font-family:var(--font-mono); color:var(--text-tertiary);}
+.rl-done{color:var(--success); font-weight:500;}
+.rl-error-msg{color:var(--danger);}
+.tool-tab-body{height:100%;}
+.tool-tab-body.hidden{display:none;}
+.tool-picker-menu button[disabled]{opacity:.45; cursor:not-allowed;}
+.tool-off{font-size:10px; color:var(--text-tertiary); margin-left:auto;}
 
 /* ---------- Code Agent tab ---------- */
 .code-agent{display:flex; flex-direction:column; gap:16px; max-width:900px; height:100%;}

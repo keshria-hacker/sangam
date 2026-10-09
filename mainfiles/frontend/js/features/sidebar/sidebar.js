@@ -271,6 +271,7 @@ function buildChatItem(chat, isPinned) {
 
 export async function openChat(chatId) {
   closeProfilePopup();
+  document.dispatchEvent(new CustomEvent('sangam:chat-switched'));
   setActiveChatId(chatId);
   renderChatHistory(elements.searchChats ? elements.searchChats.value : '');
 

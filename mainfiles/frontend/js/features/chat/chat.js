@@ -14,6 +14,7 @@ import {
   getAbortController, setAbortController, getWebSearchEnabled, setWebSearchEnabled,
   getMaxTokens, getReasoningEffort, getTemperature,
   getAgentModeEnabled, setAgentModeEnabled,
+  getThinkingDisplay,
   getChats, setChats,
   resetChatState
 } from '../../core/state.js';
@@ -231,6 +232,9 @@ export async function handleSend() {
     return;
   }
 
+  // New send stops any voice I/O (speech or dictation)
+  document.dispatchEvent(new CustomEvent('sangam:before-send'));
+
   elements.welcomeScreen?.classList.add('hidden');
 
   const agentMode = getAgentModeEnabled();
@@ -374,7 +378,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
     file_ids: fileIds,
     media_ids: getAttachedFiles().map((f) => f.mediaId).filter(Boolean),
     temperature: getTemperature(),
-    max_tokens: parseInt(getMaxTokens(), 10),
+    max_tokens: getMaxTokens() === 'auto' ? null : parseInt(getMaxTokens(), 10),
     reasoning_effort: getReasoningEffort() === 'none' ? null : getReasoningEffort(),
     regenerate,
     web_search: getWebSearchEnabled(),
@@ -441,7 +445,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       },
       reasoningDelta: (text) => {
         reasoningContent += text;
-        showReasoningInNode(typingNode, reasoningContent);
+        showReasoningInNode(typingNode, reasoningContent, { thinkingState: { getThinkingDisplay } });
       },
       toolStart: (event) => {
         const toolId = event.metadata?.tool_id;

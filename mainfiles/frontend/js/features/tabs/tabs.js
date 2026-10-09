@@ -1,31 +1,48 @@
 /**
- * Browser-like tab system.
+ * Browser-like tab system (mount-once).
  *
  * - The "main" tab is the only chat. It is pinned: always open, never closable.
- * - Tool tabs (skills, teams, learn, analytics, images) open as separate tabs
- *   so they never block or cover the chat view.
- * - Opening a tool that is already open just switches to its tab.
+ * - Tool tabs open as separate tabs so they never block chat.
+ * - Each tool view is mounted ONCE and hidden/shown on switch — state
+ *   (running logs, results, form input) survives tab switches.
+ * - The "+" picker respects feature flags.
  */
+import { apiFetch } from '../../shared/http.js';
 
 const TOOL_DEFS = {
-  skills:    { title: 'Skills',    icon: 'fa-wand-magic-sparkles' },
-  teams:     { title: 'Agent teams', icon: 'fa-users' },
-  learn:     { title: 'Learn',      icon: 'fa-graduation-cap' },
-  analytics: { title: 'Analytics',  icon: 'fa-chart-simple' },
-  images:    { title: 'Image studio', icon: 'fa-image' },
-  code:      { title: 'Code agent', icon: 'fa-code' },
-  design:    { title: 'Design studio', icon: 'fa-palette' },
+  skills:    { title: 'Skills',        icon: 'fa-wand-magic-sparkles', feature: null },
+  teams:     { title: 'Agent teams',   icon: 'fa-users',               feature: 'multi_agent' },
+  learn:     { title: 'Learn',         icon: 'fa-graduation-cap',      feature: 'learning' },
+  analytics: { title: 'Analytics',     icon: 'fa-chart-simple',        feature: 'analytics' },
+  images:    { title: 'Image studio',  icon: 'fa-image',               feature: 'image_gen' },
+  code:      { title: 'Code agent',    icon: 'fa-code',                feature: null },
+  design:    { title: 'Design studio', icon: 'fa-palette',             feature: null },
 };
 
-const openTabs = []; // [{ id, tool, title, icon }]
+const openTabs = []; // [{ id, tool, title, icon, mounted }]
 let activeTabId = 'main';
-let renderers = {}; // tool -> (bodyEl) => void, registered by feature modules
+let renderers = {};
+let featureCache = null;
 
 export function registerTabRenderer(tool, fn) {
   renderers[tool] = fn;
 }
 
 function $(sel) { return document.querySelector(sel); }
+
+async function getFeatures() {
+  if (featureCache) return featureCache;
+  try {
+    const data = await (await apiFetch('/features')).json();
+    featureCache = data.features || {};
+  } catch {
+    featureCache = {};
+  }
+  return featureCache;
+}
+
+/** Refresh the cached flags (call after a toggle in Settings). */
+export function invalidateFeatureCache() { featureCache = null; }
 
 function renderTabStrip() {
   const list = $('#toolTabList');
@@ -61,7 +78,7 @@ export function openToolTab(tool) {
   if (!def) return null;
   let tab = openTabs.find((t) => t.tool === tool);
   if (!tab) {
-    tab = { id: `tool-${tool}`, tool, title: def.title, icon: def.icon };
+    tab = { id: `tool-${tool}`, tool, title: def.title, icon: def.icon, mounted: false };
     openTabs.push(tab);
   }
   switchTab(tab.id);
@@ -69,11 +86,33 @@ export function openToolTab(tool) {
 }
 
 export function closeTab(tabId) {
-  if (tabId === 'main') return; // main tab never closes
+  if (tabId === 'main') return;
   const i = openTabs.findIndex((t) => t.id === tabId);
-  if (i >= 0) openTabs.splice(i, 1);
+  if (i >= 0) {
+    // Remove the mounted container so a reopen starts fresh
+    document.getElementById(`tabbody-${tabId}`)?.remove();
+    openTabs.splice(i, 1);
+  }
   if (activeTabId === tabId) switchTab('main');
   else renderTabStrip();
+}
+
+/** Mount the tool view once into its own persistent container. */
+function mountTab(tab) {
+  if (tab.mounted) return;
+  const body = $('#toolViewBody');
+  const container = document.createElement('div');
+  container.id = `tabbody-${tab.id}`;
+  container.className = 'tool-tab-body';
+  container.dataset.tool = tab.tool;
+  body.appendChild(container);
+  const render = renderers[tab.tool];
+  if (render) {
+    try { render(container); } catch (err) { console.error('tab render failed', tab.tool, err); }
+  } else {
+    container.innerHTML = `<p class="settings-hint">Loading ${tab.title}…</p>`;
+  }
+  tab.mounted = true;
 }
 
 export function switchTab(tabId) {
@@ -85,14 +124,11 @@ export function switchTab(tabId) {
     const tab = openTabs.find((t) => t.id === tabId);
     if (tab) {
       $('#toolViewTitle').innerHTML = `<i class="fa-solid ${tab.icon}"></i> ${tab.title}`;
-      const body = $('#toolViewBody');
-      body.innerHTML = '';
-      const render = renderers[tab.tool];
-      if (render) {
-        try { render(body); } catch (err) { console.error('tab render failed', tab.tool, err); }
-      } else {
-        body.innerHTML = `<p class="settings-hint">Loading ${tab.title}…</p>`;
-      }
+      mountTab(tab); // mount once
+      // Show this tab's container, hide the others
+      document.querySelectorAll('#toolViewBody .tool-tab-body').forEach((el) => {
+        el.classList.toggle('hidden', el.id !== `tabbody-${tabId}`);
+      });
     }
   }
   renderTabStrip();
@@ -113,24 +149,28 @@ export function initTabs() {
   renderTabStrip();
 }
 
-function toggleToolPicker() {
+async function toggleToolPicker() {
   closeToolPicker();
+  const features = await getFeatures();
   const btn = $('#tabAddBtn');
   const menu = document.createElement('div');
   menu.id = 'toolPickerMenu';
   menu.className = 'tool-picker-menu';
-  menu.innerHTML = Object.entries(TOOL_DEFS).map(([key, def]) => `
-    <button type="button" data-tool="${key}">
+  menu.innerHTML = Object.entries(TOOL_DEFS).map(([key, def]) => {
+    const off = def.feature && !features[def.feature];
+    return `
+    <button type="button" data-tool="${key}"${off ? ' disabled' : ''} title="${off ? 'Enable in Settings → Features' : def.title}">
       <i class="fa-solid ${def.icon}"></i><span>${def.title}</span>
-    </button>`).join('');
-  menu.querySelectorAll('button').forEach((b) => {
+      ${off ? '<span class="tool-off">off</span>' : ''}
+    </button>`;
+  }).join('');
+  menu.querySelectorAll('button:not([disabled])').forEach((b) => {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       openToolTab(b.dataset.tool);
       closeToolPicker();
     });
   });
-  // Position under the + button
   const rect = btn.getBoundingClientRect();
   menu.style.position = 'fixed';
   menu.style.left = `${rect.left}px`;
