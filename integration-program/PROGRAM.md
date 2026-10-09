@@ -5,6 +5,17 @@ integrations, then implement capabilities drawn from 22 reference repos.
 
 **Status: COMPLETE (2026-10-09).** All 10 themes implemented, tested
 (1114 passed), and merged into `integration/full-program`. Pushed to GitHub.
+
+**Phase 6 — Verification & Gap Closure (2026-10-09):**
+- 6 Playwright golden path tests (6/6 pass)
+- Full suite: 1148 passed, 1 flaky, 100 skipped
+- Teams SSE streaming + per-agent retry
+- Graph provenance (EXTRACTED/INFERRED/AMBIGUOUS) + memory wings
+- Model compare + Arena leaderboard
+- Fallback chain with circuit breakers + quotas
+- DESIGN.md, REPO_COVERAGE.md (honest 22-repo assessment)
+- Fixed 3 critical ES module import bugs
+- See docs/REPO_COVERAGE.md for per-repo status.
 Merge strategy: feature branches merged with `--no-ff` into the integration
 branch; `main` left untouched for a clean PR when ready.
 

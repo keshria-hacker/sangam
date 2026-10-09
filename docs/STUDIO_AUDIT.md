@@ -152,7 +152,7 @@ has no design system / artifact type / export / versions.
 |---|---|
 | `getToolDefs()` — exported, never imported | `tabs.js:28` |
 | `#reasoningEffortIndicator` — zero JS refs | `index.html:218` |
-| `#backendDownState` — never populated, only hidden | `index.html:322` |
+| `#backendDownState` — backend-unreachable screen, populated on connection failure | `app.js:516-517` |
 | Palette "Open Skills browser" → calls `a.openSkillsModal?.()` which doesn't exist; `app.js:355` exposes only `openSkillsTab` | `palette.js:36` |
 | `openSkillsModal()` — only caller is the broken palette action | `skills.js:233` |
 

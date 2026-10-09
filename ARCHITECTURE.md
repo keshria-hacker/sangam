@@ -1165,3 +1165,34 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
        │                 │          │   Gemini, etc.)  │
        └─────────────────┘          └──────────────────┘
 ```
+---
+
+## Phase 6 Additions (2026-10-09)
+
+### Teams Streaming
+- `backend/teams/streaming.py`: `stream_team_run()` yields SSE events per specialist
+- `POST /api/teams/run/stream`: SSE endpoint with disconnect handling
+- `POST /api/teams/retry-agent`: Retry single specialist
+
+### Knowledge Graph Provenance
+- Edges have `provenance`: EXTRACTED (from data), INFERRED (heuristic), AMBIGUOUS (uncertain)
+- Memory wings: `wing:{kind}` hub nodes group memories by type
+- `backend/graph_provenance.py`: `AnswerProvenance` tracks "used in this answer"
+
+### Model Compare & Arena
+- `POST /api/compare`: Parallel execution across 2-4 models
+- `POST /api/arena/vote`, `GET /api/arena/leaderboard`: Win rate tracking
+- `ArenaResult` model
+
+### Provider Resilience
+- `backend/providers/fallback_chain.py`: `FallbackChain` with circuit breakers + quotas
+- `GET /api/providers/status`: Expose breaker states + quota usage
+
+### Automations
+- `backend/automations.py`: Scheduler (hourly/daily/weekly/cron)
+- `Automation` model, `/api/automations` CRUD
+
+### Frontend Module Validation
+- `scripts/check_frontend_modules.mjs`: Validates ES module imports/exports via V8
+- Run: `node --experimental-vm-modules scripts/check_frontend_modules.mjs`
+- Catches bugs that `node --check` misses (e.g. wrong relative import paths)

@@ -126,6 +126,42 @@ Opt-in, local-first analytics dashboard — your usage stays on your server, nev
 
 Press Ctrl+P for a quick launcher: new chat, skills, teams, export, theme, and more. Export any chat as Markdown.
 
+### � studio AI Studio Shell
+
+Intent-grouped navigation (Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings). Browser-style tabs for side-by-side work — main chat stays pinned. Right Inspector panel (Ctrl+Shift+I), Activity Tray for background jobs, typed settings with search.
+
+### 🧠 Knowledge Graph
+
+Unified graph of memories, documents, code symbols, and chats. SVG visualization with zoom, click-to-inspect, provenance labels (EXTRACTED/INFERRED/AMBIGUOUS), memory wings by type, and "used in this answer" tracking.
+
+### 🤖 Agent Hub
+
+Build custom agents with system prompts, tools, and approval policies. Built-in Researcher, Coder, Writer, Analyst. Run with streaming, approve/deny tool calls, set cost budgets.
+
+### 🎨 Create Hub
+
+Typed artifacts: markdown docs, diagrams (custom SVG renderer), code files, HTML previews. Version history with restore, six starter templates, image/voice studio shortcuts.
+
+### ⏰ Automations
+
+Schedule agent tasks or chat messages: hourly, daily, weekly, or cron. Enable/disable, run now, humanized next-run times.
+
+### 🔀 Routes & Combos
+
+Keyword-based model routing (e.g. "python" → code model). Chain models into combos (fast draft → smart refine). Per-provider quota display.
+
+### ⚖️ Model Compare & Arena
+
+Run the same prompt against 2-4 models in parallel. Vote for the winner; leaderboard tracks win rates by model.
+
+### 💻 Code Agent
+
+OpenHands-style agentic coding: write_file, edit_file, run_bash tools, SSE streaming, TDD mode, learned instincts, code map (AST graph of your codebase).
+
+### 🎨 Design Studio
+
+Generate UI prototypes from prompts. Sandboxed iframe preview, refine iteratively, download as HTML.
+
 ---
 
 ## 🤖 Supported AI Providers
