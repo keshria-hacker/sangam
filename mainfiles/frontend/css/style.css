@@ -306,6 +306,13 @@ a{color:var(--accent);}
 .btn-primary:hover{filter:brightness(1.1);}
 .btn-primary:disabled{opacity:.55; cursor:wait;}
 
+/* ---------- OmniRoute gateway section ---------- */
+.omniroute-endpoint-row{display:flex; flex-direction:column; gap:8px; align-items:stretch;}
+.omniroute-presets{display:flex; gap:8px;}
+.omniroute-actions{display:flex; gap:8px;}
+#omnirouteStatusLine.status-ok{color:var(--success);}
+#omnirouteStatusLine.status-warn{color:var(--warning);}
+
 /* ---------- Image Studio tab ---------- */
 .image-studio{display:flex; flex-direction:column; gap:16px; max-width:900px;}
 .image-studio-form{display:flex; flex-direction:column; gap:10px;}

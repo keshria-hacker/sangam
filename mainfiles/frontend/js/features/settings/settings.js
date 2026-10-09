@@ -452,6 +452,9 @@ export function initSettings() {
   elements.closeSettings?.addEventListener('click', closeSettingsModal);
   elements.settingsOverlay?.addEventListener('click', (e) => { if (e.target === elements.settingsOverlay) closeSettingsModal(); });
 
+  // OmniRoute gateway (Sangam-native)
+  initOmnirouteSection();
+
   // Feature toggles (delegated)
   document.getElementById('featureToggles')?.addEventListener('click', onFeatureToggleClick);
 
@@ -595,4 +598,78 @@ export function initSettings() {
       // Also close other modals
     }
   });
+}
+/* ============ OmniRoute gateway (Sangam-native UI) ============ */
+
+async function loadOmnirouteStatus() {
+  const line = document.getElementById('omnirouteStatusLine');
+  const endpointInput = document.getElementById('omnirouteEndpoint');
+  try {
+    const res = await (await apiFetch('/omniroute/status')).json();
+    if (endpointInput && !endpointInput.dataset.touched) endpointInput.value = res.endpoint || '';
+    if (!line) return;
+    if (!res.has_key) {
+      line.textContent = 'No API key saved — add one to enable auto model discovery.';
+      line.className = '';
+    } else if (!res.reachable) {
+      line.textContent = `Key saved, but gateway not reachable at ${res.endpoint}.`;
+      line.className = 'status-warn';
+    } else {
+      line.textContent = `${res.model_count} models available via OmniRoute.`;
+      line.className = 'status-ok';
+    }
+  } catch {
+    if (line) line.textContent = 'Could not reach backend.';
+  }
+}
+
+function initOmnirouteSection() {
+  const section = document.getElementById('omnirouteSection');
+  if (!section || section.dataset.wired) return;
+  section.dataset.wired = '1';
+
+  const endpointInput = document.getElementById('omnirouteEndpoint');
+  endpointInput?.addEventListener('input', () => { endpointInput.dataset.touched = '1'; });
+
+  section.querySelectorAll('.omniroute-presets button').forEach((b) => {
+    b.addEventListener('click', () => {
+      endpointInput.value = b.dataset.endpoint;
+      endpointInput.dataset.touched = '1';
+    });
+  });
+
+  document.getElementById('omnirouteSave')?.addEventListener('click', async () => {
+    const endpoint = endpointInput?.value.trim();
+    const apiKey = document.getElementById('omnirouteKey')?.value.trim();
+    if (!endpoint && !apiKey) {
+      showToast({ type: 'info', message: 'Enter an endpoint or API key first.' });
+      return;
+    }
+    try {
+      await apiPost('/omniroute/config', { endpoint: endpoint || null, api_key: apiKey || null });
+      document.getElementById('omnirouteKey').value = '';
+      showToast({ type: 'success', title: 'OmniRoute saved' });
+      loadOmnirouteStatus();
+    } catch (err) {
+      showToast({ type: 'error', title: 'Save failed', message: err?.message || String(err) });
+    }
+  });
+
+  document.getElementById('omnirouteSync')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const res = await (await apiPost('/omniroute/sync', {})).json();
+      showToast({ type: 'success', title: `${res.count} models synced`, message: 'They now appear in the model selector.' });
+      loadOmnirouteStatus();
+      // Refresh the model list so new models appear immediately
+      window.dispatchEvent(new CustomEvent('sangam:models-changed'));
+    } catch (err) {
+      showToast({ type: 'error', title: 'Sync failed', message: err?.message || String(err) });
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  loadOmnirouteStatus();
 }

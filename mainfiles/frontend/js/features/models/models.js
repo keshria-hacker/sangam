@@ -341,6 +341,9 @@ export function renderProviderStatusList() {
 export function initModelSelector() {
   initElements();
 
+  // Refresh model list when OmniRoute (or another source) syncs new models
+  window.addEventListener('sangam:models-changed', () => { loadProvidersAndModels(); });
+
   elements.modelSelectorBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     elements.modelSelector.classList.contains('open') ? closeModelDropdown() : openModelDropdown();

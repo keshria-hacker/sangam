@@ -106,6 +106,11 @@ from .api_routes.providers_routes import (  # noqa: F401
     refresh_provider_models,
     set_provider_key,
 )
+from .api_routes.omniroute_routes import (  # noqa: F401
+    omniroute_config,
+    omniroute_status,
+    omniroute_sync,
+)
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401
 from .document import extract_text, truncate_preview  # noqa: F401

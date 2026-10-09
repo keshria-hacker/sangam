@@ -30,7 +30,20 @@ class ProviderRegistry:
 
     def get_config(self, provider_id: str) -> ProviderConfig | None:
         """Get provider configuration by ID."""
-        return self._providers.get(provider_id)
+        cfg = self._providers.get(provider_id)
+        if cfg is None:
+            return None
+        # OmniRoute uses a user-configured endpoint (local gateway or cloud),
+        # not the hardcoded default. Return a copy with the live endpoint.
+        if provider_id == "omniroute":
+            try:
+                from ..omniroute_config import get_endpoint
+                import dataclasses
+                ep = get_endpoint()
+                cfg = dataclasses.replace(cfg, api_base=ep, model_endpoint=f"{ep}/models")
+            except Exception:
+                pass
+        return cfg
 
     def get_all_configs(self) -> dict[str, ProviderConfig]:
         """Get all provider configurations."""

@@ -648,6 +648,46 @@ if (location.protocol === 'file:') {
 
         <!-- Providers tabpanel (Status + API Keys) -->
         <div class="settings-tabpanel" role="tabpanel" data-tabpanel="providers" hidden>
+          <!-- OmniRoute gateway (Sangam-native UI) -->
+          <section class="settings-section">
+            <h3><i class="fa-solid fa-route"></i> OmniRoute Gateway</h3>
+            <p class="settings-hint">One gateway for 290+ LLM providers. Once linked, its models appear in your model selector automatically — no per-provider keys needed.</p>
+            <div id="omnirouteSection">
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span>Gateway endpoint</span>
+                  <small>Local gateway or OmniRoute Cloud</small>
+                </div>
+                <div class="setting-control omniroute-endpoint-row">
+                  <input type="text" id="omnirouteEndpoint" class="provider-key-input" placeholder="http://localhost:20128/v1">
+                  <div class="omniroute-presets">
+                    <button type="button" class="btn-secondary btn-sm" data-endpoint="http://localhost:20128/v1">Local</button>
+                    <button type="button" class="btn-secondary btn-sm" data-endpoint="https://api.omniroute.online/v1">Cloud</button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span>API key</span>
+                  <small>From your OmniRoute dashboard</small>
+                </div>
+                <div class="setting-control">
+                  <input type="password" id="omnirouteKey" class="provider-key-input" placeholder="Paste API key…" autocomplete="off">
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span>Status</span>
+                  <small id="omnirouteStatusLine">Not checked yet</small>
+                </div>
+                <div class="setting-control omniroute-actions">
+                  <button type="button" class="btn-secondary btn-sm" id="omnirouteSave">Save</button>
+                  <button type="button" class="btn-primary btn-sm" id="omnirouteSync">Sync models</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="settings-section">
             <h3>Providers</h3>
             <div class="provider-status-list" id="providerStatusList"><!-- Populated by JS --></div>

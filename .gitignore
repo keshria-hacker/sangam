@@ -119,3 +119,4 @@ mainfiles/config/skills/.pack_state.json
 # Feature flag runtime overrides (user-local)
 mainfiles/feature_flags.json
 test-results:
+mainfiles/omniroute.json
