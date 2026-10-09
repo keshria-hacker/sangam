@@ -400,6 +400,8 @@ export async function startApplication() {
     import('./features/voice/voice.js').then((m) => m.initVoice()).catch(() => {});
     // Image generation: show the composer button only when the flag is on.
     import('./features/image/image.js').then((m) => m.initImage()).catch(() => {});
+    // Agent teams: show the teams button only when the flag is on.
+    import('./features/teams/teams.js').then((m) => m.initTeams()).catch(() => {});
     showToast({ type: 'success', title: 'Connected', message: `Live backend at ${getApiBaseUrl()}` });
   } catch (err) {
     chatStartNewChat();

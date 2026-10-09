@@ -146,6 +146,13 @@ def create_app() -> FastAPI:
                 logger.info("Registered %d skill packs", count)
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Skill pack registration skipped: {exc}")
+        # Multi-agent teams: project into the extension registry.
+        try:
+            from .teams import register_teams_extension
+            if register_teams_extension():
+                logger.info("Teams extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Teams extension skipped: {exc}")
         # Foundation F3: connect configured MCP servers (best-effort).
         if settings.FEATURE_MCP:
             try:

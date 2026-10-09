@@ -77,4 +77,8 @@ integrations, then implement capabilities drawn from 22 reference repos.
   (archify), science-essentials (scientific-agent-skills), agent-loop (pi);
   pack API + Skills modal pack strip; skill-pack:* extensions. See
   SKILL_PACKS.md.
-- [ ] Theme 6–10 integrations (scoped per theme before build)
+- [x] Theme 6 — Multi-agent (2026-10-08, branch `multi-agent`): agent teams
+  with fan-out/fan-in (research, code, writing), per-agent failure
+  isolation, /api/teams/* gated by FEATURE_MULTI_AGENT, Teams modal UI,
+  capability:multi_agent extension. See MULTI_AGENT.md.
+- [ ] Theme 7–10 integrations (scoped per theme before build)
