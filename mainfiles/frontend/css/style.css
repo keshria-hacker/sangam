@@ -2315,7 +2315,10 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .team-card-status.team-stopped{color:var(--warning);}
 .team-card-actions{display:flex; gap:6px;}
 .team-card-body{padding:8px 12px; font-size:13px; max-height:320px; overflow-y:auto; white-space:pre-wrap;}
-.team-card-body:empty{display:none;}
+.provider-health{font-size:10px; padding:2px 6px; border-radius:999px; text-transform:uppercase; letter-spacing:.04em;}
+.provider-health-open{background:var(--danger-bg, #fce8e6); color:var(--danger);}
+.provider-health-half{background:var(--warning-bg, #fef7e0); color:var(--warning);}
+.provider-health-quota{background:var(--bg-elevated); color:var(--text-tertiary);}
 
 /* ---------- Compare / Arena ---------- */
 .compare-tab{display:flex; flex-direction:column; gap:16px; padding:16px; max-width:1200px;}

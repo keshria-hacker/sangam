@@ -319,7 +319,7 @@ export function renderConnPulse() {
 /**
  * Render provider status list in sidebar.
  */
-export function renderProviderStatusList() {
+export async function renderProviderStatusList() {
   const list = elements.providerStatusList;
   if (!list) return;
 
@@ -329,12 +329,34 @@ export function renderProviderStatusList() {
     return;
   }
 
-  list.innerHTML = providers.map((p) => `
+  // Phase 7: fetch circuit breaker + quota states
+  let chainStates = {};
+  try {
+    const data = await (await apiFetch('/providers/status')).json();
+    chainStates = data.providers || {};
+  } catch { /* ignore */ }
+
+  list.innerHTML = providers.map((p) => {
+    const cs = chainStates[p.id];
+    let healthBadge = '';
+    if (cs) {
+      if (cs.circuit === 'open') {
+        healthBadge = `<span class="provider-health provider-health-open" title="Circuit open — cooling down">cooldown</span>`;
+      } else if (cs.circuit === 'half_open') {
+        healthBadge = `<span class="provider-health provider-health-half" title="Testing recovery">recovering</span>`;
+      }
+      if (cs.quota && cs.quota.remaining === 0) {
+        healthBadge += ` <span class="provider-health provider-health-quota" title="Hourly quota exhausted">quota</span>`;
+      }
+    }
+    return `
     <div class="provider-status-row">
       <span class="provider-dot" style="--dot-color:${PROVIDER_COLORS[p.id] || '#9AA1AC'}"></span>
       <span class="provider-label">${escapeHtml(p.label)}</span>
       <span class="provider-state ${p.state}">${p.state === 'online' ? 'Connected' : p.state === 'local' ? 'Local runtime' : ''}</span>
-    </div>`).join('');
+      ${healthBadge}
+    </div>`;
+  }).join('');
 }
 
 /**

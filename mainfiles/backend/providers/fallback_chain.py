@@ -139,4 +139,17 @@ def get_fallback_chain() -> FallbackChain:
     global _fallback_chain
     if _fallback_chain is None:
         _fallback_chain = FallbackChain()
+        # Phase 7: auto-configure with default provider order.
+        # Local first (ollama), then cloud providers.
+        _fallback_chain.configure([
+            "ollama", "openai", "anthropic", "gemini", "groq",
+            "together", "openrouter", "deepseek", "mistral", "nvidia",
+            "omniroute",
+        ])
     return _fallback_chain
+
+
+def reset_fallback_chain() -> None:
+    """Reset the global chain (for tests)."""
+    global _fallback_chain
+    _fallback_chain = None

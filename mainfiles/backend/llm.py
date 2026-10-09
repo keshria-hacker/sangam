@@ -156,12 +156,55 @@ async def stream_completion(  # noqa: PLR0913
     max_tokens: int | None = None,
     reasoning_effort: str | None = None,
 ) -> AsyncGenerator[str | ProviderStreamChunk]:
-    """Stream completion from the appropriate provider."""
+    """Stream completion from the appropriate provider.
+
+    Phase 7: wrapped with the fallback chain's circuit breaker + quota.
+    Records success/failure so the UI can show provider health.
+    """
     from . import providers
-    async for chunk in providers.stream_completion(
-        model_id, messages, db, temperature, max_tokens, reasoning_effort
-    ):
-        yield chunk
+    from .providers.fallback_chain import get_fallback_chain
+
+    # Resolve provider_id from model_id for circuit breaker tracking
+    provider_id = None
+    try:
+        info = _resolve_model(model_id)
+        provider_id = info.provider_id if info else None
+    except Exception:
+        pass
+
+    chain = get_fallback_chain()
+    if provider_id:
+        # Quota + circuit breaker guard (raises if open/exceeded)
+        quota = chain.quotas.get(provider_id)
+        if quota:
+            ok, reason = quota.check()
+            if not ok:
+                raise RuntimeError(f"Provider {provider_id}: {reason}")
+        breaker = chain.breakers.get(provider_id)
+        try:
+            await breaker.guard()
+        except Exception:
+            # Circuit open — record and re-raise so caller sees the real error
+            raise
+
+    try:
+        async for chunk in providers.stream_completion(
+            model_id, messages, db, temperature, max_tokens, reasoning_effort
+        ):
+            yield chunk
+        # Success: record it
+        if provider_id:
+            await chain.breakers.get(provider_id).record_success()
+            if provider_id in chain.quotas:
+                chain.quotas[provider_id].record()
+    except Exception:
+        # Failure: trip the breaker
+        if provider_id:
+            try:
+                await chain.breakers.get(provider_id).record_failure()
+            except Exception:
+                pass
+        raise
 
 
 async def stream_response_events(  # noqa: PLR0913
