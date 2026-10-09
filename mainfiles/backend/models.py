@@ -156,6 +156,37 @@ class AgentRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
+class Artifact(Base):
+    """Typed artifact (Phase 4)."""
+
+    __tablename__ = "artifacts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    type: Mapped[str] = mapped_column(String(16), default="doc")  # doc | diagram | code | html
+    language: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+    versions: Mapped[list["ArtifactVersion"]] = relationship(
+        back_populates="artifact", cascade="all, delete-orphan")
+
+
+class ArtifactVersion(Base):
+    """Artifact version history."""
+
+    __tablename__ = "artifact_versions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    artifact_id: Mapped[str] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column()
+    content: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+    artifact: Mapped["Artifact"] = relationship(back_populates="versions")
+
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
 

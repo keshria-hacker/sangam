@@ -14,6 +14,8 @@ const TOOL_DEFS = {
   settings:  { title: 'Settings',      icon: 'fa-gear',                feature: null },
   knowledge: { title: 'Knowledge',     icon: 'fa-brain',               feature: null },
   agents:    { title: 'Agent Hub',     icon: 'fa-robot',               feature: null },
+  create:    { title: 'Create',        icon: 'fa-wand-magic-sparkles', feature: null },
+  library:   { title: 'Library',       icon: 'fa-book',               feature: null },
   skills:    { title: 'Skills',        icon: 'fa-wand-magic-sparkles', feature: null },
   teams:     { title: 'Agent teams',   icon: 'fa-users',               feature: 'multi_agent' },
   learn:     { title: 'Learn',         icon: 'fa-graduation-cap',      feature: 'learning' },

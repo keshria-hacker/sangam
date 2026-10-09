@@ -40,6 +40,19 @@ from .api_routes.runs_routes import (  # noqa: F401
     list_runs,
     record_run,
 )
+from .api_routes.artifacts_routes import (  # noqa: F401
+    create_artifact,
+    delete_artifact,
+    get_artifact,
+    list_artifacts,
+    list_versions,
+    update_artifact,
+)
+from .api_routes.spec_routes import (  # noqa: F401
+    build_spec_doc,
+    spec_to_task,
+)
+from .api_routes.quality_routes import preview_quality  # noqa: F401
 from .api_routes.chats_routes import (  # noqa: F401
     append_messages,
     create_chat,

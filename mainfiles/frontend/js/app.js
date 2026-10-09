@@ -553,6 +553,14 @@ async function init() {
     const { renderAgentHub } = await import('./features/agents/hub.js');
     renderAgentHub(bodyEl);
   });
+  registerTabRenderer('create', async (bodyEl) => {
+    const { renderCreateHub } = await import('./features/create/hub.js');
+    renderCreateHub(bodyEl);
+  });
+  registerTabRenderer('library', async (bodyEl) => {
+    const { renderLibrary } = await import('./features/library/library.js');
+    renderLibrary(bodyEl);
+  });
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

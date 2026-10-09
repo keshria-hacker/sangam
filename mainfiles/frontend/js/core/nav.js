@@ -14,10 +14,10 @@ export const NAV_ITEMS = [
   { id: 'chat',      label: 'Chat',      icon: 'fa-comment',          action: 'chat',      feature: null },
   { id: 'agents',    label: 'Agents',    icon: 'fa-robot',            action: 'tab:agents', feature: null },
   { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'tab:knowledge', feature: null },
-  { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'tab:images', feature: 'image_gen' },
+  { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'tab:create', feature: null },
   { id: 'code',      label: 'Code',      icon: 'fa-code',             action: 'tab:code',   feature: null },
   { id: 'learn',     label: 'Learn',     icon: 'fa-graduation-cap',   action: 'tab:learn',  feature: 'learning' },
-  { id: 'library',   label: 'Library',   icon: 'fa-book',             action: 'tab:skills', feature: null },
+  { id: 'library',   label: 'Library',   icon: 'fa-book',             action: 'tab:library', feature: null },
   { id: 'insights',  label: 'Insights',  icon: 'fa-chart-simple',     action: 'tab:analytics', feature: 'analytics' },
 ];
 

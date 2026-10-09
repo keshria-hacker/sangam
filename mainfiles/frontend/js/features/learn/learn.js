@@ -24,7 +24,7 @@ export async function initLearn() {
     enabled = false;
   }
   if (!enabled) return false;
-  btn?.classList.remove('hidden');
+  // Navigation via studio rail — nothing to unhide.
   return true;
 }
 
@@ -37,8 +37,12 @@ export function renderLearnTab(bodyEl) {
       <div class="learn-controls">
         <input id="learnTopic" class="provider-key-input" placeholder="What do you want to learn?" aria-label="Topic">
         <button class="btn-primary" id="learnStart" type="button">Start lesson</button>
+        <button class="btn-secondary" id="learnImportSkill" type="button" title="Import a SKILL.md">
+          <i class="fa-solid fa-file-import"></i> Import skill
+        </button>
       </div>
       <div class="learn-lesson hidden" id="learnLesson"></div>
+      <div class="learn-scenes hidden" id="learnScenes"></div>
       <div class="learn-answer hidden" id="learnAnswerWrap">
         <textarea id="learnAnswer" rows="3" placeholder="Your answer to the check question…" aria-label="Your answer"></textarea>
         <button class="btn-secondary" id="learnCheck" type="button">Check my answer</button>
@@ -48,6 +52,7 @@ export function renderLearnTab(bodyEl) {
   bodyEl.querySelector('#learnStart').addEventListener('click', () => startLesson(bodyEl));
   bodyEl.querySelector('#learnTopic').addEventListener('keydown', (e) => { if (e.key === 'Enter') startLesson(bodyEl); });
   bodyEl.querySelector('#learnCheck').addEventListener('click', () => checkAnswer(bodyEl));
+  bodyEl.querySelector('#learnImportSkill').addEventListener('click', () => openSkillImporter(bodyEl));
   setTimeout(() => bodyEl.querySelector('#learnTopic')?.focus(), 0);
 }
 
@@ -75,11 +80,20 @@ async function startLesson(container) {
   lessonEl.classList.add('hidden');
   answerWrap.classList.add('hidden');
   feedbackEl.classList.add('hidden');
+  overlay.querySelector('#learnScenes')?.classList.add('hidden');
   try {
     const data = await (await apiPost('/learn/lesson', { topic })).json();
     currentLesson = data.lesson || '';
-    lessonEl.innerHTML = renderMarkdown(currentLesson);
+    lessonEl.innerHTML = renderMarkdown(currentLesson)
+      + `<div class="learn-lesson-actions">
+           <button class="btn-secondary btn-sm" id="learnScenesBtn" type="button">
+             <i class="fa-solid fa-scissors"></i> Break into scenes
+           </button>
+         </div>`;
     lessonEl.classList.remove('hidden');
+    overlay.querySelector('#learnScenes').classList.add('hidden');
+    overlay.querySelector('#learnScenes').innerHTML = '';
+    lessonEl.querySelector('#learnScenesBtn')?.addEventListener('click', () => breakIntoScenes(overlay));
     answerWrap.classList.remove('hidden');
     overlay.querySelector('#learnAnswer').value = '';
     setTimeout(() => overlay.querySelector('#learnAnswer')?.focus(), 0);
