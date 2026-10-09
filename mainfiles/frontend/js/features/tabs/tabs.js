@@ -13,6 +13,8 @@ const TOOL_DEFS = {
   learn:     { title: 'Learn',      icon: 'fa-graduation-cap' },
   analytics: { title: 'Analytics',  icon: 'fa-chart-simple' },
   images:    { title: 'Image studio', icon: 'fa-image' },
+  code:      { title: 'Code agent', icon: 'fa-code' },
+  design:    { title: 'Design studio', icon: 'fa-palette' },
 };
 
 const openTabs = []; // [{ id, tool, title, icon }]

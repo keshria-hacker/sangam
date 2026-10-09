@@ -13,6 +13,8 @@ import { renderTeamsTab } from './features/teams/teams.js';
 import { renderLearnTab } from './features/learn/learn.js';
 import { renderAnalyticsTab } from './features/analytics/analytics.js';
 import { renderImageTab } from './features/image/image.js';
+import { renderCodeAgentTab } from './features/code-agent/code-agent.js';
+import { renderDesignTab } from './features/design/design-studio.js';
 import { initTabs, openToolTab, registerTabRenderer } from './features/tabs/tabs.js';
 import { initElements as initSidebarElements, initSidebar, openMobileSidebar, closeMobileSidebar, toggleSidebarCollapse, loadChatList as sidebarLoadChatList, renderChatHistory as sidebarRenderChatHistory, openChat as sidebarOpenChat, deleteChat as sidebarDeleteChat } from './features/sidebar/sidebar.js';
 import { showToast, initToasts } from './shared/toast.js';
@@ -131,6 +133,8 @@ function initDOM() {
     authForgotBack: $('#authForgotBack'),
     authResetBack: $('#authResetBack'),
     skillsBtn: $('#skillsBtn'),
+    codeBtn: $('#codeBtn'),
+    designBtn: $('#designBtn'),
     shortcutsOverlay: $('#shortcutsOverlay'),
     closeShortcuts: $('#closeShortcuts'),
     backendUrlInput: $('#backendUrlInput'),
@@ -232,6 +236,10 @@ function initGlobalListeners() {
 
   // Skills button -> opens Skills tab
   elements.skillsBtn?.addEventListener('click', () => openToolTab('skills'));
+  // Code agent button -> opens Code agent tab
+  elements.codeBtn?.addEventListener('click', () => openToolTab('code'));
+  // Design studio button -> opens Design studio tab
+  elements.designBtn?.addEventListener('click', () => openToolTab('design'));
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 
@@ -455,6 +463,8 @@ async function init() {
   registerTabRenderer('learn', renderLearnTab);
   registerTabRenderer('analytics', renderAnalyticsTab);
   registerTabRenderer('images', renderImageTab);
+  registerTabRenderer('code', renderCodeAgentTab);
+  registerTabRenderer('design', renderDesignTab);
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

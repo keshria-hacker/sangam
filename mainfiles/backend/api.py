@@ -111,6 +111,9 @@ from .api_routes.omniroute_routes import (  # noqa: F401
     omniroute_status,
     omniroute_sync,
 )
+from .api_routes.code_agent_routes import (  # noqa: F401
+    code_agent_run,
+)
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401
 from .document import extract_text, truncate_preview  # noqa: F401

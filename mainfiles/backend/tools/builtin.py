@@ -326,7 +326,141 @@ def register_builtin_tools() -> None:
     registry.register(list_files_tool)
     registry.register(execute_code_tool)
     registry.register(generate_image_tool)
+    registry.register(write_file_tool)
+    registry.register(edit_file_tool)
+    registry.register(run_bash_tool)
 
 
 # Auto-register on import
 register_builtin_tools()
+
+
+async def write_file_handler(path: str, content: str) -> dict[str, Any]:
+    """Write (create or overwrite) a file in the workspace."""
+    workspace_root = _get_workspace_root()
+    if os.path.isabs(path):
+        target = Path(path).resolve()
+    else:
+        target = (workspace_root / path).resolve()
+    if not _is_path_allowed(target):
+        return {"error": f"Access denied: path outside workspace root: {path}"}
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        return {"ok": True, "path": str(target), "size": len(content)}
+    except OSError as exc:
+        return {"error": f"Write failed: {exc}"}
+
+
+write_file_tool = ToolDefinition(
+    name="write_file",
+    description="Create or overwrite a file with the given content. Creates parent directories as needed.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Path to the file"},
+            "content": {"type": "string", "description": "Full file content"},
+        },
+        "required": ["path", "content"],
+        "additionalProperties": False,
+    },
+    handler=write_file_handler,
+    capabilities=["file_access", "file_write"],
+    category="file",
+    safety_level="caution",
+    read_only=False,
+    requires_confirmation=False,
+)
+
+
+async def edit_file_handler(path: str, old_text: str, new_text: str) -> dict[str, Any]:
+    """Replace old_text with new_text in a file (exact match required)."""
+    workspace_root = _get_workspace_root()
+    if os.path.isabs(path):
+        target = Path(path).resolve()
+    else:
+        target = (workspace_root / path).resolve()
+    if not _is_path_allowed(target):
+        return {"error": f"Access denied: path outside workspace root: {path}"}
+    if not target.is_file():
+        return {"error": f"File not found: {path}"}
+    try:
+        content = target.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return {"error": f"File is not valid UTF-8 text: {path}"}
+    if old_text not in content:
+        return {"error": "old_text not found in file (exact match required)"}
+    count = content.count(old_text)
+    content = content.replace(old_text, new_text, 1)
+    target.write_text(content, encoding="utf-8")
+    return {"ok": True, "path": str(target), "replacements": 1, "other_matches": count - 1}
+
+
+edit_file_tool = ToolDefinition(
+    name="edit_file",
+    description="Replace an exact text snippet in a file. Fails if old_text is not found verbatim.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Path to the file"},
+            "old_text": {"type": "string", "description": "Exact text to replace"},
+            "new_text": {"type": "string", "description": "Replacement text"},
+        },
+        "required": ["path", "old_text", "new_text"],
+        "additionalProperties": False,
+    },
+    handler=edit_file_handler,
+    capabilities=["file_access", "file_write"],
+    category="file",
+    safety_level="caution",
+    read_only=False,
+    requires_confirmation=False,
+)
+
+
+async def run_bash_handler(command: str, timeout: int = 60) -> dict[str, Any]:
+    """Run a bash command in the workspace sandbox. Returns stdout/stderr."""
+    import asyncio as _asyncio
+    workspace_root = _get_workspace_root()
+    try:
+        proc = await _asyncio.create_subprocess_shell(
+            command,
+            stdout=_asyncio.subprocess.PIPE,
+            stderr=_asyncio.subprocess.PIPE,
+            cwd=str(workspace_root),
+        )
+        try:
+            out, err = await _asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except _asyncio.TimeoutError:
+            proc.kill()
+            return {"error": f"Command timed out after {timeout}s", "command": command}
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "stdout": out.decode("utf-8", "replace")[:20000],
+            "stderr": err.decode("utf-8", "replace")[:20000],
+            "command": command,
+        }
+    except Exception as exc:
+        return {"error": f"Bash failed: {exc}", "command": command}
+
+
+run_bash_tool = ToolDefinition(
+    name="run_bash",
+    description="Execute a bash command in the workspace directory. Returns stdout, stderr, and exit code.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "command": {"type": "string", "description": "Bash command to run"},
+            "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 60},
+        },
+        "required": ["command"],
+        "additionalProperties": False,
+    },
+    handler=run_bash_handler,
+    capabilities=["code_execution", "terminal"],
+    category="code",
+    safety_level="caution",
+    read_only=False,
+    requires_confirmation=False,
+)

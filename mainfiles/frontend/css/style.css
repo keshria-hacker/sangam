@@ -313,6 +313,54 @@ a{color:var(--accent);}
 #omnirouteStatusLine.status-ok{color:var(--success);}
 #omnirouteStatusLine.status-warn{color:var(--warning);}
 
+/* ---------- Design Studio tab ---------- */
+.design-studio{display:flex; gap:16px; height:100%; max-width:1200px;}
+.ds-main{flex:1; display:flex; flex-direction:column; gap:12px; min-width:0;}
+.ds-brief-row{display:flex; gap:10px;}
+.ds-brief-row textarea{
+  flex:1; background:var(--input-bg); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:10px 12px; font-size:14px; color:var(--text-primary); resize:vertical; min-height:60px;
+}
+.ds-brief-row textarea:focus{outline:none; border-color:var(--accent);}
+.ds-log{
+  flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px;
+  background:var(--surface-sunken); border:1px solid var(--border-soft);
+  border-radius:var(--radius-sm); padding:14px; min-height:150px;
+}
+.ds-refine-row{display:flex; gap:10px;}
+.ds-refine-row input{flex:1;}
+.ds-preview{flex:1.2; display:flex; flex-direction:column; border:1px solid var(--border-soft); border-radius:var(--radius-sm); overflow:hidden; min-width:0;}
+.ds-preview-bar{display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--bg-elevated); border-bottom:1px solid var(--border-soft); font-size:12px; font-weight:600; color:var(--text-secondary);}
+.ds-preview-bar > div{display:flex; gap:4px;}
+.ds-frame{flex:1; border:none; background:#fff; min-height:400px;}
+
+/* ---------- Code Agent tab ---------- */
+.code-agent{display:flex; flex-direction:column; gap:16px; max-width:900px; height:100%;}
+.ca-input-row{display:flex; flex-direction:column; gap:10px;}
+.ca-input-row textarea{
+  background:var(--input-bg); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:10px 12px; font-size:14px; color:var(--text-primary); resize:vertical; min-height:70px;
+}
+.ca-input-row textarea:focus{outline:none; border-color:var(--accent);}
+.ca-controls{display:flex; gap:10px; align-items:center;}
+.ca-iter{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary);}
+.ca-log{
+  flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px;
+  background:var(--surface-sunken); border:1px solid var(--border-soft);
+  border-radius:var(--radius-sm); padding:14px; min-height:200px;
+}
+.ca-step{font-size:13px; line-height:1.6;}
+.ca-thought{color:var(--text-primary); white-space:pre-wrap;}
+.ca-tool{color:var(--text-secondary);}
+.ca-tool code{background:var(--bg-elevated); padding:2px 8px; border-radius:6px; font-family:var(--font-mono); font-size:12px;}
+.ca-result{border:1px solid var(--border-soft); border-radius:6px; padding:8px 10px; background:var(--surface);}
+.ca-result summary{cursor:pointer; font-size:12px; color:var(--text-secondary);}
+.ca-result pre{margin:8px 0 0; font-size:11px; white-space:pre-wrap; max-height:300px; overflow-y:auto; color:var(--text-tertiary);}
+.ca-result.ca-error{border-color:var(--danger);}
+.ca-tool-name{font-family:var(--font-mono); color:var(--text-tertiary);}
+.ca-done{color:var(--success); font-weight:500;}
+.ca-error-msg{color:var(--danger);}
+
 /* ---------- Image Studio tab ---------- */
 .image-studio{display:flex; flex-direction:column; gap:16px; max-width:900px;}
 .image-studio-form{display:flex; flex-direction:column; gap:10px;}
