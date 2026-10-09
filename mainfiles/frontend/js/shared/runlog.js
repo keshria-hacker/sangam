@@ -5,7 +5,7 @@
  * Renders thought / tool_call / tool_result / done / error steps.
  * One implementation, no copy-paste.
  */
-import { escapeHtml } from '../../shared/utils.js';
+import { escapeHtml } from './utils.js';
 
 console.log('[Module] runlog.js loaded');
 
