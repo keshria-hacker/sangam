@@ -401,14 +401,15 @@ function renderDiagram(src) {
   const nodes = new Map(); // id -> {label, shape}
   const edges = [];        // {from, to, label}
 
-  const nodeRe = /^([A-Za-z0-9_]+)\s*([\[{\(])([^\]}\)]*)([\]}\)])\s*$/;
+  const nodeRe = /^([A-Za-z0-9_]+)\s*(?:\[([^\]]*)\]|\{([^}]*)\}|\(([^)]*)\))$/;
   const edgeRe = /^([A-Za-z0-9_]+)\s*-{1,2}\s*(?:([^-]+?)\s*-{1,2}\s*)?>\s*([A-Za-z0-9_]+)\s*$/;
 
   for (const line of lines) {
     let m = line.match(nodeRe);
     if (m) {
-      const shape = m[2] === '{' ? 'diamond' : (m[2] === '(' ? 'round' : 'box');
-      nodes.set(m[1], { label: m[3].trim() || m[1], shape });
+      const shape = m[2] !== undefined ? 'box' : (m[3] !== undefined ? 'diamond' : 'round');
+      const label = (m[2] ?? m[3] ?? m[4] ?? '').trim() || m[1];
+      nodes.set(m[1], { label, shape });
       continue;
     }
     m = line.match(edgeRe);
