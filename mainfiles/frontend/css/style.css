@@ -344,6 +344,7 @@ a{color:var(--accent);}
 .ca-input-row textarea:focus{outline:none; border-color:var(--accent);}
 .ca-controls{display:flex; gap:10px; align-items:center;}
 .ca-iter{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary);}
+.ca-tdd{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); cursor:pointer;}
 .ca-log{
   flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px;
   background:var(--surface-sunken); border:1px solid var(--border-soft);

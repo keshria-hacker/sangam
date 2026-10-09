@@ -45,6 +45,7 @@ export function renderCodeAgentTab(bodyEl) {
               <option value="20">20</option>
             </select>
           </label>
+          <label class="ca-tdd"><input type="checkbox" id="caTdd"> TDD mode</label>
           <button class="btn-primary" id="caRun" type="button"><i class="fa-solid fa-play"></i> Run agent</button>
           <button class="btn-secondary hidden" id="caStop" type="button"><i class="fa-solid fa-stop"></i> Stop</button>
         </div>
@@ -66,6 +67,7 @@ export function renderCodeAgentTab(bodyEl) {
     const task = taskEl.value.trim();
     if (!task) { showToast({ type: 'info', message: 'Describe the task first.' }); return; }
     const maxIterations = parseInt(bodyEl.querySelector('#caIters').value, 10) || 12;
+    const tddMode = bodyEl.querySelector('#caTdd').checked;
     runBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
     logEl.innerHTML = '';
@@ -75,7 +77,7 @@ export function renderCodeAgentTab(bodyEl) {
       const res = await apiFetch('/code-agent/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task, max_iterations: maxIterations }),
+        body: JSON.stringify({ task, max_iterations: maxIterations, tdd_mode: tddMode }),
         signal: abort.signal,
       });
       if (!res.ok && res.status !== 200) throw new Error(`HTTP ${res.status}`);

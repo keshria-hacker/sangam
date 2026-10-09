@@ -80,13 +80,22 @@ async def _execute_tool(name: str, args: dict) -> dict:
 
 
 async def run_code_agent(task: str, model: str | None = None,
-                         max_iterations: int = 12):
+                         max_iterations: int = 12, tdd_mode: bool = False):
     """Run the agent loop. Yields AgentStep events (for SSE streaming)."""
     import litellm
+    from .instincts import get_relevant_instincts
 
     tools = _tools_schema()
+    system = CODE_AGENT_SYSTEM
+    instincts = get_relevant_instincts(task)
+    if instincts:
+        system += "\nLearned instincts (apply when relevant):\n" + "\n".join(
+            f"- {i}" for i in instincts)
+    if tdd_mode:
+        system += ("\nTDD MODE: Write a failing test FIRST (RED), then implement "
+                   "until it passes (GREEN), then refactor. Show test evidence.")
     messages = [
-        {"role": "system", "content": CODE_AGENT_SYSTEM},
+        {"role": "system", "content": system},
         {"role": "user", "content": task},
     ]
 

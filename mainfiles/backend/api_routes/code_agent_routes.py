@@ -20,6 +20,7 @@ class CodeAgentIn(BaseModel):
     task: str
     model: str | None = None
     max_iterations: int = 12
+    tdd_mode: bool = False
 
 
 @router.post("/code-agent/run")
@@ -37,7 +38,8 @@ async def code_agent_run(payload: CodeAgentIn, db: AsyncSession = Depends(get_db
     max_iter = max(1, min(int(payload.max_iterations or 12), 25))
 
     async def _stream():
-        async for step in run_code_agent(task, model=model, max_iterations=max_iter):
+        async for step in run_code_agent(task, model=model, max_iterations=max_iter,
+                                        tdd_mode=payload.tdd_mode):
             data = {"kind": step.kind, "content": step.content}
             if step.tool_name:
                 data["tool"] = step.tool_name

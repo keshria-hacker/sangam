@@ -120,3 +120,4 @@ mainfiles/config/skills/.pack_state.json
 mainfiles/feature_flags.json
 test-results:
 mainfiles/omniroute.json
+mainfiles/instincts.json
