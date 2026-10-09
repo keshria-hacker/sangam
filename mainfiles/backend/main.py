@@ -109,6 +109,81 @@ def create_app() -> FastAPI:
         (BASE_DIR / "history").mkdir(parents=True, exist_ok=True)
         (BASE_DIR / "logs").mkdir(parents=True, exist_ok=True)
         await init_db()
+        # Foundation F1/F2: unify tools + skills into the extension registry.
+        # Best-effort — the API works even if extension init fails.
+        try:
+            from .extensions import initialize_extensions
+            initialize_extensions()
+            logger.info("Extensions initialized")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Extension init skipped: {exc}")
+        # Memory++: project long-term memory into the extension registry.
+        try:
+            from .memory import register_memory_extension
+            if register_memory_extension():
+                logger.info("Memory extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Memory extension skipped: {exc}")
+        # Voice: project voice I/O into the extension registry.
+        try:
+            from .voice import register_voice_extension
+            if register_voice_extension():
+                logger.info("Voice extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Voice extension skipped: {exc}")
+        # Image generation: project into the extension registry.
+        try:
+            from .image_gen import register_image_gen_extension
+            if register_image_gen_extension():
+                logger.info("Image-gen extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Image-gen extension skipped: {exc}")
+        # Skill packs: project bundled packs into the extension registry.
+        try:
+            from .skills.packs import register_pack_extensions
+            count = register_pack_extensions()
+            if count:
+                logger.info("Registered %d skill packs", count)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Skill pack registration skipped: {exc}")
+        # Multi-agent teams: project into the extension registry.
+        try:
+            from .teams import register_teams_extension
+            if register_teams_extension():
+                logger.info("Teams extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Teams extension skipped: {exc}")
+        # Learning mode: project into the extension registry.
+        try:
+            from .learn import register_learn_extension
+            if register_learn_extension():
+                logger.info("Learn extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Learn extension skipped: {exc}")
+        # Response quality: project into the extension registry.
+        try:
+            from .response_quality import register_quality_extension
+            if register_quality_extension():
+                logger.info("Response-quality extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Response-quality extension skipped: {exc}")
+        # Analytics: project into the extension registry.
+        try:
+            from .analytics import register_analytics_extension
+            if register_analytics_extension():
+                logger.info("Analytics extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Analytics extension skipped: {exc}")
+        # Foundation F3: connect configured MCP servers (best-effort).
+        if settings.FEATURE_MCP:
+            try:
+                from .mcp.bridge import setup_mcp_servers
+                configs = settings.mcp_server_configs()
+                if configs:
+                    connected = await setup_mcp_servers(configs)
+                    logger.info(f"MCP servers connected: {connected}")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"MCP setup skipped: {exc}")
         logger.info("Application startup complete")
         yield
         # Cleanup auto-started Ollama process (if any)
@@ -117,6 +192,12 @@ def create_app() -> FastAPI:
         # Close the rate-limit store (Redis connection, if any)
         from .ratelimit_redis import close_rate_limit_store
         await close_rate_limit_store()
+        # Foundation F3: close MCP server connections.
+        try:
+            from .mcp.bridge import shutdown_mcp_servers
+            await shutdown_mcp_servers()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"MCP shutdown skipped: {exc}")
         logger.info("Application shutdown")
 
     app = FastAPI(
@@ -201,6 +282,14 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix=settings.API_PREFIX, dependencies=[Depends(get_current_user)])
     app.include_router(skills_router, prefix=settings.API_PREFIX, dependencies=[Depends(get_current_user)])
 
+    # Foundation F6: versioned API aliases. /api/v1/* mirrors /api/* so future
+    # breaking changes can ship under /api/v2 while clients migrate.
+    api_v1 = f"/api/{settings.API_VERSION}"
+    app.include_router(public_router, prefix=api_v1)
+    app.include_router(auth_router, prefix=api_v1)
+    app.include_router(api_router, prefix=api_v1, dependencies=[Depends(get_current_user)])
+    app.include_router(skills_router, prefix=api_v1, dependencies=[Depends(get_current_user)])
+
     # --- Enhanced Health Endpoint ---
     @app.get("/health")
     async def health_check():
@@ -217,6 +306,19 @@ def create_app() -> FastAPI:
             "database": "unknown",
             "ollama": "unknown",
         }
+        # Foundation: API version + feature flags. Mock-safe: when settings is
+        # a test double (MagicMock), degrade to JSON-safe defaults instead of
+        # leaking mock objects into the response body.
+        api_version = getattr(settings, "API_VERSION", "v1")
+        checks["api_version"] = api_version if isinstance(api_version, str) else "v1"
+        try:
+            flags = settings.feature_flags() if hasattr(settings, "feature_flags") else {}
+            checks["features"] = (
+                {str(k): bool(v) for k, v in flags.items()}
+                if isinstance(flags, dict) else {}
+            )
+        except Exception:  # noqa: BLE001 — health must never 500 on flags
+            checks["features"] = {}
 
         # Check database
         try:
@@ -237,6 +339,30 @@ def create_app() -> FastAPI:
                     checks["ollama"] = f"http_{resp.status_code}"
         except Exception:
             checks["ollama"] = "unreachable"
+
+        # Foundation: extension registry status
+        try:
+            from .extensions import extensions as _extensions
+            checks["extensions"] = {
+                "registered": len(_extensions.list_all()),
+                "enabled": len(_extensions.list_enabled()),
+            }
+        except Exception:
+            checks["extensions"] = "unavailable"
+
+        # Foundation: MCP servers
+        try:
+            from .mcp.bridge import _clients as _mcp_clients
+            checks["mcp_servers"] = sorted(_mcp_clients.keys())
+        except Exception:
+            checks["mcp_servers"] = "unavailable"
+
+        # Foundation: provider circuit breakers
+        try:
+            from .providers.resilience import breakers as _breakers
+            checks["circuit_breakers"] = _breakers.states()
+        except Exception:
+            checks["circuit_breakers"] = "unavailable"
 
         status_code = 200 if checks["status"] == "healthy" else 503
         return JSONResponse(content=checks, status_code=status_code)

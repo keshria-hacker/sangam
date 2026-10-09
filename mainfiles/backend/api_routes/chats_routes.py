@@ -77,6 +77,44 @@ async def list_chats(db: AsyncSession = Depends(get_db), current_user=Depends(ge
     ]
 
 
+@router.get("/chats/{chat_id}/export")
+async def export_chat(
+    chat_id: str,
+    format: str = "markdown",
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Export a chat as Markdown (open-webui parity) for download."""
+    from fastapi.responses import PlainTextResponse
+
+    if format not in ("markdown", "md"):
+        raise HTTPException(status_code=400, detail="Unsupported format (use markdown)")
+    result = await db.execute(
+        select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.messages))
+    )
+    chat = result.scalar_one_or_none()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    lines = [f"# {chat.title or 'Chat'}", ""]
+    created = chat.created_at.isoformat() if chat.created_at else ""
+    lines.append(f"_Exported from Sangam · model: {chat.model or '—'} · {created}_")
+    lines.append("")
+    for msg in sorted(chat.messages, key=lambda m: m.created_at or datetime.min):
+        role = "**You**" if msg.role == "user" else "**Assistant**"
+        lines.append(f"## {role}")
+        lines.append("")
+        lines.append(msg.content or "")
+        lines.append("")
+    markdown = "\n".join(lines).rstrip() + "\n"
+    safe_title = "".join(c if c.isalnum() or c in ("-", "_") else "-" for c in (chat.title or "chat"))[:60]
+    return PlainTextResponse(
+        markdown,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.md"'},
+    )
+
+
 @router.get("/chats/{chat_id}", response_model=ChatDetailOut)
 async def get_chat(chat_id: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     """Get a chat by ID."""

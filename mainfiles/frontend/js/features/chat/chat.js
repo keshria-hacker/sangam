@@ -26,6 +26,7 @@ import {
   showToolCallInNode,
   showCitationInNode,
   showArtifactInNode,
+  showMediaInNode,
   bindChatActions,
 } from './message_view.js';
 import {
@@ -148,8 +149,11 @@ export function renderFileChips() {
     const info = FILE_ICON_MAP[f.ext] || { icon: 'fa-file', color: '#9AA1AC' };
     const chip = document.createElement('div');
     chip.className = 'file-chip';
+    const thumb = f.imageUrl
+      ? `<img class="file-chip-thumb" src="${escapeHtml(f.imageUrl)}" alt="">`
+      : `<span class="file-chip-icon" style="background:${info.color}"><i class="fa-solid ${f.uploading ? 'fa-spinner fa-spin' : info.icon}"></i></span>`;
     chip.innerHTML = `
-      <span class="file-chip-icon" style="background:${info.color}"><i class="fa-solid ${f.uploading ? 'fa-spinner fa-spin' : info.icon}"></i></span>
+      ${thumb}
       <span class="file-chip-info">
         <span class="file-chip-name">${escapeHtml(f.name)}</span>
         <span class="file-chip-size">${f.uploading ? 'Uploading…' : formatBytes(f.size)}</span>
@@ -384,6 +388,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
     model: model.id,
     messages: getMessages().map(({ role, content }) => ({ role, content })),
     file_ids: fileIds,
+    media_ids: getAttachedFiles().map((f) => f.mediaId).filter(Boolean),
     temperature: getTemperature(),
     max_tokens: parseInt(getMaxTokens(), 10),
     reasoning_effort: getReasoningEffort() === 'none' ? null : getReasoningEffort(),
@@ -405,6 +410,9 @@ export async function runGeneration({ content, fileIds, regenerate }) {
   let toolCalls = [];
   let citations = [];
   let artifacts = [];
+  // Foundation: streamed media (image/audio) tracked the same way.
+  let media = [];
+  let currentMedia = null;
  
  try {
     const stream = await streamChatCompletion(body, controller.signal);
@@ -504,6 +512,27 @@ export async function runGeneration({ content, fileIds, regenerate }) {
      },
      artifactEnd: (event) => {
        // Finalize artifact if needed
+     },
+
+     // Foundation: streamed media attachments (image/audio) for voice + image-gen.
+     mediaStart: ({ kind, metadata }) => {
+       currentMedia = { id: 'stream-' + Date.now(), kind, filename: metadata?.filename || '', url: null, chunks: '' };
+       showMediaInNode(typingNode, currentMedia);
+       media.push(currentMedia);
+     },
+     mediaDelta: ({ content }) => {
+       if (currentMedia) {
+         currentMedia.chunks += content;
+         showMediaInNode(typingNode, { ...currentMedia, delta: content });
+       }
+     },
+     mediaEnd: ({ url, metadata }) => {
+       if (currentMedia) {
+         if (url) currentMedia.url = url;
+         showMediaInNode(typingNode, { ...currentMedia, url: currentMedia.url, finalize: true });
+         currentMedia = null;
+       }
+       void metadata;
      },
 
      artifactDelta: (event) => {
@@ -657,7 +686,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         sidebarModule.loadChatList();
         const elapsedMs = Date.now() - genStartedAt;
         const elapsedSec = (elapsedMs / 1000).toFixed(1);
-        const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts };
+        const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts, media: media.map(m => ({ id: m.id, kind: m.kind, filename: m.filename, url: m.url })) };
         setMessages([...getMessages(), finalMsg]);
         // PHASE: Done — show completion time briefly, then replace with final message
         setThinkingPhase(typingNode, 'done', elapsedSec);
@@ -683,7 +712,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       sidebarModule.loadChatList();
       const elapsedMs = Date.now() - genStartedAt;
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
-      const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts };
+      const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts, media: media.map(m => ({ id: m.id, kind: m.kind, filename: m.filename, url: m.url })) };
       setMessages([...getMessages(), finalMsg]);
       // PHASE: Done — show completion time briefly, then replace with final message
       setThinkingPhase(typingNode, 'done', elapsedSec);
@@ -693,6 +722,8 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       typingNode.replaceWith(finalNode);
       // Final render pass: ensure complete markdown with syntax highlighting
       await finalizeMarkdownRender(finalNode, collected);
+      // Voice: auto-speak the response when the user enabled it.
+      import('../voice/voice.js').then((m) => m.maybeAutoSpeak(collected)).catch(() => {});
     } else if (!sawFirstToken) {
       // Aborted before any token
       typingNode.remove();

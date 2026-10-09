@@ -176,6 +176,18 @@ export function openSettings() {
   elements.settingsOverlay?.classList.remove('hidden');
   updateBodyScrollLock();
   setTimeout(() => elements.closeSettings?.focus(), 0);
+  // Memory section (lazy import to keep settings.js lean)
+  import('./memory-ui.js').then((m) => {
+    m.initMemorySettings();
+    m.refreshMemorySection();
+  }).catch(() => {});
+  // Voice section (only populated when the backend voice flag is on)
+  import('../voice/voice.js').then((m) => {
+    if (m.isVoiceEnabled()) {
+      document.getElementById('voiceSettingsSectionWrap')?.classList.remove('hidden');
+      m.refreshVoiceSettings();
+    }
+  }).catch(() => {});
 }
 
 /**

@@ -77,6 +77,8 @@ export const DEFAULT_SETTINGS = {
   codeThemeDark: 'github-dark',
   codeThemeLight: 'github',
   animations: true,
+  voiceAutoSpeak: false,
+  voiceId: null,
 };
 
 // Chat date bucketing

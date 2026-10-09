@@ -3,6 +3,7 @@ api_routes/chat_stream_routes.py — the chat streaming pipeline (SSE) and the
 agentic-reasoning enhancement endpoint.
 """
 import asyncio
+import json
 import sys
 import time
 import uuid
@@ -21,7 +22,7 @@ from ..capability_orchestration import derive_interpretations, should_clarify
 from ..context_manager import create_context_manager
 from ..database import AsyncSessionLocal, get_db
 from ..domain import ChatMessage
-from ..memory import retrieve_memories
+from ..memory import extract_from_turn_background, recall
 from ..models import Chat, Message, UploadedFile, UserPreference
 from ..rag import TOP_K as RAG_TOP_K
 from ..rag import retrieve_relevant_chunks
@@ -42,6 +43,7 @@ from .common import (
     sse_event,
     sse_response_event,
 )
+from .media_routes import media_content_parts, resolve_media_json
 
 # SSE heartbeat interval (seconds) — keeps proxies/load-balancers from timing out
 # long-lived streaming connections during slow model generations.
@@ -111,6 +113,26 @@ async def chat_stream(  # noqa: PLR0912
     if web_context and messages:
         # Inject as a system message so the model sees the sources.
         messages.insert(0, {"role": "system", "content": web_context})
+
+    # 2b. Media attachments (image/audio). Persisted on the user message as
+    #     media_json; vision-capable models additionally receive OpenAI-style
+    #     content_parts, other models get a textual note so nothing breaks.
+    user_media_json = resolve_media_json(getattr(payload, "media_ids", None))
+    if user_media_json and messages:
+        last_user_idx = next(
+            (i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"),
+            None,
+        )
+        if last_user_idx is not None:
+            parts = media_content_parts(user_media_json, messages[last_user_idx]["content"])
+            vision = bool(getattr(getattr(model_info, "capabilities", None), "vision", False))
+            if parts and vision:
+                messages[last_user_idx]["content_parts"] = parts
+            else:
+                names = ", ".join(
+                    a.get("filename", "?") for a in json.loads(user_media_json)
+                )
+                messages[last_user_idx]["content"] += f"\n\n[Attached media: {names}]"
 
     # --- Phase 6: Response Intelligence ---
     # Analyze request and inject guidance as system prompt additions.
@@ -187,6 +209,7 @@ async def chat_stream(  # noqa: PLR0912
                             role="user",
                             content=payload.messages[-1].content,
                             file_ids=",".join(payload.file_ids) or None,
+                            media_json=user_media_json,
                         ))
                         await clarify_db.commit()
                     # Lifecycle: message_start must precede any content event
@@ -217,25 +240,26 @@ async def chat_stream(  # noqa: PLR0912
         return StreamingResponse(clarification_generator(), media_type="text/event-stream")
 
     # --- Phase 5: Cross-session memory ---
-    # Retrieve relevant past-conversation summaries and inject as provider
-    # context. Placed AFTER response-intelligence analysis and the
-    # clarification gate: injecting earlier would pollute the conversation
-    # history that the ambiguity heuristic reads (a system message at index 0
-    # makes history non-empty, disabling the no-context branch) and the
-    # clarification path never calls the provider so it needs no memory.
-    # Degrades to no-op on any ChromaDB error (retrieve_memories never raises).
+    # Retrieve relevant long-term memories and inject as provider context.
+    # Placed AFTER response-intelligence analysis and the clarification gate:
+    # injecting earlier would pollute the conversation history that the
+    # ambiguity heuristic reads (a system message at index 0 makes history
+    # non-empty, disabling the no-context branch) and the clarification path
+    # never calls the provider so it needs no memory.
+    # Ranked recall (similarity × recency × importance × access); the current
+    # chat's own memories are excluded. Degrades to no-op on any ChromaDB
+    # error (recall never raises).
     if not payload.regenerate:
         try:
             last_user_content = payload.messages[-1].content
-            memories = await retrieve_memories(last_user_content, top_k=2)
-            memories = [m for m in memories if (chat.summary or "") not in (m, )] if chat.summary else memories
-            if memories:
-                memory_context = "\n".join(f"- {m}" for m in memories)
+            records = await recall(last_user_content, top_k=3, exclude_chat_id=chat.id)
+            if records:
+                memory_context = "\n".join(f"- {r.content}" for r in records)
                 messages.insert(0, {
                     "role": "system",
                     "content": f"[Long-term memory — relevant past conversations]\n{memory_context}",
                 })
-                logger.debug("Injected %d long-term memories", len(memories))
+                logger.debug("Injected %d long-term memories", len(records))
         except Exception as exc:  # noqa: BLE001 — memory must never break chat
             logger.warning("Memory retrieval failed: %s", exc)
 
@@ -328,7 +352,8 @@ async def chat_stream(  # noqa: PLR0912
                 if not payload.regenerate:
                     stream_db.add(Message(chat_id=chat.id, role="user",
                                    content=payload.messages[-1].content,
-                                   file_ids=",".join(payload.file_ids) or None))
+                                   file_ids=",".join(payload.file_ids) or None,
+                                   media_json=user_media_json))
                 stream_db.add(Message(id=response_message_id, chat_id=chat.id, role="assistant", content=collected,
                                model=payload.model, response_time=response_time))
                 # Merge the chat into the new session so the model/updated_at
@@ -337,6 +362,24 @@ async def chat_stream(  # noqa: PLR0912
                 chat.updated_at = datetime.now(UTC)
                 await stream_db.merge(chat)
                 await stream_db.commit()
+                # Analytics (opt-in): message sent with model. Never breaks chat.
+                try:
+                    from ..analytics import events as _ae, record_event as _record
+
+                    await _record(
+                        stream_db, current_user.id, _ae.MESSAGE_SENT,
+                        {"model": payload.model},
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
+                # Memory++: fire-and-forget extraction of durable facts from
+                # this turn (preferences, corrections, "remember this").
+                # Offline heuristics; never blocks the response.
+                if not payload.regenerate:
+                    extract_from_turn_background(
+                        payload.messages[-1].content, chat_id=chat.id
+                    )
 
                 # Phase 5: fire-and-forget rolling summarization. Checked every
                 # threshold crossing; failures are logged inside summarize_chat.

@@ -1,0 +1,6 @@
+name: spec-driven
+version: 1.0.0
+description: Spec-Driven Development workflow — constitution, specify, plan, tasks, implement. Turns vague ideas into verified working software.
+source: github/spec-kit
+skills:
+  - sdd-workflow

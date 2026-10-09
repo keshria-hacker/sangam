@@ -110,3 +110,9 @@ cookies.txt
 mainfiles/history/
 history/
 
+
+# Foundation: extension enable/disable state + agent venvs
+mainfiles/extensions_state.json
+.venv-res/
+# Skill-pack enable/disable state (user-local)
+mainfiles/config/skills/.pack_state.json

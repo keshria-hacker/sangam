@@ -180,6 +180,10 @@ if (location.protocol === 'file:') {
           <span class="pulse-dot"></span> Checking providers
         </span>
         <button class="icon-btn" id="skillsBtn" title="Skills & tools" aria-label="Skills and tools"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+        <button class="icon-btn hidden" id="teamsBtn" title="Agent teams" aria-label="Agent teams"><i class="fa-solid fa-users"></i></button>
+        <button class="icon-btn hidden" id="learnBtn" title="Learn" aria-label="Learn"><i class="fa-solid fa-graduation-cap"></i></button>
+        <button class="icon-btn hidden" id="analyticsBtn" title="Usage analytics" aria-label="Usage analytics"><i class="fa-solid fa-chart-simple"></i></button>
+        <button class="icon-btn" id="paletteBtn" title="Command palette (Ctrl+P)" aria-label="Command palette"><i class="fa-solid fa-terminal"></i></button>
         <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
           <i class="fa-solid fa-moon"></i>
         </button>
@@ -229,7 +233,7 @@ if (location.protocol === 'file:') {
               <span>Explain temperature vs. token limit</span>
             </button>
           </div>
-          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> New chat · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Ctrl+Shift+W</kbd> Toggle web search · <kbd>Ctrl+Enter</kbd> Send</p>
+          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> New chat · <kbd>Ctrl+P</kbd> Commands · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Ctrl+Shift+W</kbd> Toggle web search · <kbd>Ctrl+Enter</kbd> Send</p>
         </div>
 
         <!-- Messages render here -->
@@ -284,6 +288,12 @@ if (location.protocol === 'file:') {
         <div class="composer-row">
           <button class="icon-btn composer-attach" id="attachBtn" title="Attach files" aria-label="Attach files">
             <i class="fa-solid fa-paperclip"></i>
+          </button>
+          <button class="icon-btn hidden" id="micBtn" title="Dictate (speech to text)" aria-label="Dictate message">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+          <button class="icon-btn hidden" id="imageBtn" title="Generate image" aria-label="Generate image">
+            <i class="fa-solid fa-image"></i>
           </button>
           <input type="file" id="fileInput" multiple hidden
             accept=".pdf,.docx,.txt,.csv,.xlsx,.pptx,.json,.html,.xml,.py,.java,.js,.c,.cpp,.cs,.go,.rs,.php,.sql,.r">
@@ -548,6 +558,24 @@ if (location.protocol === 'file:') {
             <h3>API Keys</h3>
             <div id="providerKeyManager"><!-- Populated by JS --></div>
           </section>
+
+          <!-- Long-term Memory -->
+          <section class="settings-section">
+            <h3>Memory</h3>
+            <p class="settings-hint">What Sangam remembers across conversations. Delete anything you'd rather it forget.</p>
+            <div class="memory-stats" id="memoryStats"><!-- Populated by JS --></div>
+            <div class="memory-controls">
+              <input type="search" id="memorySearch" class="provider-key-input" placeholder="Search memories&hellip;" aria-label="Search memories" autocomplete="off">
+              <button class="btn-secondary btn-sm" id="memoryConsolidateBtn" type="button" title="Decay stale memories and prune dead ones">Tidy up</button>
+            </div>
+            <div class="memory-list" id="memoryList"><!-- Populated by JS --></div>
+          </section>
+
+          <!-- Voice (shown when the voice feature flag is on) -->
+          <section class="settings-section hidden" id="voiceSettingsSectionWrap">
+            <h3>Voice</h3>
+            <div id="voiceSettingsSection"><!-- Populated by JS --></div>
+          </section>
         </div>
 
       </div>
@@ -659,6 +687,7 @@ if (location.protocol === 'file:') {
       <h2 id="skillsModalTitle"><i class="fa-solid fa-wand-magic-sparkles"></i> Skills</h2>
       <button class="icon-btn ghost close-skills-btn" id="closeSkills" aria-label="Close skills"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    <div id="skillsPacks" class="skills-packs"></div>
     <div class="skills-layout">
       <div class="skills-sidebar">
         <div class="skills-search-wrap">

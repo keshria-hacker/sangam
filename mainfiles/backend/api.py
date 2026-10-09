@@ -52,6 +52,45 @@ from .api_routes.common import (  # noqa: F401
     sse_response_event,
 )
 from .api_routes.files_routes import upload_file  # noqa: F401
+from .api_routes.features_routes import get_features  # noqa: F401
+from .api_routes.extensions_routes import (  # noqa: F401
+    disable_extension,
+    enable_extension,
+    list_extensions,
+)
+from .api_routes.media_routes import (  # noqa: F401
+    get_media,
+    load_media_attachment,
+    upload_media,
+)
+from .api_routes.memory_routes import (  # noqa: F401
+    create_memory,
+    get_memory_stats,
+    remove_memory,
+    run_consolidation,
+    search_memories,
+)
+from .api_routes.voice_routes import (  # noqa: F401
+    get_voice_status,
+    get_voices,
+    speech_to_text,
+    text_to_speech,
+)
+from .api_routes.image_routes import (  # noqa: F401
+    generate_image_endpoint,
+    get_image_status,
+)
+from .api_routes.teams_routes import (  # noqa: F401
+    get_teams,
+    run_team_endpoint,
+)
+from .api_routes.learn_routes import (  # noqa: F401
+    answer_feedback,
+    create_lesson,
+)
+from .api_routes.analytics_routes import (  # noqa: F401
+    analytics_stats,
+)
 from .api_routes.models_routes import (  # noqa: F401
     _to_model_info,
     get_models,

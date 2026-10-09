@@ -100,6 +100,78 @@ class Settings(BaseSettings):
     WEB_SEARCH_API_KEY: str | None = None
     WEB_SEARCH_MAX_RESULTS: int = 5
 
+    # --- Feature flags (foundation for upcoming integrations) ---
+    # Each flag gates a capability end-to-end (backend + UI). Override via env,
+    # e.g. FEATURE_VOICE=true. The GET /api/features endpoint exposes them.
+    FEATURE_VOICE: bool = False          # VoiceStudio-style local TTS/STT
+    FEATURE_IMAGE_GEN: bool = False      # Fooocus-style local image generation
+    FEATURE_MCP: bool = True             # MCP client: consume external MCP servers
+    FEATURE_MULTI_AGENT: bool = False    # munder-difflin/orca-style agent teams
+    FEATURE_ANALYTICS: bool = False      # openpanel-style opt-in analytics
+    FEATURE_SPEC_KIT: bool = False       # spec-kit style spec-driven workflows
+    FEATURE_LEARNING: bool = False       # OpenMAIC-style interactive classroom
+    QUALITY_NO_SLOP: bool = False        # no-ai-slop style response cleanup
+    QUALITY_ADHD_FRIENDLY: bool = False  # i-have-adhd style scannable formatting
+
+    # --- MCP servers (JSON list, e.g. '[{"name":"codebase","command":["codebase-memory-mcp"]}]') ---
+    MCP_SERVERS_JSON: str | None = Field(
+        default=None,
+        description="JSON list of MCP server configs: {name, command|url, args, env}",
+    )
+
+    # --- Voice (TTS/STT) ---
+    # Engines: "auto" picks the first available; "kokoro" / "faster-whisper" /
+    # "openai" force one; "none" disables that direction explicitly.
+    VOICE_TTS_ENGINE: str = "auto"
+    VOICE_STT_ENGINE: str = "auto"
+    # OpenAI-compatible audio server (OpenAI, a local VoiceStudio backend via
+    # its /v1/audio/* endpoints, speaches, ...). Used when engine == "openai".
+    VOICE_OPENAI_BASE_URL: str | None = None
+    VOICE_OPENAI_API_KEY: str | None = None
+    VOICE_OPENAI_TTS_MODEL: str = "tts-1"
+    VOICE_OPENAI_STT_MODEL: str = "whisper-1"
+    VOICE_KOKORO_VOICE: str = "af_heart"   # default kokoro voice id
+    VOICE_WHISPER_MODEL: str = "tiny"       # faster-whisper model size
+    VOICE_MAX_TTS_CHARS: int = 2000         # per-request TTS cap
+
+    # --- Image generation ---
+    # Engines: "auto" picks the first available; "openai" forces the
+    # OpenAI-compatible API; "fooocus" drives a local Fooocus Gradio UI
+    # (experimental); "none" disables.
+    IMAGE_GEN_ENGINE: str = "auto"
+    IMAGE_OPENAI_BASE_URL: str = "https://api.openai.com"
+    IMAGE_OPENAI_API_KEY: str | None = None
+    IMAGE_OPENAI_MODEL: str = "dall-e-3"
+    FOOOCUS_URL: str = "http://127.0.0.1:7865"  # local Fooocus --listen UI
+    IMAGE_MAX_IMAGES: int = 2                   # per-request cap
+    IMAGE_DEFAULT_SIZE: str = "1024x1024"
+
+    # --- API ---
+    API_VERSION: str = "v1"
+
+    def feature_flags(self) -> dict[str, bool]:
+        return {
+            "voice": self.FEATURE_VOICE,
+            "image_gen": self.FEATURE_IMAGE_GEN,
+            "mcp": self.FEATURE_MCP,
+            "multi_agent": self.FEATURE_MULTI_AGENT,
+            "analytics": self.FEATURE_ANALYTICS,
+            "spec_kit": self.FEATURE_SPEC_KIT,
+            "learning": self.FEATURE_LEARNING,
+        }
+
+    def mcp_server_configs(self) -> list[dict]:
+        """Parse MCP_SERVERS_JSON into a list of server config dicts."""
+        if not self.MCP_SERVERS_JSON:
+            return []
+        import json
+
+        try:
+            parsed = json.loads(self.MCP_SERVERS_JSON)
+            return parsed if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
 
 @lru_cache
 def get_settings() -> Settings:

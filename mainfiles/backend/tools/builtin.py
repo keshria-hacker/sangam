@@ -258,6 +258,64 @@ execute_code_tool = ToolDefinition(
 
 
 # -----------------------------------------------------------------------------
+# Image Generation Tool (image-gen theme)
+# -----------------------------------------------------------------------------
+async def generate_image_handler(
+    prompt: str, style: str | None = None, size: str | None = None
+) -> dict[str, Any]:
+    """Generate an image from a text prompt via the configured engine."""
+    from ..config import settings as _settings
+
+    if not _settings.FEATURE_IMAGE_GEN:
+        return {"error": "Image generation is not enabled (FEATURE_IMAGE_GEN=false)."}
+    try:
+        from ..image_gen import ImageGenError, generate_images
+
+        attachments = generate_images(prompt, style=style, size=size, n=1)
+    except Exception as exc:  # noqa: BLE001 — report, never raise
+        return {"error": f"Image generation failed: {exc}"}
+    if not attachments:
+        return {"error": "The engine returned no images."}
+    a = attachments[0]
+    return {
+        "image_url": a.url,
+        "media_id": a.id,
+        "mime_type": a.mime_type,
+        # Hint for the model: embed this markdown so the image renders in chat.
+        "markdown": f"![generated image]({a.url})",
+    }
+
+
+generate_image_tool = ToolDefinition(
+    name="generate_image",
+    description=(
+        "Generate an image from a text prompt. Returns the image URL, media id, "
+        "and markdown to embed so the image renders in the chat. Use when the "
+        "user asks for an image, illustration, or visual."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "prompt": {"type": "string", "description": "Detailed image description"},
+            "style": {
+                "type": "string",
+                "description": "Style preset: photographic, cinematic, digital-art, anime, portrait, landscape, fantasy, none",
+            },
+            "size": {"type": "string", "description": "e.g. 1024x1024, 1792x1024"},
+        },
+        "required": ["prompt"],
+        "additionalProperties": False,
+    },
+    handler=generate_image_handler,
+    capabilities=["image_generation"],
+    category="general",
+    safety_level="safe",
+    read_only=False,
+    requires_confirmation=False,
+)
+
+
+# -----------------------------------------------------------------------------
 # Register all built-in tools
 # -----------------------------------------------------------------------------
 def register_builtin_tools() -> None:
@@ -266,6 +324,7 @@ def register_builtin_tools() -> None:
     registry.register(read_file_tool)
     registry.register(list_files_tool)
     registry.register(execute_code_tool)
+    registry.register(generate_image_tool)
 
 
 # Auto-register on import

@@ -232,6 +232,70 @@ export function showArtifactInNode(node, artifact) {
 }
 
 /**
+ * Media attachments (image/audio) — foundation for voice + image-gen.
+ *
+ * Streamed via MEDIA_START / MEDIA_DELTA / MEDIA_END: deltas carry base64 or
+ * data-URI chunks, media_end carries the final served URL. Persisted messages
+ * render from msg.media (see mediaHtml / buildMessageNode).
+ */
+export function showMediaInNode(node, media) {
+  let container = node.querySelector(".msg-media");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "msg-media";
+    const body = node.querySelector(".msg-body");
+    const ref = body.querySelector(".msg-actions") || body.querySelector("article.assistant-response") || body.querySelector(".msg-content");
+    if (ref) {
+      body.insertBefore(container, ref);
+    } else {
+      body.appendChild(container);
+    }
+  }
+
+  const mediaId = media.id || "stream";
+  let mediaEl = container.querySelector('[data-media-id="' + mediaId + '"]');
+  if (!mediaEl) {
+    mediaEl = document.createElement("div");
+    mediaEl.className = "media-item";
+    mediaEl.dataset.mediaId = mediaId;
+    mediaEl.dataset.chunks = "";
+    if (media.kind === "audio") {
+      mediaEl.innerHTML = '<audio controls preload="metadata"></audio>';
+    } else {
+      mediaEl.innerHTML = '<img alt="' + escapeHtml(media.filename || "image") + '" loading="lazy">';
+    }
+    container.appendChild(mediaEl);
+  }
+
+  if (media.delta) {
+    mediaEl.dataset.chunks += media.delta;
+  }
+  if (media.url) {
+    const target = mediaEl.querySelector("img, audio");
+    if (target) target.src = media.url;
+    mediaEl.dataset.chunks = "";
+  } else if (media.finalize && mediaEl.dataset.chunks) {
+    const target = mediaEl.querySelector("img, audio");
+    if (target) target.src = mediaEl.dataset.chunks;
+  }
+}
+
+/**
+ * Static HTML for persisted msg.media attachments (MediaAttachment list).
+ */
+export function mediaHtml(msg) {
+  if (!msg.media || msg.media.length === 0) return "";
+  return '<div class="msg-media">' + msg.media.map((m) => {
+    const url = escapeHtml(m.url || "");
+    const label = escapeHtml(m.filename || m.kind);
+    if (m.kind === "audio") {
+      return '<div class="media-item"><audio controls preload="metadata" src="' + url + '"></audio><div class="media-label">' + label + "</div></div>";
+    }
+    return '<div class="media-item"><img src="' + url + '" alt="' + label + '" loading="lazy"></div>';
+  }).join("") + "</div>";
+}
+
+/**
  * Get provider display info for a model.
  */
 export function buildMessageNode(msg) {
@@ -248,6 +312,7 @@ export function buildMessageNode(msg) {
       <div class="msg-body">
         <div class="msg-meta"><span class="msg-author">You</span><span class="msg-time">${formatTime(msg.created_at)}</span></div>
         <div class="msg-content" aria-live="polite">${escapeHtml(msg.content)}</div>
+        ${mediaHtml(msg)}
         <div class="msg-edit-btn" title="Edit message"><i class="fa-regular fa-pen-to-square" aria-hidden="true"></i> Edit</div>
       </div>`;
 
@@ -360,9 +425,11 @@ export function buildMessageNode(msg) {
       ${toolCallsHtml}
       ${citationsHtml}
       ${artifactsHtml}
+      ${mediaHtml(msg)}
       <div class="msg-actions always-visible" role="group" aria-label="Message actions">
         <button class="msg-action-btn copy-msg-btn" aria-label="Copy message"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy</button>
         <button class="msg-action-btn regenerate-btn" aria-label="Regenerate response"><i class="fa-solid fa-arrow-rotate-right" aria-hidden="true"></i> Regenerate</button>
+        ${window.__sangamVoice ? '<button class="msg-action-btn speak-msg-btn" aria-label="Read aloud"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Speak</button>' : ''}
         <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
         <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
       </div>
@@ -382,6 +449,17 @@ export function buildMessageNode(msg) {
   // Regenerate button
   const regenBtn = node.querySelector('.regenerate-btn');
   regenBtn.addEventListener('click', () => _regenerate && _regenerate());
+
+  // Speak button (voice feature)
+  const speakBtn = node.querySelector('.speak-msg-btn');
+  if (speakBtn) {
+    speakBtn.addEventListener('click', async () => {
+      const m = await import('../voice/voice.js');
+      // Strip to plain text for speech: reuse the rendered text content.
+      const article = node.querySelector('article.assistant-response');
+      m.speakText(article ? article.innerText : (msg.content || ''));
+    });
+  }
 
   // Feedback buttons (thumbs up/down) — persisted via the messages API.
   // Clicking the active thumb again clears the feedback (toggle-off undo).

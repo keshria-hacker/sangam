@@ -396,6 +396,18 @@ export async function startApplication() {
     await sidebarLoadChatList();
     elements.backendDownState?.classList.add('hidden');
     chatStartNewChat();
+    // Voice: show mic/speak UI only when the backend flag is on.
+    import('./features/voice/voice.js').then((m) => m.initVoice()).catch(() => {});
+    // Image generation: show the composer button only when the flag is on.
+    import('./features/image/image.js').then((m) => m.initImage()).catch(() => {});
+    // Agent teams: show the teams button only when the flag is on.
+    import('./features/teams/teams.js').then((m) => m.initTeams()).catch(() => {});
+    // Learning mode: show the learn button only when the flag is on.
+    import('./features/learn/learn.js').then((m) => m.initLearn()).catch(() => {});
+    // Analytics: show the usage button only when the flag is on.
+    import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
+    // Command palette (Ctrl+P).
+    import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
     showToast({ type: 'success', title: 'Connected', message: `Live backend at ${getApiBaseUrl()}` });
   } catch (err) {
     chatStartNewChat();

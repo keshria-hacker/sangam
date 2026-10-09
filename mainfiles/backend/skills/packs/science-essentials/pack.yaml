@@ -1,0 +1,8 @@
+name: science-essentials
+version: 1.0.0
+description: Core research workflows — literature review, data analysis, citation hygiene. A starter set inspired by the 177-skill scientific-agent-skills library.
+source: K-Dense-AI/scientific-agent-skills
+skills:
+  - literature-review
+  - data-analysis
+  - citation-hygiene
