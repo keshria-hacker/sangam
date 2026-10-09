@@ -30,8 +30,27 @@ export function getCombos() {
   } catch { return []; }
 }
 
-/** Evaluate routing rules against a message. Returns model_id or null. */
-export function evaluateRoutes(message) {
+/** Evaluate routing rules against a message. Returns model_id or null.
+ * Phase 7: evaluates on the backend so every client and automation uses it.
+ * Falls back to local evaluation if the backend is unreachable.
+ */
+export async function evaluateRoutes(message) {
+  try {
+    const res = await (await apiFetch('/routing/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    })).json();
+    if (res && res.matched) return res.model_id;
+    return null;
+  } catch {
+    // Fallback: local evaluation
+    return evaluateRoutesLocal(message);
+  }
+}
+
+/** Local fallback for routing evaluation (same logic as backend). */
+export function evaluateRoutesLocal(message) {
   const rules = getRoutes();
   const lower = message.toLowerCase();
   for (const r of rules) {

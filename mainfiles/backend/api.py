@@ -162,6 +162,7 @@ from .api_routes.code_agent_routes import (  # noqa: F401
     chat_agent_run,
     code_agent_run,
 )
+from .api_routes.routing_routes import evaluate_routing  # noqa: F401
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401
 from .document import extract_text, truncate_preview  # noqa: F401

@@ -235,10 +235,10 @@ export async function handleSend() {
 
   elements.welcomeScreen?.classList.add('hidden');
 
-  // Routing: check if a rule matches this message
+  // Routing: check if a rule matches this message (backend evaluation)
   try {
     const { evaluateRoutes } = await import('../routing/routes.js');
-    const routedModel = evaluateRoutes(text);
+    const routedModel = await evaluateRoutes(text);
     if (routedModel) {
       const { getModels } = await import('../models/models.js');
       const match = getModels().find((m) => m.id === routedModel);
