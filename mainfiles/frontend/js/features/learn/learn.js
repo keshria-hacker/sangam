@@ -253,10 +253,14 @@ export function openSkillImporter(hostEl) {
         </div>
         <label class="settings-label">Or pick a file</label>
         <input type="file" id="skillFile" accept=".md,.markdown,text/markdown" class="skill-file-input">
+        <label class="settings-label">Or pick a skill folder <span class="settings-hint">(looks for SKILL.md inside)</span></label>
+        <input type="file" id="skillFolder" webkitdirectory directory class="skill-file-input" aria-label="Skill folder">
         <label class="settings-label">Or paste SKILL.md content</label>
         <textarea id="skillContent" rows="10" class="provider-key-input skill-textarea"
           placeholder="# my-skill&#10;&#10;Instructions for the agent…"></textarea>
         <div class="skill-preview hidden" id="skillPreview"></div>
+        <div class="skill-risk hidden" id="skillRisk"></div>
+        <div class="skill-version hidden" id="skillVersion"></div>
         <p class="settings-hint">No backend install endpoint exists yet — imports are saved as
           <strong>local drafts</strong> on this device until then.</p>
       </div>
@@ -316,11 +320,90 @@ export function openSkillImporter(hostEl) {
     reader.readAsText(file);
   });
 
+  // Folder import: find SKILL.md in selected folder
+  modal.querySelector('#skillFolder').addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || []);
+    const skillFile = files.find((f) => f.name.toLowerCase() === 'skill.md');
+    if (!skillFile) {
+      showToast({ type: 'error', title: 'No SKILL.md found', message: 'The selected folder does not contain a SKILL.md file.' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      contentEl.value = String(reader.result || '');
+      refreshPreview();
+      showToast({ type: 'success', title: 'Folder imported', message: `Found ${skillFile.name} (${files.length} files total).` });
+    };
+    reader.readAsText(skillFile);
+  });
+
+  // Risk scan: check for dangerous patterns
+  const scanRisks = (content) => {
+    const risks = [];
+    const patterns = [
+      [/rm\s+-rf\s+\//i, 'Deletes files recursively from root'],
+      [/curl.*\|\s*bash/i, 'Downloads and executes remote script'],
+      [/wget.*\|\s*sh/i, 'Downloads and executes remote script'],
+      [/eval\s*\(/i, 'Uses eval() — arbitrary code execution'],
+      [/exec\s*\(/i, 'Uses exec() — arbitrary code execution'],
+      [/\bpassword\b.*[:=]/i, 'May contain hardcoded password'],
+      [/\bapi[_-]?key\b.*[:=]\s*['"][^'"]+['"]/i, 'May contain hardcoded API key'],
+    ];
+    for (const [pattern, desc] of patterns) {
+      if (pattern.test(content)) risks.push(desc);
+    }
+    return risks;
+  };
+
+  // Version pin: extract from frontmatter
+  const parseVersion = (content) => {
+    const fm = (content || '').match(/^---\s*\n([\s\S]*?)\n---/);
+    if (fm) {
+      const verLine = fm[1].split('\n').find((l) => /^\s*version\s*:/i.test(l));
+      if (verLine) return verLine.split(':').slice(1).join(':').trim().replace(/^['"]|['"]$/g, '');
+    }
+    return null;
+  };
+
+  // Enhanced refreshPreview with risk scan + version
+  const origRefresh = refreshPreview;
+  const enhancedRefresh = () => {
+    origRefresh();
+    const content = contentEl.value.trim();
+    if (content.length < 20) return;
+
+    // Risk scan
+    const riskEl = modal.querySelector('#skillRisk');
+    const risks = scanRisks(content);
+    if (risks.length) {
+      riskEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i>
+        <strong>Security risks detected:</strong>
+        <ul>${risks.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}</ul>`;
+      riskEl.classList.remove('hidden');
+    } else {
+      riskEl.classList.add('hidden');
+    }
+
+    // Version pin
+    const verEl = modal.querySelector('#skillVersion');
+    const version = parseVersion(content);
+    if (version) {
+      verEl.innerHTML = `<i class="fa-solid fa-tag"></i> Version <strong>${escapeHtml(version)}</strong> detected — will be pinned.`;
+      verEl.classList.remove('hidden');
+    } else {
+      verEl.classList.add('hidden');
+    }
+  };
+  contentEl.removeEventListener('input', refreshPreview);
+  contentEl.addEventListener('input', enhancedRefresh);
+
   installBtn.addEventListener('click', () => {
     const content = contentEl.value.trim();
     const name = parseSkillName(content) || `skill-${Date.now().toString(36)}`;
-    saveSkillDraft({ name, content });
-    showToast({ type: 'success', title: 'Skill draft saved', message: `${name} — stored locally until backend install lands.` });
+    const version = parseVersion(content);
+    const risks = scanRisks(content);
+    saveSkillDraft({ name, content, version, risks, pinnedAt: new Date().toISOString() });
+    showToast({ type: 'success', title: 'Skill draft saved', message: `${name}${version ? ` v${version}` : ''} — stored locally.` });
     close();
   });
 }
