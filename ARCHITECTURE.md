@@ -794,17 +794,16 @@ The `SkillRouter` handles execution:
 | `/api/skills/auto-suggest` | POST | Suggest skills based on context |
 | `/api/skills/chain` | POST | Execute a chain of skills sequentially |
 
-### 9.6 Frontend Skills Modal
+### 9.6 Frontend Skills Browser
 
-The skills modal (`features/skills/skills.js`) provides:
+Skills are browsed in the **Library tab** (`features/library/`), which provides:
 - **Search** — filter by name, description, tags
 - **Category filters** — engineering, design, behavioral, productivity, knowledge, system, personal, misc
-- **Invocation filters** — all, command, auto, both
-- **Detail panel** — parameters with validation, dependencies, execute button, copy command
-- **Execution** — runs `/api/skills/execute`, shows result in modal
+- **Detail panel** — parameters with validation, dependencies, execute button
+- **Execution** — runs `/api/skills/execute`, shows result
+- **Skill packs** — enable/disable bundled packs (spec-driven, diagramming, science, agent-loop)
 
-**Fixed Issues (v1.1):**
-- CSS completely rewritten to match actual HTML structure (`.skills-layout`, `.skills-sidebar`, `.skills-search-wrap`, `.skills-categories`, `.skills-invocations`, `.skills-list`, `.skills-detail`)
+The legacy skills modal (`features/skills/skills.js`) is deprecated in favor of the Library tab.
 - `loadSkills()` moved from `init()` to `openSkillsModal()` so it runs after authentication (fixes 401 on first load)
 - Category filter buttons now match backend `SkillCategory` enum values
 
@@ -1127,6 +1126,11 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/skills/categories` | Yes | List categories |
 | GET | `/api/skills/{id}` | Yes | Skill detail |
 | POST | `/api/skills/execute` | Yes | Execute skill |
+| POST | `/api/skills/chain` | Yes | Chain skills |
+| POST | `/api/skills/auto-suggest` | Yes | Suggest skills |
+| GET | `/api/skills/packs` | Yes | List skill packs |
+| POST | `/api/skills/packs/{name}/enable` | Yes | Enable pack |
+| POST | `/api/skills/packs/{name}/disable` | Yes | Disable pack |
 | GET | `/api/extensions` | Yes | List extensions |
 | POST | `/api/extensions/{name}/enable` | Yes | Enable extension |
 | POST | `/api/extensions/{name}/disable` | Yes | Disable extension |
@@ -1265,16 +1269,16 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
 │                           FRONTEND (port 5500)                          │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │  app.js                                                         │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────┐  │   │
-│  │  │ Auth       │ │ Settings   │ │ Models     │ │ Chat         │  │   │
-│  │  │ Module     │ │ Module     │ │ Module     │ │ Module       │  │   │
-│  │  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └──────┬───────┘  │   │
-│  │        │              │              │              │           │   │
-│  │  ┌─────┴──────┐ ┌─────┴──────┐ ┌─────┴──────┐ ┌─────┴───────┐  │   │
-│  │  │ Sidebar    │ │ Skills     │ │ State      │ │ Storage     │  │   │
-│  │  │ Module     │ │ Module     │ │ (signals)  │ │ (localStore)│  │   │
-│  │  └────────────┘ └────────────┘ └────────────┘ └─────────────┘  │   │
+│  │  app.js → nav.js (intent rail) → state.js (signals)                │   │
+│  │  ┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐  │   │
+│  │  │ Chat     ││ Agents   ││Knowledge ││ Create   ││ Learn    │  │   │
+│  │  │ (pinned) ││ Hub+Teams││ Graph    ││ Hub      ││ Mode     │  │   │
+│  │  └──────────┘└──────────┘└──────────┘└──────────┘└──────────┘  │   │
+│  │  ┌──────────┐┌──────────┐┌──────────┐┌──────────────────┐     │   │
+│  │  │ Code     ││ Library  ││ Insights ││ Automations etc. │     │   │
+│  │  │ Agent    ││ (skills) ││          ││                    │     │   │
+│  │  └──────────┘└──────────┘└──────────┘└──────────────────┘     │   │
+│  │  tabs/ (mount-once) │ inspector/ │ tray/ (jobs)                │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                            │                                            │
 │              apiFetch() / streamChatCompletion() / parseSSE()            │
