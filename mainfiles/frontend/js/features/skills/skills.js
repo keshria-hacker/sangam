@@ -227,31 +227,6 @@ async function loadSkills() {
   }
 }
 
-/**
- * Open the skills modal.
- */
-export function openSkillsModal(overlay) {
-  if (!overlay) return;
-  overlay.classList.remove('hidden');
-  loadPacks();
-  loadSkills();
-}
-/**
- * Close the skills modal.
- */
-export function closeSkillsModal() {
-  const overlay = document.getElementById('skillsOverlay');
-  if (overlay) overlay.classList.add('hidden');
-}
-
-/**
- * Public initialization function for the skills modal.
- */
-export function init(overlay) {
-  initElements(overlay);
-  wireEvents();
-}
-
 function wireEvents() {
   if (!elements.list || !elements.detail) return;
   elements.search.oninput = (event) => { state.query = event.target.value; applyFilters(); renderList(); };

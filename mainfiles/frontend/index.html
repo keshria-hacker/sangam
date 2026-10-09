@@ -202,7 +202,6 @@ if (location.protocol === 'file:') {
           <span class="model-name">Loading models…</span>
           <span class="model-provider">Checking providers</span>
           <span class="status-dot offline" title="Not linked"></span>
-          <span class="reasoning-effort hidden" id="reasoningEffortIndicator" aria-label="Reasoning effort"></span>
           <i class="fa-solid fa-chevron-down"></i>
         </button>
 
@@ -376,40 +375,6 @@ if (location.protocol === 'file:') {
             </div>
           </div>
 
-          <!-- Agentic Reasoning Panel -->
-          <div class="agentic-reasoning-panel hidden" id="agenticReasoningPanel">
-            <div class="panel-header">
-              <i class="fa-solid fa-brain"></i>
-              <span>Agentic Reasoning</span>
-            </div>
-            <div class="panel-content">
-              <p class="panel-description">
-                When enabled, your message will be processed with reasoning and tool use
-                before being sent to the AI model. This allows for web search, file operations,
-                and code execution to enhance your request.
-              </p>
-              <div class="panel-settings">
-                <div class="setting-row">
-                  <label class="setting-label">Max Iterations:</label>
-                  <select id="agenticReasoningIterations">
-                    <option value="1">1</option>
-                    <option value="2" selected>2</option>
-                    <option value="3">3</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
-                <div class="setting-row">
-                  <label class="setting-label">Tools:</label>
-                  <div class="tool-checkboxes">
-                    <label><input type="checkbox" checked> Web Search</label>
-                    <label><input type="checkbox" checked> File Operations</label>
-                    <label><input type="checkbox"> Code Execution</label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="composer-select" id="reasoningSelect" title="Reasoning effort (supported by OpenAI o-series and other reasoning models)">
             <i class="fa-solid fa-brain"></i>
             <button class="select-btn" id="reasoningBtn" aria-label="Reasoning effort">
@@ -430,9 +395,9 @@ if (location.protocol === 'file:') {
             <span>Web</span>
           </button>
 
-          <button class="pill-control toggle-pill" id="agenticReasoningToggle" title="Enable agentic reasoning for this message" aria-pressed="false">
-            <i class="fa-solid fa-brain"></i>
-            <span>Reason</span>
+          <button class="pill-control toggle-pill" id="agentModeToggle" title="Agent mode: the assistant can use tools (web, files, code) to help" aria-pressed="false">
+            <i class="fa-solid fa-robot"></i>
+            <span>Agent</span>
           </button>
 
           <span class="composer-hint" id="composerHint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to send</span>

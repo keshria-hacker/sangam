@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import llm
-from ..code_agent import run_code_agent
+from ..code_agent import CHAT_AGENT_TOOLS, run_agent, run_code_agent
 from ..database import get_db
 from .common import router
 
@@ -31,15 +31,54 @@ async def code_agent_run(payload: CodeAgentIn, db: AsyncSession = Depends(get_db
         from fastapi import HTTPException
         raise HTTPException(status_code=422, detail="Task is required")
 
-    model = payload.model
-    if not model:
-        model = await llm.default_model_id(db)
+    model_id = payload.model or await llm.default_model_id(db)
+    if not model_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="No model available")
 
     max_iter = max(1, min(int(payload.max_iterations or 12), 25))
 
     async def _stream():
-        async for step in run_code_agent(task, model=model, max_iterations=max_iter,
-                                        tdd_mode=payload.tdd_mode):
+        async for step in run_code_agent(task, model_id=model_id, db=db,
+                                         max_iterations=max_iter,
+                                         tdd_mode=payload.tdd_mode):
+            data = {"kind": step.kind, "content": step.content}
+            if step.tool_name:
+                data["tool"] = step.tool_name
+            yield f"data: {json.dumps(data)}\n\n"
+        yield "data: {\"kind\": \"end\"}\n\n"
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
+class ChatAgentIn(BaseModel):
+    message: str
+    model: str | None = None
+    max_steps: int = 8
+    tools: list[str] | None = None
+
+
+@router.post("/agent/run")
+async def chat_agent_run(payload: ChatAgentIn, db: AsyncSession = Depends(get_db)):
+    """Chat Agent mode: tool-using loop. Streams SSE: thought, tool_call, tool_result, answer, done, error."""
+    message = (payload.message or "").strip()
+    if not message:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail="Message is required")
+
+    model_id = payload.model or await llm.default_model_id(db)
+    if not model_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="No model available")
+
+    max_steps = max(1, min(int(payload.max_steps or 8), 15))
+    # Only allow known-safe chat tools
+    tool_names = [t for t in (payload.tools or CHAT_AGENT_TOOLS) if t in CHAT_AGENT_TOOLS]
+
+    async def _stream():
+        async for step in run_agent(message, model_id, db,
+                                    tool_names=tool_names,
+                                    max_iterations=max_steps):
             data = {"kind": step.kind, "content": step.content}
             if step.tool_name:
                 data["tool"] = step.tool_name

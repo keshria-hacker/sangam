@@ -33,7 +33,7 @@ function buildActions() {
   const a = app();
   const actions = [
     { id: 'new-chat', label: 'New chat', hint: 'Ctrl+K', run: () => a.startNewChat?.() },
-    { id: 'skills', label: 'Open Skills browser', run: () => a.openSkillsModal?.() },
+    { id: 'skills', label: 'Open Skills browser', run: () => a.openSkillsTab?.() },
     { id: 'settings', label: 'Open Settings', hint: 'Ctrl+,', run: () => a.openSettings?.() },
     { id: 'models', label: 'Switch model', hint: 'Ctrl+M', run: () => a.openModelDropdown?.() },
     {

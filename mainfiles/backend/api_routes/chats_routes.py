@@ -5,6 +5,7 @@ and per-message feedback endpoints.
 from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -242,3 +243,30 @@ async def submit_feedback(
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
+
+
+class AppendMessagesIn(BaseModel):
+    messages: list[dict]  # [{role, content}]
+
+
+@router.post("/chats/{chat_id}/messages")
+async def append_messages(chat_id: str, payload: AppendMessagesIn,
+                          db: AsyncSession = Depends(get_db),
+                          current_user=Depends(get_current_user)):
+    """Append messages to a chat (used by Agent mode, which bypasses /chat/stream)."""
+    chat = (await db.execute(select(Chat).where(Chat.id == chat_id))).scalar_one_or_none()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    saved = []
+    for m in payload.messages:
+        role = m.get("role", "user")
+        content = (m.get("content") or "").strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        msg = Message(chat_id=chat_id, role=role, content=content,
+                      created_at=datetime.now(UTC))
+        db.add(msg)
+        saved.append(role)
+    chat.updated_at = datetime.now(UTC)
+    await db.commit()
+    return {"ok": True, "saved": saved}

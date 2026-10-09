@@ -13,7 +13,7 @@ import {
   getLastUserText, setLastUserText, getIsGenerating, setIsGenerating,
   getAbortController, setAbortController, getWebSearchEnabled, setWebSearchEnabled,
   getMaxTokens, getReasoningEffort, getTemperature,
-  getAgenticReasoningEnabled, setAgenticReasoningEnabled,
+  getAgentModeEnabled, setAgentModeEnabled,
   getChats, setChats,
   resetChatState
 } from '../../core/state.js';
@@ -75,8 +75,7 @@ export function initElements() {
     sendBtn: $('#sendBtn'),
     stopBtn: $('#stopBtn'),
     webSearchToggle: $('#webSearchToggle'),
-    agenticReasoningToggle: $('#agenticReasoningToggle'),
-    agenticReasoningPanel: $('#agenticReasoningPanel'),
+    agentModeToggle: $('#agentModeToggle'),
     tempControl: $('#tempControl'),
     tempPopover: $('#tempPopover'),
     tempSlider: $('#tempSlider'),
@@ -234,55 +233,8 @@ export async function handleSend() {
 
   elements.welcomeScreen?.classList.add('hidden');
 
-  // Process user message with agentic reasoning if enabled
-  let processedContent = text;
-  let toolResults = [];
-  if (getAgenticReasoningEnabled()) {
-    try {
-      // Show thinking indicator
-      showToast({ type: 'info', title: 'Agentic Reasoning', message: 'Enhancing your request with reasoning and tool use...' });
-
-      // Call the backend agentic reasoning endpoint — pass the panel's
-      // iteration limit and the checked tool groups so the backend honours them.
-      const panel = elements.agenticReasoningPanel;
-      const maxIterations = Number(panel?.querySelector('#agenticReasoningIterations')?.value) || 2;
-      const tools = panel
-        ? [...panel.querySelectorAll('.tool-checkboxes input:checked')]
-            .map((el) => {
-              const label = el.parentElement?.textContent?.trim().toLowerCase() || '';
-              if (label.includes('web')) return 'web_search';
-              if (label.includes('file')) return 'file_operations';
-              if (label.includes('code')) return 'code_execution';
-              return '';
-            })
-            .filter(Boolean)
-        : [];
-
-      const response = await (await apiPost('/agentic-reasoning', {
-        message: text,
-        model: getSelectedModel()?.id || '',
-        chat_id: getActiveChatId(),
-        max_iterations: maxIterations,
-        tools,
-      })).json();
-
-      if (response.reasoning_used) {
-        processedContent = response.enhanced_message || text;
-        toolResults = response.tool_results || [];
-        console.log('[Agentic Reasoning] Enhanced response:', processedContent);
-        console.log('[Agentic Reasoning] Tool results:', toolResults);
-        showToast({ type: 'success', title: 'Agentic Reasoning', message: `Enhanced with ${toolResults.length} tool(s)` });
-      } else {
-        showToast({ type: 'info', title: 'Agentic Reasoning', message: 'No enhancement needed' });
-      }
-    } catch (error) {
-      console.error('[Agentic Reasoning] Error:', error);
-      showToast({ type: 'warning', title: 'Agentic Reasoning', message: 'Reasoning enhancement failed, proceeding with original request.' });
-      processedContent = text;
-    }
-  }
-
-  const userMsg = { role: 'user', content: processedContent || '(Sent with attached files)', created_at: new Date().toISOString() };
+  const agentMode = getAgentModeEnabled();
+  const userMsg = { role: 'user', content: text || '(Sent with attached files)', created_at: new Date().toISOString() };
   setMessages([...getMessages(), userMsg]);
   elements.messages?.appendChild(buildMessageNode(userMsg));
   setLastUserText(userMsg.content);
@@ -296,6 +248,38 @@ export async function handleSend() {
   setFollowingStream(true); // a new send re-engages auto-following
   updateJumpBtn();
   scrollToBottom(true);
+
+  if (agentMode) {
+    setIsGenerating(true);
+    setSendButtonState(true);
+    const { runAgentGeneration } = await import('./agent_mode.js');
+    await runAgentGeneration({
+      content: userMsg.content,
+      messagesEl: elements.messages,
+      scrollToBottom,
+      onDone: async (answer, stopped) => {
+        setIsGenerating(false);
+        setSendButtonState(false);
+        if (answer && !stopped) {
+          const asstMsg = { role: 'assistant', content: answer, created_at: new Date().toISOString() };
+          setMessages([...getMessages(), asstMsg]);
+          // Persist both messages via the append endpoint
+          const chatId = getActiveChatId();
+          if (chatId) {
+            try {
+              await apiPost(`/chats/${chatId}/messages`, {
+                messages: [
+                  { role: 'user', content: userMsg.content },
+                  { role: 'assistant', content: answer },
+                ],
+              });
+            } catch (e) { console.warn('[Agent] persist failed', e); }
+          }
+        }
+      },
+    });
+    return;
+  }
 
   runGeneration({ content: userMsg.content, fileIds, regenerate: false });
 }
@@ -851,26 +835,19 @@ export function initChatEvents() {
     elements.webSearchToggle.setAttribute('aria-pressed', String(enabled));
   });
 
-  // Agentic reasoning toggle
-  elements.agenticReasoningToggle?.addEventListener('click', () => {
-    const enabled = !getAgenticReasoningEnabled();
-    setAgenticReasoningEnabled(enabled);
-    elements.agenticReasoningToggle.classList.toggle('active', enabled);
-    elements.agenticReasoningToggle.setAttribute('aria-pressed', String(enabled));
-
-    // Show/hide the agentic reasoning panel
-    if (elements.agenticReasoningPanel) {
-      elements.agenticReasoningPanel.classList.toggle('hidden', !enabled);
-    }
+  // Agent mode toggle
+  elements.agentModeToggle?.addEventListener('click', () => {
+    const enabled = !getAgentModeEnabled();
+    setAgentModeEnabled(enabled);
+    elements.agentModeToggle.classList.toggle('active', enabled);
+    elements.agentModeToggle.setAttribute('aria-pressed', String(enabled));
+    showToast({ type: 'info', title: 'Agent mode', message: enabled ? 'Agent can now use tools (web, files, code).' : 'Agent mode off.' });
   });
 
-  // Initialize agentic reasoning toggle state
-  const agenticReasoningEnabled = getAgenticReasoningEnabled();
-  elements.agenticReasoningToggle?.classList.toggle('active', agenticReasoningEnabled);
-  elements.agenticReasoningToggle?.setAttribute('aria-pressed', String(agenticReasoningEnabled));
-  if (elements.agenticReasoningPanel) {
-    elements.agenticReasoningPanel.classList.toggle('hidden', !agenticReasoningEnabled);
-  }
+  // Initialize agent mode toggle state
+  const agentModeOn = getAgentModeEnabled();
+  elements.agentModeToggle?.classList.toggle('active', agentModeOn);
+  elements.agentModeToggle?.setAttribute('aria-pressed', String(agentModeOn));
 
   // Composer drag-drop
   const composerEl = document.getElementById('composer');

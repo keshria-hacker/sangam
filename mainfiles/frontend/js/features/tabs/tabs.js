@@ -25,10 +25,6 @@ export function registerTabRenderer(tool, fn) {
   renderers[tool] = fn;
 }
 
-export function getToolDefs() {
-  return TOOL_DEFS;
-}
-
 function $(sel) { return document.querySelector(sel); }
 
 function renderTabStrip() {

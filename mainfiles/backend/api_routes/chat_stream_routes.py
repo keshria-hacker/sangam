@@ -1,10 +1,8 @@
 """
-api_routes/chat_stream_routes.py — the chat streaming pipeline (SSE) and the
-agentic-reasoning enhancement endpoint.
+api_routes/chat_stream_routes.py — the chat streaming pipeline (SSE).
 """
 import asyncio
 import json
-import sys
 import time
 import uuid
 from datetime import UTC, datetime
@@ -424,110 +422,3 @@ async def chat_stream(  # noqa: PLR0912
                 return
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-# ---------------------------------------------------------------------------
-# Agentic Reasoning Endpoint
-# ---------------------------------------------------------------------------
-
-
-@router.post("/agentic-reasoning")
-async def agentic_reasoning_endpoint(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    """Enhance the user's message with reasoning + tool use.
-
-    Returns the enriched message (and the tool calls that produced it) so the
-    client can send it through the normal ``/chat/stream`` pipeline.
-    """
-    body = await request.json()
-    message = body.get("message", "")
-    if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
-
-    model_id = body.get("model") or ""
-    chat_id = body.get("chat_id")
-
-    # --- Reasoning panel settings -------------------------------------
-    try:
-        max_iterations = max(1, min(int(body.get("max_iterations", 3)), 5))
-    except (TypeError, ValueError):
-        max_iterations = 3
-
-    # The panel groups tools; expand the groups into concrete tool names.
-    _TOOL_GROUPS = {
-        "web_search": ["web_search"],
-        "file_operations": ["read_file", "list_files"],
-        "code_execution": ["execute_code"],
-    }
-    allowed_tools: list[str] = []
-    for entry in body.get("tools") or []:
-        allowed_tools.extend(_TOOL_GROUPS.get(entry, [entry]))
-
-    try:
-        # Chat history gives the reasoning loop the conversation context.
-        chat_history = []
-        if chat_id:
-            chat_result = await db.execute(
-                select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.messages))
-            )
-            chat = chat_result.scalar_one_or_none()
-            if chat:
-                chat_history = [
-                    ChatMessage(role=msg.role, content=msg.content)
-                    for msg in chat.messages
-                ]
-
-        # The agent package lives in `<project root>/.agents` (file is
-        # mainfiles/backend/api_routes/x.py — parents[3] is the repo root).
-        agents_dir = str(Path(__file__).resolve().parents[3] / ".agents")
-        if agents_dir not in sys.path:
-            sys.path.append(agents_dir)
-
-        from agentic_reasoning import (
-            AgenticReasoningConfig,
-            enhance_chat_response_with_reasoning,
-        )
-
-        config = AgenticReasoningConfig(
-            max_iterations=max_iterations,
-            enable_tools=bool(allowed_tools),
-            allowed_tools=allowed_tools,
-        )
-
-        enhanced_message, tool_results = await enhance_chat_response_with_reasoning(
-            user_message=message,
-            model_id=model_id,
-            db=db,
-            chat_history=chat_history or None,
-            config=config,
-        )
-
-        tool_results_data = [
-            {
-                "tool_call_id": r.tool_call_id,
-                "name": r.name,
-                "content": str(r.content) if r.content else "",
-                "error": r.error,
-                "is_error": r.is_error,
-            }
-            for r in tool_results
-            if not r.is_error  # failed tools are logged, never shown as context
-        ]
-
-        return {
-            "enhanced_message": enhanced_message or message,
-            "reasoning_used": bool(tool_results_data),
-            "tool_results": tool_results_data,
-        }
-
-    except Exception as exc:  # noqa: BLE001 — enhancement must never block chat
-        logger.error("Agentic reasoning failed: %s", exc)
-        return {
-            "enhanced_message": message,
-            "reasoning_used": False,
-            "tool_results": [],
-            "error": str(exc),
-        }

@@ -8,7 +8,7 @@ The actual route handlers live in ``backend/api_routes/``, split by resource:
 - ``api_routes/files_routes.py``       document upload
 - ``api_routes/chats_routes.py``       chat CRUD, preferences, summary, feedback
 - ``api_routes/models_routes.py``      model catalogue
-- ``api_routes/chat_stream_routes.py`` chat streaming pipeline + agentic reasoning
+- ``api_routes/chat_stream_routes.py`` chat streaming pipeline
 
 This facade keeps the historical import surface stable: ``backend.main`` mounts
 ``router``/``public_router`` from here, and tests import or patch
@@ -25,10 +25,10 @@ from . import (
 )
 from .api_routes.chat_stream_routes import (  # noqa: F401
     SSE_HEARTBEAT_INTERVAL,
-    agentic_reasoning_endpoint,
     chat_stream,
 )
 from .api_routes.chats_routes import (  # noqa: F401
+    append_messages,
     create_chat,
     delete_chat,
     get_chat,
@@ -112,6 +112,7 @@ from .api_routes.omniroute_routes import (  # noqa: F401
     omniroute_sync,
 )
 from .api_routes.code_agent_routes import (  # noqa: F401
+    chat_agent_run,
     code_agent_run,
 )
 from .config import settings  # noqa: F401

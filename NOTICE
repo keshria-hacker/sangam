@@ -1,0 +1,36 @@
+# NOTICE
+
+Sangam is original code. Where ideas, patterns, or APIs were adapted from
+open-source projects, they are credited below. No code was copied from
+projects with branding-restricted or copyleft licenses (Open WebUI,
+OpenPanel, Fooocus, VoiceStudio) — those are integrated only as separate
+services over their public APIs, or used as idea sources.
+
+## MIT / Apache-2.0 licensed inspirations
+
+- **OpenHands** (MIT) — agent loop patterns (inspect → plan → act → observe →
+  iterate), code-as-action, sandboxed tool execution. Reimplemented natively.
+- **orca** (MIT) — parallel agent fan-out/fan-in, per-agent failure isolation.
+- **munder-difflin** (MIT) — multi-agent stage view, approvals inbox, per-run
+  budgets. (Pixel art assets NOT reused — separate license.)
+- **ECC** (MIT) — harness patterns: confidence-scored instincts, TDD workflow
+  gates, doctor/health-check pattern.
+- **Graphify** (MIT) — AST-based code knowledge graph with EXTRACTED/INFERRED
+  edge provenance. Reimplemented natively (Python AST).
+- **spec-kit** (MIT) — spec → plan → tasks workflow (skill pack).
+- **archify** (MIT) — diagram-generation skill patterns.
+- **pi** (MIT) — agent loop patterns (skill pack).
+- **MemPalace** (Apache-2.0) — typed memories, importance-ranked recall,
+  consolidation patterns.
+- **codebase-memory-mcp** (MIT) — consumed as an MCP server (not vendored).
+- **scientific-agent-skills** (MIT) — science skill pack content format.
+- **OpenMAIC** (Apache-2.0) — classroom/roundtable learning patterns.
+- **OmniRoute** (MIT) — consumed as a gateway service over its OpenAI-compatible API.
+
+## Idea-only sources (no code)
+
+- **Open WebUI** — UX reference (chat, palette, artifacts). Branding-restricted license.
+- **OpenPanel** (AGPL-3.0) — analytics UX ideas only.
+- **Fooocus** (GPL-3.0) — driven as a separate local service via its public API.
+- **VoiceStudio** (AGPL-3.0) — referenced as a compatible server endpoint only.
+- **i-have-adhd / no-ai-slop** (MIT) — output-style rules reimplemented natively.
