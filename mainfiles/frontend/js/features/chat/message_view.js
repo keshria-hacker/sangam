@@ -429,6 +429,7 @@ export function buildMessageNode(msg) {
       <div class="msg-actions always-visible" role="group" aria-label="Message actions">
         <button class="msg-action-btn copy-msg-btn" aria-label="Copy message"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy</button>
         <button class="msg-action-btn regenerate-btn" aria-label="Regenerate response"><i class="fa-solid fa-arrow-rotate-right" aria-hidden="true"></i> Regenerate</button>
+        ${window.__sangamVoice ? '<button class="msg-action-btn speak-msg-btn" aria-label="Read aloud"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Speak</button>' : ''}
         <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
         <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
       </div>
@@ -448,6 +449,17 @@ export function buildMessageNode(msg) {
   // Regenerate button
   const regenBtn = node.querySelector('.regenerate-btn');
   regenBtn.addEventListener('click', () => _regenerate && _regenerate());
+
+  // Speak button (voice feature)
+  const speakBtn = node.querySelector('.speak-msg-btn');
+  if (speakBtn) {
+    speakBtn.addEventListener('click', async () => {
+      const m = await import('../voice/voice.js');
+      // Strip to plain text for speech: reuse the rendered text content.
+      const article = node.querySelector('article.assistant-response');
+      m.speakText(article ? article.innerText : (msg.content || ''));
+    });
+  }
 
   // Feedback buttons (thumbs up/down) — persisted via the messages API.
   // Clicking the active thumb again clears the feedback (toggle-off undo).

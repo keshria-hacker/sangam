@@ -285,6 +285,9 @@ if (location.protocol === 'file:') {
           <button class="icon-btn composer-attach" id="attachBtn" title="Attach files" aria-label="Attach files">
             <i class="fa-solid fa-paperclip"></i>
           </button>
+          <button class="icon-btn hidden" id="micBtn" title="Dictate (speech to text)" aria-label="Dictate message">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
           <input type="file" id="fileInput" multiple hidden
             accept=".pdf,.docx,.txt,.csv,.xlsx,.pptx,.json,.html,.xml,.py,.java,.js,.c,.cpp,.cs,.go,.rs,.php,.sql,.r">
 
@@ -559,6 +562,12 @@ if (location.protocol === 'file:') {
               <button class="btn-secondary btn-sm" id="memoryConsolidateBtn" type="button" title="Decay stale memories and prune dead ones">Tidy up</button>
             </div>
             <div class="memory-list" id="memoryList"><!-- Populated by JS --></div>
+          </section>
+
+          <!-- Voice (shown when the voice feature flag is on) -->
+          <section class="settings-section hidden" id="voiceSettingsSectionWrap">
+            <h3>Voice</h3>
+            <div id="voiceSettingsSection"><!-- Populated by JS --></div>
           </section>
         </div>
 

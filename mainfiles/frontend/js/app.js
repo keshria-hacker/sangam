@@ -396,6 +396,8 @@ export async function startApplication() {
     await sidebarLoadChatList();
     elements.backendDownState?.classList.add('hidden');
     chatStartNewChat();
+    // Voice: show mic/speak UI only when the backend flag is on.
+    import('./features/voice/voice.js').then((m) => m.initVoice()).catch(() => {});
     showToast({ type: 'success', title: 'Connected', message: `Live backend at ${getApiBaseUrl()}` });
   } catch (err) {
     chatStartNewChat();

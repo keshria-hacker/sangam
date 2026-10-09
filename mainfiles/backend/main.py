@@ -124,6 +124,13 @@ def create_app() -> FastAPI:
                 logger.info("Memory extension registered")
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Memory extension skipped: {exc}")
+        # Voice: project voice I/O into the extension registry.
+        try:
+            from .voice import register_voice_extension
+            if register_voice_extension():
+                logger.info("Voice extension registered")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Voice extension skipped: {exc}")
         # Foundation F3: connect configured MCP servers (best-effort).
         if settings.FEATURE_MCP:
             try:

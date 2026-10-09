@@ -61,4 +61,9 @@ integrations, then implement capabilities drawn from 22 reference repos.
 - [x] Theme 2 — Memory++ (2026-10-08, branch `memory-plus`): typed memories
   (episodic/semantic/procedural), importance-ranked recall, auto-extraction,
   consolidation, memory management API, Settings UI. See MEMORY_UPGRADE.md.
-- [ ] Theme 3–10 integrations (scoped per theme before build)
+- [x] Theme 3 — Voice (2026-10-08, branch `voice`): local-first TTS/STT with
+  pluggable engines (kokoro, faster-whisper, OpenAI-compatible incl.
+  VoiceStudio server); /api/voice/* endpoints gated by FEATURE_VOICE; mic
+  dictation, per-message speak button, auto-speak setting, browser TTS
+  fallback. See VOICE.md.
+- [ ] Theme 4–10 integrations (scoped per theme before build)

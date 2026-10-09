@@ -116,6 +116,21 @@ class Settings(BaseSettings):
         description="JSON list of MCP server configs: {name, command|url, args, env}",
     )
 
+    # --- Voice (TTS/STT) ---
+    # Engines: "auto" picks the first available; "kokoro" / "faster-whisper" /
+    # "openai" force one; "none" disables that direction explicitly.
+    VOICE_TTS_ENGINE: str = "auto"
+    VOICE_STT_ENGINE: str = "auto"
+    # OpenAI-compatible audio server (OpenAI, a local VoiceStudio backend via
+    # its /v1/audio/* endpoints, speaches, ...). Used when engine == "openai".
+    VOICE_OPENAI_BASE_URL: str | None = None
+    VOICE_OPENAI_API_KEY: str | None = None
+    VOICE_OPENAI_TTS_MODEL: str = "tts-1"
+    VOICE_OPENAI_STT_MODEL: str = "whisper-1"
+    VOICE_KOKORO_VOICE: str = "af_heart"   # default kokoro voice id
+    VOICE_WHISPER_MODEL: str = "tiny"       # faster-whisper model size
+    VOICE_MAX_TTS_CHARS: int = 2000         # per-request TTS cap
+
     # --- API ---
     API_VERSION: str = "v1"
 

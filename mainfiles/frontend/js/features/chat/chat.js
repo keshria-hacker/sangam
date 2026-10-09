@@ -718,6 +718,8 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       typingNode.replaceWith(finalNode);
       // Final render pass: ensure complete markdown with syntax highlighting
       await finalizeMarkdownRender(finalNode, collected);
+      // Voice: auto-speak the response when the user enabled it.
+      import('../voice/voice.js').then((m) => m.maybeAutoSpeak(collected)).catch(() => {});
     } else if (!sawFirstToken) {
       // Aborted before any token
       typingNode.remove();

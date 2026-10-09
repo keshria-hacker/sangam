@@ -70,6 +70,12 @@ from .api_routes.memory_routes import (  # noqa: F401
     run_consolidation,
     search_memories,
 )
+from .api_routes.voice_routes import (  # noqa: F401
+    get_voice_status,
+    get_voices,
+    speech_to_text,
+    text_to_speech,
+)
 from .api_routes.models_routes import (  # noqa: F401
     _to_model_info,
     get_models,
