@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import llm, websearch
+from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models import ProviderKey
