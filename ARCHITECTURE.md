@@ -15,6 +15,8 @@
 11. [Document Processing](#11-document-processing)
 12. [Testing](#12-testing)
 13. [Configuration Reference](#13-configuration-reference)
+14. [Data Flow Diagram](#data-flow-diagram-complete)
+15. [Recent Additions (Phase 6)](#15-recent-additions-phase-6-2026-10-09)
 
 ---
 
@@ -33,9 +35,22 @@
 - Conversation history with bucketed date grouping + rolling cross-session summaries
 - Response Intelligence: intent/style classification, clarification gate, uncertainty hedging
 - Paper / Ink theme system (light / dark / system) — monochrome design tokens
-- Extensible Skills system
-- Local authentication (single-user, scrypt password hashing, login lockout, forgot/reset flow)
+- Extensible Skills system + skill packs
+- Local authentication (scrypt password hashing, login lockout, forgot/reset flow)
 - Ollama auto-detection and auto-start (Sangam launches `ollama serve` in the background if installed but not running)
+- **Studio shell**: intent-grouped rail, browser-style tabs, Inspector panel, Activity Tray
+- **Knowledge graph**: unified graph of memories, docs, code, chats with provenance
+- **Agent Hub**: custom agents with tools, approval policies, cost budgets, run history
+- **Multi-agent Teams**: fan-out/fan-in with SSE streaming per specialist
+- **Create Hub**: typed artifacts (docs, diagrams, code, HTML) with version history
+- **Code Agent**: agentic coding (write_file/edit_file/run_bash) with approvals
+- **Design Studio**: UI prototype generation with sandboxed preview
+- **Learning Mode**: teacher lessons + Socratic tutor
+- **Automations**: scheduled agent tasks and chat messages
+- **Routes & Combos**: keyword model routing, model chains, quotas
+- **Model Compare & Arena**: parallel comparison, voting, leaderboard
+- **Voice**: local-first TTS/STT with pluggable engines
+- **Image Generation**: style presets with pluggable engines
 
 ---
 
@@ -43,96 +58,110 @@
 
 ```
 <repo root>/
-├── .dockerignore               # Docker build exclusion rules
-├── Dockerfile                  # Multi-stage Docker build (builder + slim runtime)
-├── docker-compose.yml          # Backend + optional Redis/frontend services
-├── mainfiles/                  # Application code (backend package + frontend + config)
+├── Dockerfile / Dockerfile.all         # Docker builds
+├── docker-compose.yml / docker-compose.all.yml
+├── mainfiles/                  # Application code
 │   ├── backend/                # FastAPI Python backend (imported as `backend.*`)
-│   │   ├── main.py             # App entrypoint/factory, lifespan, CORS, CSRF, security headers, router mounts
-│   │   ├── config.py           # Typed settings loaded from .env via pydantic-settings
+│   │   ├── main.py             # App entrypoint, lifespan, CORS, security headers, router mounts
+│   │   ├── config.py           # Typed settings from .env (pydantic-settings)
 │   │   ├── database.py         # Async SQLAlchemy engine + session factory (SQLite)
-│   │   ├── models.py           # SQLAlchemy ORM tables (Chat, Message, User, UserPreference, AuthSession, …)
-│   │   ├── schemas.py          # Pydantic request/response validation models
-│   │   ├── api.py              # HTTP API facade — mounts handlers from api_routes/
-│   │   ├── api_routes/         # Route handlers split by resource
-│   │   │   ├── common.py               # SSE framing + upload-content helpers
-│   │   │   ├── providers_routes.py     # provider keys, model refresh, websearch, health
-│   │   │   ├── files_routes.py         # document upload
-│   │   │   ├── chats_routes.py         # chat CRUD, preferences, summary, feedback
+│   │   ├── models.py           # SQLAlchemy ORM tables
+│   │   ├── schemas.py          # Pydantic request/response models
+│   │   ├── api.py              # API facade — mounts handlers from api_routes/
+│   │   ├── api_routes/         # 26 route modules
+│   │   │   ├── chat_stream_routes.py   # /chat/stream SSE pipeline
+│   │   │   ├── code_agent_routes.py    # /agent/*, /code-agent/*
+│   │   │   ├── agents_routes.py        # /agents CRUD + run
+│   │   │   ├── teams_routes.py         # /teams, /teams/run/stream SSE
+│   │   │   ├── knowledge_routes.py     # /knowledge/graph, /knowledge/search
+│   │   │   ├── artifacts_routes.py     # /artifacts + versions
+│   │   │   ├── automations_routes.py   # /automations CRUD + run-now
+│   │   │   ├── compare_routes.py       # /compare, /arena/*
+│   │   │   ├── voice_routes.py         # /voice/*
+│   │   │   ├── image_routes.py         # /image/*
+│   │   │   ├── learn_routes.py         # /learn/*
+│   │   │   ├── quality_routes.py       # /quality/preview
+│   │   │   ├── spec_routes.py          # /spec/build, /spec/to-task
+│   │   │   ├── runs_routes.py          # /runs history
+│   │   │   ├── settings_routes.py      # /user/settings
+│   │   │   ├── memory_routes.py        # /memory*
+│   │   │   ├── omniroute_routes.py     # /omniroute/*
+│   │   │   ├── features_routes.py      # /features flags
+│   │   │   ├── extensions_routes.py    # /extensions
+│   │   │   ├── media_routes.py         # /media/*
+│   │   │   ├── analytics_routes.py     # /analytics/*
+│   │   │   ├── chats_routes.py         # chat CRUD, summary, feedback
 │   │   │   ├── models_routes.py        # model catalogue
-│   │   │   └── chat_stream_routes.py   # chat streaming pipeline + agentic reasoning
-│   │   ├── auth.py             # Local auth (register, login, logout, forgot/reset, sessions, CSRF, lockout)
-│   │   ├── llm.py              # Facade over providers/: model resolution, streaming
-│   │   ├── capability_orchestration.py  # Clarification gate (should_clarify) + interpretations
-│   │   ├── response_events.py  # Canonical SSE event model + ResponseEventBuilder
-│   │   ├── response_intelligence/  # Intent/style classification, ambiguity triggers, prompt injection
-│   │   ├── response_postprocessor.py   # Uncertainty hedging at persistence time
-│   │   ├── context_manager.py  # Safe context truncation / token budgeting
-│   │   ├── memory.py           # Cross-session memory store (ChromaDB)
+│   │   │   ├── providers_routes.py     # keys, refresh, /providers/status
+│   │   │   ├── files_routes.py         # document upload
+│   │   │   └── common.py               # SSE framing helpers
+│   │   ├── auth.py             # Local auth (register, login, logout, sessions, CSRF, lockout)
+│   │   ├── llm.py              # Provider facade — model resolution, streaming
+│   │   ├── code_agent.py       # Agentic coding loop (write_file/edit_file/run_bash, approvals)
+│   │   ├── code_graph.py       # AST code graph
+│   │   ├── knowledge_graph.py  # Unified knowledge graph builder
+│   │   ├── graph_provenance.py # Edge provenance (EXTRACTED/INFERRED/AMBIGUOUS)
+│   │   ├── automations.py      # Automation scheduler
+│   │   ├── spec_wizard.py      # Spec → build pipeline
+│   │   ├── instincts.py        # Learned coding patterns (confidence-scored)
+│   │   ├── omniroute_config.py # OmniRoute gateway config
+│   │   ├── feature_flags.py    # Runtime feature flags (persisted)
+│   │   ├── domain.py / response_policy.py  # Response policy rules
+│   │   ├── capability_orchestration.py  # Clarification gate
+│   │   ├── response_events.py  # Canonical SSE event model
+│   │   ├── response_intelligence/  # Intent/style classification
+│   │   ├── response_quality/   # AI-slop cleanup + ADHD formatting
+│   │   ├── response_postprocessor.py   # Uncertainty hedging
+│   │   ├── context_manager.py  # Context truncation / token budgeting
+│   │   ├── memory/             # Typed memory store (episodic/semantic/procedural)
 │   │   ├── summarizer.py       # Rolling chat summarization
-│   │   ├── security.py         # Fernet field encryption (MASTER_KEY) + CSRF tokens
+│   │   ├── security.py         # Fernet encryption (MASTER_KEY) + CSRF
 │   │   ├── prompt_injection.py # Prompt-injection detection
-│   │   ├── document.py         # File text extraction (PDF, DOCX, XLSX, CSV, PPTX, code, text)
-│   │   ├── rag.py              # Document chunking + vector retrieval (ChromaDB)
-│   │   ├── websearch.py        # Web search (DuckDuckGo Lite / Tavily / Brave)
-│   │   ├── ratelimit.py        # Rate limiting middleware (+ ratelimit_redis.py Redis store)
-│   │   ├── middleware/         # ASGI middleware (request ID)
+│   │   ├── document.py         # File text extraction
+│   │   ├── rag.py              # Document chunking + vector retrieval
+│   │   ├── websearch.py        # Web search (DuckDuckGo/Tavily/Brave)
+│   │   ├── analytics/          # Local-first analytics
+│   │   ├── learn/              # Learning mode (lessons, tutor)
+│   │   ├── image_gen/          # Image generation engines
+│   │   ├── voice/              # TTS/STT engines
+│   │   ├── mcp/                # MCP client
+│   │   ├── extensions/         # Extension registry
+│   │   ├── skills/             # Skills registry, executor, packs
+│   │   ├── teams/              # Multi-agent teams (streaming.py)
+│   │   ├── tools/              # Tool-calling registry + executor
+│   │   ├── ratelimit.py        # Rate limiting (+ ratelimit_redis.py)
+│   │   ├── middleware/         # ASGI middleware
 │   │   ├── migrations/         # Alembic migration scripts
-│   │   ├── tools/              # Tool-calling registry + executor (agentic reasoning)
 │   │   └── providers/          # Provider adapters + registry
-│   │       ├── __init__.py     # Provider registration, list_models, list_provider_status
-│   │       ├── base.py         # Abstract provider interface + non-chat model filtering
-│   │       ├── registry.py     # ProviderRegistry + provider configs
-│   │       ├── model_discovery.py  # Live model fetch (fetch_models_from_provider)
-│   │       ├── key_resolver.py # API key resolution (DB → env)
-│   │       ├── ollama.py       # Native Ollama streaming + auto-start (_try_start_ollama)
-│   │       ├── openai_compatible.py# OpenAI-compatible adapter (Together/Groq/OpenRouter/DeepSeek/Mistral/OmniRoute)
+│   │       ├── __init__.py / base.py / registry.py
+│   │       ├── model_discovery.py / key_resolver.py
+│   │       ├── fallback_chain.py   # Circuit breakers + quotas + fallback
+│   │       ├── ollama.py / openai_compatible.py
 │   │       ├── anthropic.py / gemini.py / nvidia.py
 │   │       ├── litellm_fallback.py / compat.py / inaccessible.py
-│   │       └── enhanced/       # Intelligent routing layer (cost/latency/capability scores)
+│   │       └── enhanced/       # Intelligent routing layer
 │   ├── frontend/               # Static frontend (served via Python http.server)
 │   │   ├── index.html          # Single-page application HTML
-│   │   ├── css/
-│   │   │   └── style.css       # Complete design system + all component styles
+│   │   ├── css/style.css       # Complete design system
 │   │   ├── js/
-│   │   │   ├── app.js          # Main application bootstrap & global listeners
-│   │   │   ├── core/state.js   # Central signal-based reactive state store
-│   │   │   ├── shared/         # Shared utilities
-│   │   │   │   ├── constants.js    # DEFAULT_SETTINGS, CHAT_BUCKETS, provider colors, STORAGE_KEYS
-│   │   │   │   ├── http.js         # apiFetch/apiPost/apiPut/apiDelete + streamChatCompletion/parseSSE
-│   │   │   │   ├── markdown.js     # Streaming markdown + highlight.js + KaTeX rendering
-│   │   │   │   ├── toast.js        # Toast notifications
-│   │   │   │   └── utils.js        # escapeHtml, formatDate, bucketFor, etc.
-│   │   │   └── features/       # Feature modules (one per UI area)
-│   │   │       ├── auth/auth.js              # Login/register/forgot/reset, session check, logout
-│   │   │       ├── chat/chat.js              # Send/regenerate/streaming, SSE handling, clarification cards
-│   │   │       ├── chat/message_view.js      # Message DOM construction + in-stream status widgets
-│   │   │       ├── chat/autoscroll.js        # Smart auto-scroll controller (hysteresis + jump-to-latest)
-│   │   │       ├── chat/response_controller.js  # Canonical response_event state machine (client side)
-│   │   │       ├── models/models.js          # Model selector, provider status
-│   │   │       ├── settings/settings.js      # Theme, API keys, preferences
-│   │   │       ├── skills/skills.js          # Skills modal browser & execution
-│   │   │       └── sidebar/sidebar.js        # Chat history sidebar (bucketed by date)
-│   │   ├── assets/
-│   │   │   └── logo.png        # Sangam brand logo
-│   │   └── package.json        # {"type": "module"} so node --check parses JS as ESM
+│   │   │   ├── app.js          # Main bootstrap
+│   │   │   ├── core/           # state.js, nav.js, jobs.js
+│   │   │   ├── shared/         # 10 modules (http, markdown, settings_store, i18n, …)
+│   │   │   └── features/       # 26 feature modules (agents, knowledge, create, …)
+│   │   ├── assets/logo.png     # Sangam brand logo
+│   │   └── package.json        # {"type": "module"} for node --check
 │   ├── config/
-│   │   ├── providers.yaml      # Reference provider registry (documentation only)
+│   │   ├── providers.yaml      # Reference provider registry (docs only)
 │   │   └── skills/             # Skill definitions (SKILL.md files)
-│   │       ├── api-design/
-│   │       ├── coding-standards/
-│   │       └── web-search/
 │   ├── history/                # SQLite database (sangam.db)
 │   ├── uploads/                # Uploaded file storage
 │   └── logs/                   # Rotating application logs (loguru)
-├── tests/                      # Unified test tree (pytest — unit, integration/, e2e/, manual/)
-│   ├── conftest.py             # Shared fixtures (auth client, tmp DB, path setup)
-│   ├── integration/            # HTTP-level API tests (auth, chat, models, security)
-│   ├── e2e/ + manual/          # End-to-end and manually-run checks
-│   └── test_*.py               # Unit tests per backend module (~35 files)
-├── scripts/                    # Dev & CI utilities (quality.sh/ps1, check_frontend_modules.mjs,
-│                               #   e2e_walkthrough.py, runtime_verify.py, ui_verify_chrome.py,
-│                               #   merge_tests.py, generate_master_key.py)
+├── tests/                      # Unified test tree (60 files: unit, integration/, e2e/, manual/)
+│   ├── conftest.py             # Shared fixtures
+│   ├── integration/            # HTTP-level API tests
+│   ├── e2e/                    # Playwright golden paths
+│   └── test_*.py               # Unit tests per module
+├── scripts/                    # check_frontend_modules.mjs, quality.sh, e2e_walkthrough.py, …
 ├── start.py                    # Launcher: venv, deps, env, then both servers
 ├── start.bat / start.sh        # One-command start (Windows / Unix)
 ├── .env / .env.example         # Environment configuration
@@ -141,8 +170,6 @@
 ├── README.md                   # Project README
 └── ARCHITECTURE.md             # This file
 ```
-
----
 
 ## 3. Backend Architecture
 
@@ -956,7 +983,7 @@ Representative modules:
 
 | Area | Files | Coverage |
 |-----------|-------|----------|
-| Authentication | `test_auth.py`, `test_auth_unit.py` | Password hashing, tokens, session lifecycle, brute-force lockout |
+| Authentication | `test_auth.py` | Password hashing, tokens, session lifecycle, brute-force lockout |
 | API surface | `test_api.py`, `tests/integration/test_api_*.py` | Route behavior, auth gates, chat/model/file endpoints |
 | Documents + RAG | `test_document.py`, `test_rag.py` | Extraction, truncation, chunking, retrieval |
 | Models/providers | `test_models.py`, `test_providers.py`, `test_provider_adapters.py`, `test_llm.py` | Live fetch, filtering, Ollama discovery, curated fallback, routing |
@@ -997,7 +1024,7 @@ The `.github/workflows/ci.yml` has two jobs:
 
 **verify** — checkout, Python 3.13, Node 22, install deps (root `requirements.txt` + `mainfiles/backend/requirements-dev.txt`), `compileall` on `mainfiles/backend`/`start.py`/`scripts`/`tests`, run the unified pytest suite with pytest-cov (`PYTHONPATH=mainfiles`, `TEST_MODE=1`), enforce the coverage gate (66%, see `pyproject.toml`), `node --check` every file under `mainfiles/frontend/js`, and validate the frontend module graph with `scripts/check_frontend_modules.mjs`.
 
-> **Note:** the coverage gate is the measured pytest baseline (66.27% on Linux/CI, 66.47% on Windows, as of 2026-10-07, 950 passed / 100 skipped on the unified tree) rather than the historical 76%, because the response-intelligence and enhanced-provider subsystems still have limited coverage. Raise `fail_under` in `pyproject.toml` (and the workflow) as coverage grows.
+> **Note:** the coverage gate is the measured pytest baseline (66.27% on Linux/CI, 66.47% on Windows, as of 2026-10-09, 1148 passed / 100 skipped on the unified tree) rather than the historical 76%, because the response-intelligence and enhanced-provider subsystems still have limited coverage. Raise `fail_under` in `pyproject.toml` (and the workflow) as coverage grows.
 
 **security** — Bandit static analysis and Safety dependency scan, uploaded as build artifacts (both non-blocking).
 
@@ -1324,7 +1351,7 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
 ```
 ---
 
-## Phase 6 Additions (2026-10-09)
+## 15. Recent Additions (Phase 6, 2026-10-09)
 
 ### Teams Streaming
 - `backend/teams/streaming.py`: `stream_team_run()` yields SSE events per specialist

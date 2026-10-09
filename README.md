@@ -395,9 +395,18 @@ Run the test suite from the project root:
 venv\Scripts\python.exe -m pytest tests -v
 ```
 
-The test suite lives in a single unified tree at `tests/` (unit, `integration/`, `e2e/`, `manual/`), consolidated by the module-split refactor.
+The test suite lives in a single unified tree at `tests/` (60 files: unit, `integration/`, `e2e/`, `manual/`). As of 2026-10-09: **1148 passed, 1 flaky, 100 skipped**.
 
-Tests cover core functionality including authentication, document processing, model discovery, streaming, response intelligence, Skills, web search, voice, image generation, skill packs, multi-agent teams, learning mode, response quality, and analytics.
+Tests cover authentication, document processing + RAG, model discovery, streaming, response intelligence, skills + packs, web search, voice, image generation, multi-agent teams, learning mode, response quality, analytics, knowledge graph, agents, artifacts, automations, and the Phase 6 additions (teams SSE streaming, graph provenance, model compare/Arena, fallback chain).
+
+Playwright end-to-end tests (`tests/e2e/golden_paths.spec.ts`) cover 6 golden paths: first run, ask/refine, knowledge, create, agents, settings.
+
+Frontend modules are validated with:
+
+```bash
+node --experimental-vm-modules scripts/check_frontend_modules.mjs
+```
+(all 47 ES modules parse + link)
 
 ---
 
