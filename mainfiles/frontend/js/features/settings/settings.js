@@ -228,6 +228,18 @@ async function onFeatureToggleClick(e) {
     const data = await res.json();
     setFeatureToggle(btn, !!data.enabled);
     refreshFeatureButtons(data.features || {});
+    // Re-run the feature's init so its module state (and button wiring) syncs.
+    const initMap = {
+      voice: ['../voice/voice.js', 'initVoice'],
+      image_gen: ['../image/image.js', 'initImage'],
+      multi_agent: ['../teams/teams.js', 'initTeams'],
+      learning: ['../learn/learn.js', 'initLearn'],
+      analytics: ['../analytics/analytics.js', 'initAnalytics'],
+    };
+    const [modPath, fn] = initMap[name] || [];
+    if (modPath) {
+      import(modPath).then((m) => m[fn]?.()).catch(() => {});
+    }
     showToast({ type: 'success', title: `Feature ${want ? 'enabled' : 'disabled'}`, message: name.replace(/_/g, ' ') });
   } catch (err) {
     showToast({ type: 'error', title: 'Could not toggle feature', message: err.message });
