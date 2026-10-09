@@ -60,6 +60,10 @@ export async function renderKnowledgeTab(bodyEl) {
       <section class="kn-section">
         <h3><i class="fa-solid fa-brain"></i> Memories</h3>
         <div class="kn-mem-controls">
+          <select id="knMemView" class="provider-key-input" aria-label="Memory view">
+            <option value="list">List</option>
+            <option value="rooms">Rooms</option>
+          </select>
           <select id="knMemKind" class="provider-key-input">
             <option value="">All kinds</option>
             <option value="episodic">Episodic</option>
@@ -95,6 +99,7 @@ export async function renderKnowledgeTab(bodyEl) {
 
   // Wire memory browser
   bodyEl.querySelector('#knMemKind').addEventListener('change', () => loadMemories(bodyEl));
+  bodyEl.querySelector('#knMemView').addEventListener('change', () => loadMemories(bodyEl));
   bodyEl.querySelector('#knTidy').addEventListener('click', () => tidyMemories(bodyEl));
 
   await Promise.all([loadGraph(bodyEl), loadMcp(bodyEl), loadMemories(bodyEl)]);
@@ -430,8 +435,13 @@ async function loadMcp(bodyEl) {
 async function loadMemories(bodyEl) {
   const box = bodyEl.querySelector('#knMemories');
   const kind = bodyEl.querySelector('#knMemKind').value;
+  const view = bodyEl.querySelector('#knMemView')?.value || 'list';
   box.innerHTML = '<p class="settings-hint">Loading…</p>';
   try {
+    if (view === 'rooms') {
+      await loadMemoryRooms(bodyEl, box);
+      return;
+    }
     const url = kind ? `/memory?kind=${kind}&limit=50` : '/memory?limit=50';
     const items = await (await apiFetch(url)).json();
     if (!items.length) {
@@ -442,6 +452,7 @@ async function loadMemories(bodyEl) {
       <div class="kn-mem" data-id="${escapeHtml(m.id)}">
         <span class="kn-chip" style="--chip-color:${TYPE_COLORS.memory}">${escapeHtml(m.kind || '')}</span>
         <span class="kn-mem-content">${escapeHtml((m.content || '').slice(0, 160))}</span>
+        ${m.room && m.room !== 'default' ? `<span class="kn-mem-room" title="Room / drawer">${escapeHtml(m.room)}/${escapeHtml(m.drawer || 'general')}</span>` : ''}
         ${m.importance != null ? `<span class="kn-mem-imp" title="Importance">${Number(m.importance).toFixed(2)}</span>` : ''}
         <button class="icon-btn kn-mem-del" title="Forget"><i class="fa-solid fa-trash"></i></button>
       </div>`).join('');
@@ -461,6 +472,81 @@ async function loadMemories(bodyEl) {
     });
   } catch {
     box.innerHTML = '<p class="settings-hint">Could not load memories.</p>';
+  }
+}
+
+/** Phase 7: browsable rooms/drawers hierarchy. */
+async function loadMemoryRooms(bodyEl, box) {
+  try {
+    const data = await (await apiFetch('/memory/rooms')).json();
+    const rooms = data.rooms || [];
+    if (!rooms.length) {
+      box.innerHTML = '<p class="settings-hint">No memories yet.</p>';
+      return;
+    }
+    box.innerHTML = rooms.map((room) => `
+      <details class="kn-room" ${room.name === 'default' ? 'open' : ''}>
+        <summary>
+          <i class="fa-solid fa-folder"></i>
+          <strong>${escapeHtml(room.name)}</strong>
+          <span class="kn-room-count">${room.total} memories</span>
+        </summary>
+        <div class="kn-drawers">
+          ${room.drawers.map((d) => `
+            <details class="kn-drawer">
+              <summary>
+                <i class="fa-solid fa-folder-open"></i>
+                ${escapeHtml(d.name)}
+                <span class="kn-room-count">${d.count}</span>
+              </summary>
+              <div class="kn-drawer-mems" data-room="${escapeHtml(room.name)}" data-drawer="${escapeHtml(d.name)}">
+                <p class="settings-hint">Loading…</p>
+              </div>
+            </details>`).join('')}
+        </div>
+      </details>`).join('');
+
+    // Lazy-load drawer contents on expand
+    box.querySelectorAll('.kn-drawer').forEach((drawerEl) => {
+      drawerEl.addEventListener('toggle', async () => {
+        if (!drawerEl.open) return;
+        const memsEl = drawerEl.querySelector('.kn-drawer-mems');
+        if (memsEl.dataset.loaded) return;
+        memsEl.dataset.loaded = '1';
+        const room = memsEl.dataset.room;
+        const drawer = memsEl.dataset.drawer;
+        try {
+          const items = await (await apiFetch(
+            `/memory/rooms/${encodeURIComponent(room)}/${encodeURIComponent(drawer)}`
+          )).json();
+          if (!items.length) {
+            memsEl.innerHTML = '<p class="settings-hint">Empty.</p>';
+            return;
+          }
+          memsEl.innerHTML = items.map((m) => `
+            <div class="kn-mem" data-id="${escapeHtml(m.id)}">
+              <span class="kn-chip" style="--chip-color:${TYPE_COLORS.memory}">${escapeHtml(m.kind || '')}</span>
+              <span class="kn-mem-content">${escapeHtml((m.content || '').slice(0, 120))}</span>
+              <button class="icon-btn kn-mem-del" title="Forget"><i class="fa-solid fa-trash"></i></button>
+            </div>`).join('');
+          memsEl.querySelectorAll('.kn-mem-del').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const id = btn.closest('.kn-mem').dataset.id;
+              if (!confirm('Forget this memory?')) return;
+              await apiFetch(`/memory/${encodeURIComponent(id)}`, { method: 'DELETE' });
+              showToast({ type: 'success', title: 'Memory forgotten' });
+              delete memsEl.dataset.loaded;
+              drawerEl.open = false;
+              drawerEl.open = true;
+            });
+          });
+        } catch {
+          memsEl.innerHTML = '<p class="settings-hint">Could not load.</p>';
+        }
+      });
+    });
+  } catch {
+    box.innerHTML = '<p class="settings-hint">Could not load rooms.</p>';
   }
 }
 

@@ -47,6 +47,8 @@ async def save_memory(
     chat_id: str = "",
     user_id: str = "",
     importance: float | None = None,
+    room: str = "default",
+    drawer: str = "general",
 ) -> MemoryRecord | None:
     """Persist one memory record. Returns the record, or None on failure."""
     try:
@@ -62,6 +64,8 @@ async def save_memory(
             chat_id=chat_id,
             user_id=user_id,
             importance=importance if importance is not None else 0.4,
+            room=room,
+            drawer=drawer,
         )
         col = _get_collection()
         col.add(

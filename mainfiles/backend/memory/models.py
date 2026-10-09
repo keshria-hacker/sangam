@@ -30,6 +30,9 @@ class MemoryRecord:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_accessed: datetime = field(default_factory=lambda: datetime.now(UTC))
     access_count: int = 0
+    # Phase 7: rooms/drawers for browsable hierarchy
+    room: str = "default"            # Top-level container (e.g. "work", "personal")
+    drawer: str = "general"          # Sub-container within a room
     # Retrieval-time only (not persisted):
     similarity: float = 0.0
     score: float = 0.0
@@ -44,6 +47,8 @@ class MemoryRecord:
             "created_at": self.created_at.isoformat(),
             "last_accessed": self.last_accessed.isoformat(),
             "access_count": int(self.access_count),
+            "room": self.room,
+            "drawer": self.drawer,
         }
 
     @classmethod
@@ -80,6 +85,8 @@ class MemoryRecord:
             created_at=_dt(meta.get("created_at"), now),
             last_accessed=_dt(meta.get("last_accessed"), now),
             access_count=int(meta.get("access_count", 0) or 0),
+            room=str(meta.get("room", "default")),
+            drawer=str(meta.get("drawer", "general")),
         )
         if distance is not None:
             # ChromaDB default space is squared L2; map to a 0..1 similarity.

@@ -2954,6 +2954,16 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   border:1px solid var(--border-soft); border-radius:10px;}
 .kn-mem-content{flex:1; font-size:13px; color:var(--text-primary);}
 .kn-mem-imp{font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono);}
+.kn-mem-room{font-size:11px; color:var(--text-tertiary); background:var(--bg-elevated); padding:2px 6px; border-radius:4px;}
+.kn-room{border:1px solid var(--border-soft); border-radius:var(--radius-sm); margin-bottom:8px;}
+.kn-room summary{cursor:pointer; padding:10px 12px; display:flex; gap:8px; align-items:center; font-size:13px;}
+.kn-room summary strong{flex:1;}
+.kn-room-count{font-size:11px; color:var(--text-tertiary);}
+.kn-drawers{padding:0 12px 12px;}
+.kn-drawer{border-left:2px solid var(--border-soft); margin:8px 0; padding-left:8px;}
+.kn-drawer summary{cursor:pointer; padding:6px 8px; display:flex; gap:8px; align-items:center; font-size:13px;}
+.kn-drawer summary .kn-room-count{margin-left:auto;}
+.kn-drawer-mems{padding:4px 0;}
 
 /* ---------- Agent Hub ---------- */
 .agent-hub{padding:20px; max-width:1000px;}

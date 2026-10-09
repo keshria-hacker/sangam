@@ -29,6 +29,8 @@ class MemoryIn(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
     kind: Literal["episodic", "semantic", "procedural"] = "semantic"
     importance: float | None = Field(default=None, ge=0.0, le=1.0)
+    room: str = Field(default="default", max_length=64)
+    drawer: str = Field(default="general", max_length=64)
 
 
 class MemoryOut(BaseModel):
@@ -40,6 +42,8 @@ class MemoryOut(BaseModel):
     access_count: int = 0
     created_at: str = ""
     score: float | None = None
+    room: str = "default"
+    drawer: str = "general"
 
     @classmethod
     def from_record(cls, record: MemoryRecord, with_score: bool = False) -> "MemoryOut":
@@ -52,6 +56,8 @@ class MemoryOut(BaseModel):
             access_count=record.access_count,
             created_at=record.created_at.isoformat(),
             score=round(record.score, 4) if with_score else None,
+            room=record.room,
+            drawer=record.drawer,
         )
 
 
@@ -78,6 +84,8 @@ async def create_memory(payload: MemoryIn):
         payload.content,
         kind=MemoryKind(payload.kind),
         importance=payload.importance if payload.importance is not None else 0.9,
+        room=payload.room,
+        drawer=payload.drawer,
     )
     if record is None:
         raise HTTPException(status_code=500, detail="Could not save memory")
@@ -105,3 +113,75 @@ async def remove_memory(memory_id: str):
 async def run_consolidation():
     """Decay stale memories and prune dead ones. Safe to run on a schedule."""
     return await consolidate()
+
+
+class MemoryMoveIn(BaseModel):
+    room: str = Field(min_length=1, max_length=64)
+    drawer: str = Field(min_length=1, max_length=64)
+
+
+@router.get("/memory/rooms")
+async def get_memory_rooms():
+    """Get the rooms/drawers hierarchy with memory counts.
+
+    Returns: {rooms: [{name, drawers: [{name, count}], total}]}
+    """
+    from ..memory import list_memories
+
+    records = await list_memories(limit=10000)
+    rooms: dict[str, dict[str, int]] = {}
+    for r in records:
+        room = r.room or "default"
+        drawer = r.drawer or "general"
+        if room not in rooms:
+            rooms[room] = {}
+        rooms[room][drawer] = rooms[room].get(drawer, 0) + 1
+
+    result = []
+    for room_name in sorted(rooms.keys()):
+        drawers = [
+            {"name": d, "count": c}
+            for d, c in sorted(rooms[room_name].items())
+        ]
+        result.append({
+            "name": room_name,
+            "drawers": drawers,
+            "total": sum(rooms[room_name].values()),
+        })
+    return {"rooms": result}
+
+
+@router.get("/memory/rooms/{room}/{drawer}")
+async def get_drawer_memories(room: str, drawer: str, limit: int = 50):
+    """List memories in a specific room/drawer."""
+    from ..memory import list_memories
+
+    records = await list_memories(limit=10000)
+    filtered = [r for r in records if (r.room or "default") == room and (r.drawer or "general") == drawer]
+    filtered = filtered[: min(max(1, limit), 200)]
+    return [MemoryOut.from_record(r) for r in filtered]
+
+
+@router.put("/memory/{memory_id}/move")
+async def move_memory(memory_id: str, payload: MemoryMoveIn):
+    """Move a memory to a different room/drawer."""
+    from ..memory import get_memory, save_memory, delete_memory
+
+    record = await get_memory(memory_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    # Update room/drawer by re-saving (ChromaDB metadata is immutable on update)
+    record.room = payload.room
+    record.drawer = payload.drawer
+    await delete_memory(memory_id)
+    new_record = await save_memory(
+        record.content,
+        kind=record.kind,
+        importance=record.importance,
+        chat_id=record.chat_id,
+        room=record.room,
+        drawer=record.drawer,
+    )
+    if not new_record:
+        raise HTTPException(status_code=500, detail="Could not move memory")
+    return MemoryOut.from_record(new_record)
