@@ -56,6 +56,7 @@ from .api_routes.quality_routes import preview_quality  # noqa: F401
 from .api_routes.automations_routes import (  # noqa: F401
     create_automation,
     delete_automation,
+    get_automation,
     list_automations,
     run_automation_now,
     update_automation,

@@ -61,9 +61,10 @@ function renderTabStrip() {
     el.className = 'tab' + (t.id === activeTabId ? ' tab-active' : '');
     el.setAttribute('role', 'tab');
     el.setAttribute('aria-selected', t.id === activeTabId);
+    el.setAttribute('tabindex', t.id === activeTabId ? '0' : '-1');
     el.dataset.tabId = t.id;
     el.innerHTML = `<i class="fa-solid ${t.icon}"></i><span>${t.title}</span>
-      <button class="tab-close" aria-label="Close ${t.title} tab"><i class="fa-solid fa-xmark"></i></button>`;
+      <button class="tab-close" aria-label="Close ${t.title} tab" tabindex="-1"><i class="fa-solid fa-xmark"></i></button>`;
     el.addEventListener('click', (e) => {
       if (e.target.closest('.tab-close')) {
         closeTab(t.id);
@@ -77,7 +78,35 @@ function renderTabStrip() {
   if (mainTab) {
     mainTab.classList.toggle('tab-active', activeTabId === 'main');
     mainTab.setAttribute('aria-selected', activeTabId === 'main');
+    mainTab.setAttribute('tabindex', activeTabId === 'main' ? '0' : '-1');
   }
+}
+
+/** Arrow-key navigation for the tab strip (WAI-ARIA tabs pattern). */
+function initTabKeyboard() {
+  const strip = $('#tabStrip');
+  if (!strip || strip.dataset.kbWired) return;
+  strip.dataset.kbWired = '1';
+  strip.addEventListener('keydown', (e) => {
+    const tabs = [...strip.querySelectorAll('[role="tab"]')];
+    const cur = document.activeElement;
+    const i = tabs.indexOf(cur);
+    if (i === -1) return;
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (i + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = tabs.length - 1;
+    else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      cur.click();
+      return;
+    } else return;
+    e.preventDefault();
+    tabs[next].focus();
+    // Activate on focus (automatic activation)
+    tabs[next].click();
+  });
 }
 
 /** Open (or focus) a tool tab. Returns the tab id. */
@@ -147,7 +176,10 @@ export function getActiveTabId() {
 }
 
 export function initTabs() {
-  $('#mainTab')?.addEventListener('click', () => switchTab('main'));
+  const mainTab = $('#mainTab');
+  mainTab?.addEventListener('click', () => switchTab('main'));
+  if (mainTab && !mainTab.hasAttribute('tabindex')) mainTab.setAttribute('tabindex', '0');
+  initTabKeyboard();
   $('#toolViewClose')?.addEventListener('click', () => closeTab(activeTabId));
   $('#tabAddBtn')?.addEventListener('click', (e) => {
     e.stopPropagation();

@@ -56,11 +56,26 @@ async def list_automations(db: AsyncSession = Depends(get_db),
     )).scalars().all()
     return {"automations": [
         {"id": a.id, "name": a.name, "trigger": a.trigger, "action": a.action,
-         "enabled": a.enabled,
+         "enabled": a.enabled, "config": __import__("json").loads(a.config_json or "{}"),
          "last_run": a.last_run.isoformat() if a.last_run else None,
          "next_run": a.next_run.isoformat() if a.next_run else None}
         for a in autos
     ]}
+
+
+@router.get("/automations/{automation_id}")
+async def get_automation(automation_id: str, db: AsyncSession = Depends(get_db),
+                         user=Depends(get_current_user)):
+    auto = await db.get(Automation, automation_id)
+    if not auto or auto.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    return {
+        "id": auto.id, "name": auto.name, "trigger": auto.trigger,
+        "action": auto.action, "enabled": auto.enabled,
+        "config": __import__("json").loads(auto.config_json or "{}"),
+        "last_run": auto.last_run.isoformat() if auto.last_run else None,
+        "next_run": auto.next_run.isoformat() if auto.next_run else None,
+    }
 
 
 @router.put("/automations/{automation_id}")
