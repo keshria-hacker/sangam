@@ -89,4 +89,8 @@ integrations, then implement capabilities drawn from 22 reference repos.
   no-ai-slop cleanup + ADHD-friendly formatting as deterministic
   post-processing passes (QUALITY_NO_SLOP / QUALITY_ADHD_FRIENDLY),
   hooked into the persistence-time postprocessor. See OUTPUT_QUALITY.md.
-- [ ] Theme 9–10 integrations (scoped per theme before build)
+- [x] Theme 9 — Analytics (2026-10-08, branch `analytics`): opt-in local-first
+  analytics (openpanel-style) — event recording across chat/teams/learn/image/
+  voice/packs, aggregate-only dashboard API + UI, FEATURE_ANALYTICS gated,
+  capability:analytics extension. See ANALYTICS.md.
+- [ ] Theme 10 — Design polish (open-design, open-webui) (scoped before build)

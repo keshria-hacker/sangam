@@ -7,7 +7,7 @@ the learner's answer.
 """
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,13 +44,20 @@ async def _model_id(model: str | None, db: AsyncSession) -> str:
 
 
 @router.post("/learn/lesson")
-async def create_lesson(payload: LessonIn, db: AsyncSession = Depends(get_db)):
+async def create_lesson(
+    payload: LessonIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """Teacher agent produces a structured lesson on the topic."""
     _require_learn()
     try:
         lesson = await start_lesson(payload.topic, await _model_id(payload.model, db), db)
     except LearnError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    from ..analytics import events as _ae, optional_user_id, record_event as _record
+
+    await _record(db, await optional_user_id(request, db), _ae.LESSON_STARTED, {})
     return {"topic": lesson.topic, "lesson": lesson.content}
 
 

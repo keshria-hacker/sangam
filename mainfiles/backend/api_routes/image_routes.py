@@ -7,10 +7,12 @@ MediaAttachments, so they render in chat like any image.
 """
 from __future__ import annotations
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..database import get_db
 from ..image_gen import ImageGenError, generate_images, image_status
 from .common import router
 
@@ -35,7 +37,11 @@ async def get_image_status():
 
 
 @router.post("/image/generate")
-async def generate_image_endpoint(payload: ImageGenIn):
+async def generate_image_endpoint(
+    payload: ImageGenIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """Generate images; returns saved media attachments."""
     _require_image_gen()
     try:
@@ -44,4 +50,8 @@ async def generate_image_endpoint(payload: ImageGenIn):
         )
     except ImageGenError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    from ..analytics import events as _ae, optional_user_id, record_event as _record
+
+    await _record(db, await optional_user_id(request, db), _ae.IMAGE_GENERATED,
+                  {"n": payload.n})
     return {"images": [a.model_dump(mode="json") for a in attachments]}

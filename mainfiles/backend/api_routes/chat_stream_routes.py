@@ -362,6 +362,16 @@ async def chat_stream(  # noqa: PLR0912
                 chat.updated_at = datetime.now(UTC)
                 await stream_db.merge(chat)
                 await stream_db.commit()
+                # Analytics (opt-in): message sent with model. Never breaks chat.
+                try:
+                    from ..analytics import events as _ae, record_event as _record
+
+                    await _record(
+                        stream_db, current_user.id, _ae.MESSAGE_SENT,
+                        {"model": payload.model},
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
 
                 # Memory++: fire-and-forget extraction of durable facts from
                 # this turn (preferences, corrections, "remember this").

@@ -39,10 +39,12 @@ async def get_teams():
 @router.post("/teams/run")
 async def run_team_endpoint(
     payload: TeamRunIn,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Run a team on a task: fan-out to specialists, fan-in via coordinator."""
     _require_teams()
+    from ..analytics import events as _ae, optional_user_id, record_event as _record
     from ..llm import default_model_id
 
     model_id = payload.model or await default_model_id(db)
@@ -52,6 +54,8 @@ async def run_team_endpoint(
         result = await run_team(payload.team_id, payload.task, model_id, db)
     except TeamError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await _record(db, await optional_user_id(request, db), _ae.TEAM_RUN,
+                  {"team_id": payload.team_id})
     if result.error and not result.synthesis:
         raise HTTPException(status_code=502, detail=result.error)
     return result.to_dict()

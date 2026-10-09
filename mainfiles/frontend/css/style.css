@@ -2102,6 +2102,27 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .learn-feedback{border-top:1px solid var(--border-soft); padding-top:10px; font-size:13.5px; line-height:1.6;}
 .learn-feedback h4{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); margin:0 0 8px;}
 
+/* ---------- Analytics dashboard ---------- */
+.analytics-modal{max-width:600px;}
+.analytics-body{padding:16px; display:flex; flex-direction:column; gap:14px; max-height:70vh; overflow-y:auto;}
+.analytics-controls{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+.analytics-note{font-size:12px; color:var(--text-tertiary);}
+.analytics-body h4{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); margin:0 0 8px;}
+.astat-total{display:flex; align-items:baseline; gap:8px;}
+.astat-total strong{font-size:24px; color:var(--text-primary);}
+.astat-total span{font-size:12px; color:var(--text-tertiary);}
+.abar-chart{display:flex; flex-direction:column; gap:4px; margin-bottom:6px;}
+.abar-row{display:flex; align-items:center; gap:8px;}
+.abar-label{font-size:11px; color:var(--text-tertiary); width:44px; flex:none;}
+.abar-track{flex:1; height:8px; background:var(--bg-hover); border-radius:4px; overflow:hidden;}
+.abar-fill{height:100%; background:var(--accent); border-radius:4px;}
+.abar-count{font-size:11px; color:var(--text-secondary); width:28px; text-align:right; flex:none;}
+.analytics-cols{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+.astat-row{display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--border-soft);}
+.astat-row span{color:var(--text-secondary);}
+.astat-row strong{color:var(--text-primary);}
+.analytics-empty{font-size:13px; color:var(--text-tertiary);}
+
 .skills-detail{flex:1; overflow-y:auto; padding:20px;}
 .skills-detail .placeholder{color:var(--text-tertiary); text-align:center; padding:40px 20px;}
 .skills-detail h3{margin-bottom:8px;}

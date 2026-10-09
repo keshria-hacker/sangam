@@ -157,3 +157,19 @@ class PasswordResetToken(Base):
     used: Mapped[bool] = mapped_column(default=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
+
+
+class AnalyticsEvent(Base):
+    """Local-first usage event (openpanel-style, opt-in via FEATURE_ANALYTICS).
+
+    Only aggregate-friendly data is stored: event type + small JSON
+    properties. No message content, no prompts — ever.
+    """
+
+    __tablename__ = "analytics_events"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    properties: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), index=True)

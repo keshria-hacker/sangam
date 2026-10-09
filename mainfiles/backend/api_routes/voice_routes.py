@@ -7,11 +7,13 @@ Engines are optional: with no TTS/STT engine installed the endpoints answer
 """
 from __future__ import annotations
 
-from fastapi import HTTPException, Request, UploadFile
+from fastapi import Depends, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..database import get_db
 from ..voice import VoiceError, list_voices, synthesize, transcribe, voice_status
 from .common import router
 
@@ -44,18 +46,29 @@ async def get_voices():
 
 
 @router.post("/voice/tts")
-async def text_to_speech(payload: TTSIn):
+async def text_to_speech(
+    payload: TTSIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """Synthesize speech; returns audio/wav bytes for immediate playback."""
     _require_voice()
     try:
         audio, mime = synthesize(payload.text, payload.voice)
     except VoiceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    from ..analytics import events as _ae, optional_user_id, record_event as _record
+
+    await _record(db, await optional_user_id(request, db), _ae.VOICE_TTS, {})
     return Response(content=audio, media_type=mime)
 
 
 @router.post("/voice/stt")
-async def speech_to_text(request: Request, file: UploadFile):
+async def speech_to_text(
+    request: Request,
+    file: UploadFile,
+    db: AsyncSession = Depends(get_db),
+):
     """Transcribe an uploaded audio clip (webm/wav/mp3/ogg/m4a)."""
     _require_voice()
     filename = (file.filename or "audio.webm").rsplit("/", 1)[-1]
@@ -68,4 +81,7 @@ async def speech_to_text(request: Request, file: UploadFile):
         text = transcribe(data, filename)
     except VoiceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    from ..analytics import events as _ae, optional_user_id, record_event as _record
+
+    await _record(db, await optional_user_id(request, db), _ae.VOICE_STT, {})
     return {"text": text}

@@ -404,6 +404,8 @@ export async function startApplication() {
     import('./features/teams/teams.js').then((m) => m.initTeams()).catch(() => {});
     // Learning mode: show the learn button only when the flag is on.
     import('./features/learn/learn.js').then((m) => m.initLearn()).catch(() => {});
+    // Analytics: show the usage button only when the flag is on.
+    import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
     showToast({ type: 'success', title: 'Connected', message: `Live backend at ${getApiBaseUrl()}` });
   } catch (err) {
     chatStartNewChat();

@@ -6,9 +6,11 @@ endpoints consumed by the frontend Skills browser.
 """
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..database import get_db
 from .registry import InvocationType, SkillCategory, get_registry
 from .router import get_router
 
@@ -135,13 +137,20 @@ async def list_skill_packs():
 
 
 @router.post("/packs/{name}/enable")
-async def enable_skill_pack(name: str):
+async def enable_skill_pack(
+    name: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """Enable a skill pack (its skills become visible to the registry)."""
+    from ..analytics import events as _ae, optional_user_id, record_event as _record
     from .packs import enable_pack
 
     pack = enable_pack(name)
     if pack is None:
         raise HTTPException(404, f"Skill pack not found: {name}")
+    await _record(db, await optional_user_id(request, db), _ae.PACK_ENABLED,
+                  {"pack": name})
     return pack.to_dict()
 
 
