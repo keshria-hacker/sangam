@@ -16,6 +16,7 @@ import { renderImageTab } from './features/image/image.js';
 import { renderCodeAgentTab } from './features/code-agent/code-agent.js';
 import { renderDesignTab } from './features/design/design-studio.js';
 import { initTabs, openToolTab, registerTabRenderer } from './features/tabs/tabs.js';
+import { trapFocus } from './shared/focus_trap.js';
 import { renderRail, registerNavHandler } from './core/nav.js';
 import { initPopovers } from './features/composer/popovers.js';
 import { initTray } from './features/tray/tray.js';
@@ -262,15 +263,29 @@ function initGlobalListeners() {
     // Ctrl+/ - Shortcuts help
     if ((e.ctrlKey || e.metaKey) && e.key === '/') {
       e.preventDefault();
-      elements.shortcutsOverlay?.classList.remove('hidden');
+      openShortcutsModal();
     }
   });
 
-  // Close shortcuts modal
-  elements.shortcutsOverlay?.addEventListener('click', (e) => {
-    if (e.target === elements.shortcutsOverlay) elements.shortcutsOverlay.classList.add('hidden');
+  // Shortcuts modal with focus trap
+  let releaseShortcutsTrap = null;
+  function openShortcutsModal() {
+    elements.shortcutsOverlay?.classList.remove('hidden');
+    releaseShortcutsTrap = trapFocus(elements.shortcutsOverlay);
+  }
+  function closeShortcutsModal() {
+    elements.shortcutsOverlay?.classList.add('hidden');
+    releaseShortcutsTrap?.();
+    releaseShortcutsTrap = null;
+  }
+  // Escape closes it (handled globally too, but be explicit)
+  elements.shortcutsOverlay?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeShortcutsModal();
   });
-  elements.closeShortcuts?.addEventListener('click', () => elements.shortcutsOverlay.classList.add('hidden'));
+  elements.shortcutsOverlay?.addEventListener('click', (e) => {
+    if (e.target === elements.shortcutsOverlay) closeShortcutsModal();
+  });
+  elements.closeShortcuts?.addEventListener('click', closeShortcutsModal);
 
   // Skills button -> opens Skills tab
   elements.skillsBtn?.addEventListener('click', () => openToolTab('skills'));
@@ -560,6 +575,14 @@ async function init() {
   registerTabRenderer('library', async (bodyEl) => {
     const { renderLibrary } = await import('./features/library/library.js');
     renderLibrary(bodyEl);
+  });
+  registerTabRenderer('routes', async (bodyEl) => {
+    const { renderRoutesTab } = await import('./features/routing/routes.js');
+    renderRoutesTab(bodyEl);
+  });
+  registerTabRenderer('automations', async (bodyEl) => {
+    const { renderAutomations } = await import('./features/automations/ui.js');
+    renderAutomations(bodyEl);
   });
 
   // Initialize auth flow (this will call startApplication on success)

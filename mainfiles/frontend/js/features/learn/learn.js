@@ -10,6 +10,7 @@ import { apiFetch, apiPost } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { renderMarkdown } from '../../shared/markdown.js';
+import { trapFocus } from '../../shared/focus_trap.js';
 console.log('[Module] learn.js loaded');
 
 let currentLesson = '';
@@ -265,9 +266,12 @@ export function openSkillImporter(hostEl) {
       </div>
     </div>`;
   host.appendChild(modal);
-  const close = () => modal.remove();
+  let releaseTrap = null;
+  const close = () => { releaseTrap?.(); modal.remove(); };
   modal.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', close));
   modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  modal.setAttribute('aria-modal', 'true');
+  releaseTrap = trapFocus(modal);
 
   const contentEl = modal.querySelector('#skillContent');
   const previewEl = modal.querySelector('#skillPreview');

@@ -13,6 +13,7 @@ import {
   getAbortController, getModels, getSidebarCollapsed, setSidebarCollapsed
 } from '../../core/state.js';
 import { closeProfilePopup } from '../auth/auth.js';
+import { trapFocus } from '../../shared/focus_trap.js';
 console.log('[Module] sidebar.js loaded');
 
 // Dynamic imports to break circular dependency with chat.js
@@ -315,6 +316,7 @@ async function callChatModule(fnName, ...args) {
   return mod[fnName](...args);
 }
 
+var releaseConfirmTrap = null;
 function showConfirmDelete(chatId) {
   pendingDeleteChatId = chatId;
   var titleEl = document.getElementById('confirmTitle');
@@ -322,14 +324,17 @@ function showConfirmDelete(chatId) {
   var overlayEl = document.getElementById('confirmOverlay');
   if (titleEl) titleEl.textContent = 'Delete chat?';
   if (msgEl) msgEl.textContent = 'This conversation will be permanently removed.';
-  if (overlayEl) overlayEl.classList.remove('hidden');
+  if (overlayEl) {
+    overlayEl.classList.remove('hidden');
+    releaseConfirmTrap = trapFocus(overlayEl);
+  }
   updateBodyScrollLock();
-  setTimeout(function() { var el = document.getElementById('confirmCancel'); if (el) el.focus(); }, 50);
 }
 
 function hideConfirm() {
   var overlayEl = document.getElementById('confirmOverlay');
   if (overlayEl) overlayEl.classList.add('hidden');
+  if (releaseConfirmTrap) { releaseConfirmTrap(); releaseConfirmTrap = null; }
   pendingDeleteChatId = null;
   updateBodyScrollLock();
 }

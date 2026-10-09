@@ -235,6 +235,21 @@ export async function handleSend() {
 
   elements.welcomeScreen?.classList.add('hidden');
 
+  // Routing: check if a rule matches this message
+  try {
+    const { evaluateRoutes } = await import('../routing/routes.js');
+    const routedModel = evaluateRoutes(text);
+    if (routedModel) {
+      const { getModels } = await import('../models/models.js');
+      const match = getModels().find((m) => m.id === routedModel);
+      if (match) {
+        const { selectModel } = await import('../models/models.js');
+        selectModel(match);
+        showToast({ type: 'info', title: 'Routed', message: `Using ${match.name} (routing rule)` });
+      }
+    }
+  } catch {}
+
   const agentMode = getAgentModeEnabled();
   const userMsg = { role: 'user', content: text || '(Sent with attached files)', created_at: new Date().toISOString() };
   setMessages([...getMessages(), userMsg]);

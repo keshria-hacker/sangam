@@ -3026,3 +3026,24 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .lib-toolbar .provider-key-input{width:auto;}
 .lib-template-body{font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); background:var(--bg-elevated); border-radius:6px; padding:8px; margin:0; white-space:pre-wrap; max-height:120px; overflow:hidden;}
 .lib-draft{border-style:dashed;}
+
+/* ---------- Routes ---------- */
+.routes-view{padding:20px; max-width:800px;}
+.routes-section{margin-bottom:28px;}
+.routes-section h4{margin:0 0 8px; display:flex; align-items:center; gap:10px;}
+.route-row{display:flex; align-items:center; gap:10px; padding:10px 12px;
+  background:var(--surface); border:1px solid var(--border-soft); border-radius:8px; margin-bottom:8px;}
+.route-kw{font-family:var(--font-mono); font-size:12px; background:var(--bg-elevated); padding:2px 8px; border-radius:4px;}
+.route-model{font-size:13px; color:var(--text-secondary);}
+
+/* ---------- Automations ---------- */
+.automations .auto-toggle{margin-left:auto;}
+.automations .auto-disabled{opacity:.65;}
+.auto-badge{display:inline-flex; align-items:center; gap:6px; font-size:11px;
+  background:var(--bg-elevated); color:var(--text-secondary); padding:3px 9px;
+  border-radius:999px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.auto-badge i{color:var(--accent); font-size:10px;}
+.auto-runs{display:flex; gap:14px; font-size:11px; color:var(--text-tertiary);}
+.auto-runs i{margin-right:4px;}
+#autoForm small.settings-hint{display:block; margin-top:4px;}
+#autoForm small.settings-hint code{background:var(--bg-elevated); padding:1px 5px; border-radius:4px;}

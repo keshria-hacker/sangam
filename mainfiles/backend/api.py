@@ -53,6 +53,13 @@ from .api_routes.spec_routes import (  # noqa: F401
     spec_to_task,
 )
 from .api_routes.quality_routes import preview_quality  # noqa: F401
+from .api_routes.automations_routes import (  # noqa: F401
+    create_automation,
+    delete_automation,
+    list_automations,
+    run_automation_now,
+    update_automation,
+)
 from .api_routes.chats_routes import (  # noqa: F401
     append_messages,
     create_chat,

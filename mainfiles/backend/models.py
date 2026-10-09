@@ -249,4 +249,18 @@ class CustomAgent(Base):
 
     user: Mapped["User"] = relationship(back_populates="custom_agents")
 
+class Automation(Base):
+    """Scheduled automation (Phase 5)."""
 
+    __tablename__ = "automations"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    trigger: Mapped[str] = mapped_column(String(64))  # hourly|daily|weekly|cron
+    action: Mapped[str] = mapped_column(String(32))  # agent|chat
+    config_json: Mapped[str] = mapped_column(Text, default="{}")
+    enabled: Mapped[bool] = mapped_column(default=True)
+    last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

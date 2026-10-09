@@ -16,6 +16,8 @@ const TOOL_DEFS = {
   agents:    { title: 'Agent Hub',     icon: 'fa-robot',               feature: null },
   create:    { title: 'Create',        icon: 'fa-wand-magic-sparkles', feature: null },
   library:   { title: 'Library',       icon: 'fa-book',               feature: null },
+  routes:    { title: 'Routes',        icon: 'fa-route',              feature: null },
+  automations: { title: 'Automations', icon: 'fa-clock',              feature: null },
   skills:    { title: 'Skills',        icon: 'fa-wand-magic-sparkles', feature: null },
   teams:     { title: 'Agent teams',   icon: 'fa-users',               feature: 'multi_agent' },
   learn:     { title: 'Learn',         icon: 'fa-graduation-cap',      feature: 'learning' },
