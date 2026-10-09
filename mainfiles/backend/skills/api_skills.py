@@ -126,6 +126,36 @@ async def suggest_skills(ctx: dict):
     }
 
 
+@router.get("/packs")
+async def list_skill_packs():
+    """List all bundled skill packs with their enabled state."""
+    from .packs import list_packs
+
+    return [p.to_dict() for p in list_packs()]
+
+
+@router.post("/packs/{name}/enable")
+async def enable_skill_pack(name: str):
+    """Enable a skill pack (its skills become visible to the registry)."""
+    from .packs import enable_pack
+
+    pack = enable_pack(name)
+    if pack is None:
+        raise HTTPException(404, f"Skill pack not found: {name}")
+    return pack.to_dict()
+
+
+@router.post("/packs/{name}/disable")
+async def disable_skill_pack(name: str):
+    """Disable a skill pack."""
+    from .packs import disable_pack
+
+    pack = disable_pack(name)
+    if pack is None:
+        raise HTTPException(404, f"Skill pack not found: {name}")
+    return pack.to_dict()
+
+
 @router.get("/{sid}")
 async def get_skill(sid: str):
     """Return full detail for a single skill, excluding the full prompt template."""

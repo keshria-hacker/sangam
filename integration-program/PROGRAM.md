@@ -71,4 +71,10 @@ integrations, then implement capabilities drawn from 22 reference repos.
   (OpenAI-compatible, experimental local Fooocus driver), /api/image/*
   endpoints gated by FEATURE_IMAGE_GEN, generate_image agent tool, composer
   image button with media_ids attachment. See IMAGE_GEN.md.
-- [ ] Theme 5–10 integrations (scoped per theme before build)
+- [x] Theme 5 — Skill packs (2026-10-08, branch `skill-packs`): pack system
+  (pack.yaml manifests, enable/disable without file copying, registry
+  extra_roots); 4 bundled packs — spec-driven (spec-kit), diagramming
+  (archify), science-essentials (scientific-agent-skills), agent-loop (pi);
+  pack API + Skills modal pack strip; skill-pack:* extensions. See
+  SKILL_PACKS.md.
+- [ ] Theme 6–10 integrations (scoped per theme before build)

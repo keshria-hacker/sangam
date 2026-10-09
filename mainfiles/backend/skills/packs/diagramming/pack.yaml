@@ -1,0 +1,6 @@
+name: diagramming
+version: 1.0.0
+description: Turn ideas, plans, and codebases into clear Mermaid architecture diagrams that render right in the chat.
+source: tt-a1i/archify
+skills:
+  - archify

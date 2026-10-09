@@ -138,6 +138,14 @@ def create_app() -> FastAPI:
                 logger.info("Image-gen extension registered")
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Image-gen extension skipped: {exc}")
+        # Skill packs: project bundled packs into the extension registry.
+        try:
+            from .skills.packs import register_pack_extensions
+            count = register_pack_extensions()
+            if count:
+                logger.info("Registered %d skill packs", count)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Skill pack registration skipped: {exc}")
         # Foundation F3: connect configured MCP servers (best-effort).
         if settings.FEATURE_MCP:
             try:

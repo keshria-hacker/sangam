@@ -169,6 +169,52 @@ async function copyCommand() {
 /**
  * Load skills from backend.
  */
+/**
+ * Render the skill-pack strip (enable/disable curated packs).
+ */
+async function loadPacks() {
+  const container = document.getElementById('skillsPacks');
+  if (!container) return;
+  try {
+    const packs = await apiFetch('/skills/packs');
+    if (!Array.isArray(packs) || !packs.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = `
+      <div class="packs-header"><h4>Skill packs</h4><span>curated bundles</span></div>
+      <div class="packs-grid">${packs.map((p) => `
+        <div class="pack-card${p.enabled ? ' enabled' : ''}">
+          <div class="pack-info">
+            <strong>${escapeHtml(p.name)}</strong>
+            <span class="pack-desc">${escapeHtml(p.description || '')}</span>
+            <span class="pack-meta">${p.skill_count} skill${p.skill_count === 1 ? '' : 's'} · v${escapeHtml(p.version)}</span>
+          </div>
+          <button class="btn-secondary btn-sm pack-toggle" type="button" data-pack="${escapeHtml(p.name)}" data-enabled="${p.enabled ? '1' : '0'}">
+            ${p.enabled ? 'Disable' : 'Enable'}
+          </button>
+        </div>`).join('')}</div>`;
+    container.querySelectorAll('.pack-toggle').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.pack;
+        const action = btn.dataset.enabled === '1' ? 'disable' : 'enable';
+        btn.disabled = true;
+        try {
+          await apiPost(`/skills/packs/${encodeURIComponent(name)}/${action}`, {});
+          showToast({ type: 'success', title: `Pack ${action}d`, message: name });
+          await loadPacks();
+          await loadSkills(); // pack skills appear/disappear in the list
+        } catch (err) {
+          showToast({ type: 'error', title: `Could not ${action} pack`, message: err?.message || String(err) });
+          btn.disabled = false;
+        }
+      });
+    });
+  } catch {
+    container.innerHTML = '';
+  }
+}
+
 async function loadSkills() {
   elements.list.innerHTML = '<div class="loading">Loading skills…</div>';
   try {
@@ -187,6 +233,7 @@ async function loadSkills() {
 export function openSkillsModal(overlay) {
   if (!overlay) return;
   overlay.classList.remove('hidden');
+  loadPacks();
   loadSkills();
 }
 /**
