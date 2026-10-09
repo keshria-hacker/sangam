@@ -164,7 +164,7 @@ class Artifact(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
-    type: Mapped[str] = mapped_column(String(16), default="doc")  # doc | diagram | code | html
+    type: Mapped[str] = mapped_column(String(16), default="doc")  # doc | diagram | code | html | design
     language: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

@@ -23,6 +23,7 @@ const TOOL_DEFS = {
   learn:     { title: 'Learn',         icon: 'fa-graduation-cap',      feature: 'learning' },
   analytics: { title: 'Analytics',     icon: 'fa-chart-simple',        feature: 'analytics' },
   images:    { title: 'Image studio',  icon: 'fa-image',               feature: 'image_gen' },
+  voice:     { title: 'Voice studio',  icon: 'fa-microphone',           feature: 'voice' },
   code:      { title: 'Code agent',    icon: 'fa-code',                feature: null },
   design:    { title: 'Design studio', icon: 'fa-palette',             feature: null },
   compare:   { title: 'Compare',       icon: 'fa-scale-balanced',      feature: null },

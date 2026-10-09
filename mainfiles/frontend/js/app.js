@@ -598,6 +598,10 @@ async function init() {
     const { renderCompareTab } = await import('./features/compare/compare.js');
     renderCompareTab(bodyEl);
   });
+  registerTabRenderer('voice', async (bodyEl) => {
+    const { renderVoiceStudio } = await import('./features/voice/studio.js');
+    renderVoiceStudio(bodyEl);
+  });
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

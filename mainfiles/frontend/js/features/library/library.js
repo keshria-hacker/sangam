@@ -107,7 +107,7 @@ function renderSkills(wrap) {
   wrap.innerHTML = `
     <div class="lib-grid">
       ${skills.map((s) => `
-        <div class="lib-card">
+        <div class="lib-card" data-skill="${escapeHtml(s.id || s.name)}">
           <div class="lib-card-head">
             <strong>${escapeHtml(s.name)}</strong>
             ${kindBadge(s.kind)}
@@ -115,8 +115,10 @@ function renderSkills(wrap) {
           <p class="lib-desc">${escapeHtml(s.description || 'No description.')}</p>
           <div class="lib-card-foot">
             <span class="settings-hint">v${escapeHtml(s.version || '?')}</span>
+            <button class="btn-secondary btn-sm" data-preview type="button">Preview</button>
             ${toggleSwitch(s)}
           </div>
+          <div class="lib-skill-detail hidden" data-detail></div>
         </div>`).join('') || '<p class="settings-hint">No skills registered.</p>'}
     </div>
     <div class="lib-section">
@@ -125,6 +127,83 @@ function renderSkills(wrap) {
     </div>`;
   wireToggles(wrap);
   renderDrafts(wrap);
+  // Phase 7: SKILL.md preview + risk scan + version pin
+  wrap.querySelectorAll('[data-preview]').forEach((btn) => {
+    btn.addEventListener('click', () => previewSkill(wrap, btn));
+  });
+}
+
+/** Phase 7: Show SKILL.md preview with risk scan and version pin. */
+async function previewSkill(wrap, btn) {
+  const card = btn.closest('.lib-card');
+  const detail = card.querySelector('[data-detail]');
+  const skillId = card.dataset.skill;
+  if (!detail.classList.contains('hidden')) {
+    detail.classList.add('hidden');
+    btn.textContent = 'Preview';
+    return;
+  }
+  btn.textContent = 'Hide';
+  detail.classList.remove('hidden');
+  detail.innerHTML = '<p class="settings-hint">Loading…</p>';
+  try {
+    const data = await (await apiFetch(`/skills/${encodeURIComponent(skillId)}`)).json();
+    const skillMd = data.skill_md || data.content || 'No SKILL.md available.';
+    // Simple risk scan: look for dangerous patterns
+    const risks = scanSkillRisks(skillMd);
+    detail.innerHTML = `
+      <div class="lib-preview">
+        <h5>SKILL.md</h5>
+        <pre class="lib-skill-md">${escapeHtml(skillMd.slice(0, 3000))}${skillMd.length > 3000 ? '\n…(truncated)' : ''}</pre>
+        <h5>Risk scan</h5>
+        ${risks.length ? `
+          <ul class="lib-risks">
+            ${risks.map((r) => `<li class="lib-risk-${r.level}"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(r.msg)}</li>`).join('')}
+          </ul>` : '<p class="settings-hint">No risks detected.</p>'}
+        <h5>Version pin</h5>
+        <div class="lib-version-pin">
+          <input class="provider-key-input" data-pin-version placeholder="Pin version (e.g. 1.2.0)" value="${escapeHtml(data.pinned_version || '')}">
+          <button class="btn-secondary btn-sm" data-pin-save type="button">Pin</button>
+        </div>
+      </div>`;
+    detail.querySelector('[data-pin-save]').addEventListener('click', async () => {
+      const version = detail.querySelector('[data-pin-version]').value.trim();
+      try {
+        await apiFetch(`/skills/${encodeURIComponent(skillId)}/pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ version: version || null }),
+        });
+        showToast({ type: 'success', title: version ? `Pinned to v${version}` : 'Unpinned' });
+      } catch (err) {
+        showToast({ type: 'error', title: 'Pin failed', message: String(err?.message || err) });
+      }
+    });
+  } catch (err) {
+    detail.innerHTML = `<p class="team-error">Preview failed: ${escapeHtml(err?.message || String(err))}</p>`;
+  }
+}
+
+/** Phase 7: Simple heuristic risk scan for SKILL.md content. */
+function scanSkillRisks(content) {
+  const risks = [];
+  const lower = content.toLowerCase();
+  if (/rm\s+-rf|del\s+\/[sq]|format\s+c:/i.test(content)) {
+    risks.push({ level: 'high', msg: 'Contains potentially destructive file deletion commands' });
+  }
+  if (/curl.*\|\s*(bash|sh)|wget.*\|\s*(bash|sh)/i.test(content)) {
+    risks.push({ level: 'high', msg: 'Downloads and executes remote scripts' });
+  }
+  if (/eval\(|exec\(|__import__|subprocess|os\.system/i.test(content)) {
+    risks.push({ level: 'medium', msg: 'Contains code execution patterns' });
+  }
+  if (/api[_-]?key|password|token|secret/i.test(content) && /send|post|upload|transmit/i.test(content)) {
+    risks.push({ level: 'medium', msg: 'May transmit credentials' });
+  }
+  if (/\.env|credentials|id_rsa|\.pem/i.test(content)) {
+    risks.push({ level: 'low', msg: 'References sensitive files' });
+  }
+  return risks;
 }
 
 async function renderDrafts(wrap) {

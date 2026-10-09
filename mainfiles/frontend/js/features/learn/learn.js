@@ -38,21 +38,29 @@ export function renderLearnTab(bodyEl) {
       <div class="learn-controls">
         <input id="learnTopic" class="provider-key-input" placeholder="What do you want to learn?" aria-label="Topic">
         <button class="btn-primary" id="learnStart" type="button">Start lesson</button>
+        <button class="btn-secondary" id="learnOutline" type="button" title="Generate editable outline">
+          <i class="fa-solid fa-list"></i> Outline
+        </button>
         <button class="btn-secondary" id="learnImportSkill" type="button" title="Import a SKILL.md">
           <i class="fa-solid fa-file-import"></i> Import skill
         </button>
       </div>
+      <div class="learn-outline hidden" id="learnOutlineWrap"></div>
       <div class="learn-lesson hidden" id="learnLesson"></div>
       <div class="learn-scenes hidden" id="learnScenes"></div>
       <div class="learn-answer hidden" id="learnAnswerWrap">
         <textarea id="learnAnswer" rows="3" placeholder="Your answer to the check question…" aria-label="Your answer"></textarea>
         <button class="btn-secondary" id="learnCheck" type="button">Check my answer</button>
+        <button class="btn-secondary" id="learnQuiz" type="button">Take quiz</button>
       </div>
       <div class="learn-feedback hidden" id="learnFeedback"></div>
+      <div class="learn-quiz hidden" id="learnQuizWrap"></div>
     </div>`;
   bodyEl.querySelector('#learnStart').addEventListener('click', () => startLesson(bodyEl));
   bodyEl.querySelector('#learnTopic').addEventListener('keydown', (e) => { if (e.key === 'Enter') startLesson(bodyEl); });
   bodyEl.querySelector('#learnCheck').addEventListener('click', () => checkAnswer(bodyEl));
+  bodyEl.querySelector('#learnOutline').addEventListener('click', () => generateOutline(bodyEl));
+  bodyEl.querySelector('#learnQuiz').addEventListener('click', () => generateQuiz(bodyEl));
   bodyEl.querySelector('#learnImportSkill').addEventListener('click', () => openSkillImporter(bodyEl));
   setTimeout(() => bodyEl.querySelector('#learnTopic')?.focus(), 0);
 }
@@ -121,6 +129,143 @@ async function checkAnswer(container) {
     showToast({ type: 'error', title: 'Feedback failed', message: err?.message || String(err) });
   } finally {
     setBusy(false);
+  }
+}
+
+/** Phase 7: Generate an editable outline from the backend. */
+async function generateOutline(container) {
+  const root = container || document.getElementById('toolViewBody') || document;
+  const topic = root.querySelector('#learnTopic').value.trim();
+  if (!topic) {
+    showToast({ type: 'info', title: 'Enter a topic first' });
+    return;
+  }
+  const wrap = root.querySelector('#learnOutlineWrap');
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = '<p class="settings-hint">Generating outline…</p>';
+  try {
+    const data = await (await apiPost('/learn/outline', { topic })).json();
+    const outline = data.outline || [];
+    wrap.innerHTML = `
+      <h4>Outline: ${escapeHtml(data.topic)}</h4>
+      <div class="learn-outline-list">
+        ${outline.map((s, i) => `
+          <div class="learn-outline-sec" data-idx="${i}">
+            <input class="provider-key-input" data-title value="${escapeHtml(s.title || '')}" aria-label="Section title">
+            <textarea rows="3" data-points aria-label="Key points">${escapeHtml((s.points || []).join('\n'))}</textarea>
+            <div class="learn-outline-meta">
+              <label>Minutes: <input type="number" data-duration value="${s.duration_min || 5}" min="1" max="60" style="width:60px"></label>
+              <button class="icon-btn" data-del aria-label="Remove section"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="learn-outline-actions">
+        <button class="btn-secondary btn-sm" id="learnOutlineAdd" type="button">+ Add section</button>
+        <button class="btn-primary btn-sm" id="learnOutlineUse" type="button">Use this outline</button>
+      </div>`;
+    // Wire delete buttons
+    wrap.querySelectorAll('[data-del]').forEach((btn) => {
+      btn.addEventListener('click', () => btn.closest('.learn-outline-sec').remove());
+    });
+    // Add section
+    wrap.querySelector('#learnOutlineAdd').addEventListener('click', () => {
+      const list = wrap.querySelector('.learn-outline-list');
+      const div = document.createElement('div');
+      div.className = 'learn-outline-sec';
+      div.innerHTML = `
+        <input class="provider-key-input" data-title placeholder="Section title" aria-label="Section title">
+        <textarea rows="3" data-points placeholder="Key points (one per line)" aria-label="Key points"></textarea>
+        <div class="learn-outline-meta">
+          <label>Minutes: <input type="number" data-duration value="5" min="1" max="60" style="width:60px"></label>
+          <button class="icon-btn" data-del aria-label="Remove section"><i class="fa-solid fa-trash"></i></button>
+        </div>`;
+      div.querySelector('[data-del]').addEventListener('click', () => div.remove());
+      list.appendChild(div);
+    });
+    // Use outline → start lesson with outline context
+    wrap.querySelector('#learnOutlineUse').addEventListener('click', () => {
+      const sections = [...wrap.querySelectorAll('.learn-outline-sec')].map((sec) => ({
+        title: sec.querySelector('[data-title]').value,
+        points: sec.querySelector('[data-points]').value.split('\n').filter((p) => p.trim()),
+        duration_min: parseInt(sec.querySelector('[data-duration]').value, 10) || 5,
+      })).filter((s) => s.title.trim());
+      if (!sections.length) {
+        showToast({ type: 'info', title: 'Add at least one section' });
+        return;
+      }
+      // Store outline and start lesson
+      window.__learnOutline = sections;
+      showToast({ type: 'success', title: `Outline saved (${sections.length} sections)` });
+      startLesson(root);
+    });
+  } catch (err) {
+    wrap.innerHTML = `<p class="team-error">Outline failed: ${escapeHtml(err?.message || String(err))}</p>`;
+  }
+}
+
+/** Phase 7: Generate a quiz and grade answers. */
+async function generateQuiz(container) {
+  const root = container || document.getElementById('toolViewBody') || document;
+  const topic = root.querySelector('#learnTopic').value.trim();
+  if (!topic || !currentLesson) {
+    showToast({ type: 'info', title: 'Start a lesson first' });
+    return;
+  }
+  const wrap = root.querySelector('#learnQuizWrap');
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = '<p class="settings-hint">Generating quiz…</p>';
+  try {
+    const data = await (await apiPost('/learn/quiz', { topic, lesson: currentLesson, num_questions: 5 })).json();
+    const questions = data.questions || [];
+    if (!questions.length) {
+      wrap.innerHTML = '<p class="settings-hint">No questions generated.</p>';
+      return;
+    }
+    wrap.innerHTML = `
+      <h4>Quiz: ${escapeHtml(topic)}</h4>
+      <div class="learn-quiz-list">
+        ${questions.map((q, i) => `
+          <div class="learn-quiz-q" data-idx="${i}">
+            <p><strong>Q${i + 1}.</strong> ${escapeHtml(q.question)}</p>
+            <div class="learn-quiz-opts">
+              ${(q.options || []).map((opt) => `
+                <label><input type="radio" name="q${i}" value="${escapeHtml(opt)}"> ${escapeHtml(opt)}</label>
+              `).join('')}
+            </div>
+          </div>`).join('')}
+      </div>
+      <button class="btn-primary" id="learnQuizSubmit" type="button">Submit answers</button>
+      <div id="learnQuizResult" class="hidden"></div>`;
+    wrap.querySelector('#learnQuizSubmit').addEventListener('click', async () => {
+      const answers = questions.map((_, i) => {
+        const sel = wrap.querySelector(`input[name="q${i}"]:checked`);
+        return sel ? sel.value : '';
+      });
+      if (answers.some((a) => !a)) {
+        showToast({ type: 'info', title: 'Answer all questions first' });
+        return;
+      }
+      try {
+        const result = await (await apiPost('/learn/grade', { topic, questions, answers })).json();
+        const resEl = wrap.querySelector('#learnQuizResult');
+        resEl.classList.remove('hidden');
+        resEl.innerHTML = `
+          <h4>Score: ${result.score}/${result.total} (${result.percentage}%)</h4>
+          ${result.results.map((r, i) => `
+            <div class="learn-quiz-r ${r.correct ? 'correct' : 'wrong'}">
+              <p><strong>Q${i + 1}.</strong> ${escapeHtml(r.question)}</p>
+              <p>Your answer: ${escapeHtml(r.your_answer)} ${r.correct ? '✓' : '✗'}</p>
+              ${!r.correct ? `<p>Correct: ${escapeHtml(r.correct_answer)}</p>` : ''}
+              ${r.explanation ? `<p class="settings-hint">${escapeHtml(r.explanation)}</p>` : ''}
+            </div>`).join('')}`;
+        resEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (err) {
+        showToast({ type: 'error', title: 'Grading failed', message: String(err?.message || err) });
+      }
+    });
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (err) {
+    wrap.innerHTML = `<p class="team-error">Quiz failed: ${escapeHtml(err?.message || String(err))}</p>`;
   }
 }
 

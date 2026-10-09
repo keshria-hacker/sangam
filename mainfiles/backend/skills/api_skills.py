@@ -194,4 +194,23 @@ async def get_skill(sid: str):
         "tags": sk.tags,
         "src": sk.source_repo,
         "prompt": (prompt[:500] + "...") if len(prompt) > 500 else prompt,
+        "skill_md": sk.prompt_template,  # Phase 7: full SKILL.md for preview
+        "version": getattr(sk, "version", None),
+        "pinned_version": getattr(sk, "pinned_version", None),
     }
+
+
+class SkillPinIn(BaseModel):
+    version: str | None = None
+
+
+@router.post("/{sid}/pin")
+async def pin_skill_version(sid: str, payload: SkillPinIn):
+    """Pin a skill to a specific version (or unpin with null)."""
+    rg = get_registry()
+    sk = rg.get(sid)
+    if not sk:
+        raise HTTPException(404, f"Skill not found: {sid}")
+    # Store pin on the skill object (in-memory; persists for session)
+    sk.pinned_version = payload.version
+    return {"id": sid, "pinned_version": payload.version}

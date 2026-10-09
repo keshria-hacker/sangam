@@ -19,6 +19,8 @@ export const NAV_ITEMS = [
   { id: 'learn',     label: 'Learn',     icon: 'fa-graduation-cap',   action: 'tab:learn',  feature: 'learning' },
   { id: 'library',   label: 'Library',   icon: 'fa-book',             action: 'tab:library', feature: null },
   { id: 'insights',  label: 'Insights',  icon: 'fa-chart-simple',     action: 'tab:analytics', feature: 'analytics' },
+  { id: 'images',    label: 'Images',    icon: 'fa-image',            action: 'tab:images',  feature: 'image_gen' },
+  { id: 'voice',     label: 'Voice',     icon: 'fa-microphone',       action: 'tab:voice',   feature: 'voice' },
 ];
 
 export const NAV_BOTTOM = [

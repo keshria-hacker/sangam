@@ -16,6 +16,7 @@ const TYPE_META = {
   diagram: { label: 'Diagram',     icon: 'fa-diagram-project', placeholder: 'Untitled diagram' },
   code:    { label: 'Code snippet', icon: 'fa-code',           placeholder: 'Untitled snippet' },
   html:    { label: 'HTML page',   icon: 'fa-globe',           placeholder: 'Untitled page' },
+  design:  { label: 'Design system', icon: 'fa-palette',       placeholder: 'Untitled design system' },
 };
 
 const CODE_LANGUAGES = [
@@ -53,6 +54,11 @@ const TEMPLATES = [
     name: 'HTML starter', icon: 'fa-globe', type: 'html',
     title: 'Landing page',
     content: `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>Page</title>\n<style>body{font-family:system-ui;max-width:640px;margin:40px auto;padding:0 16px}</style></head>\n<body>\n<h1>Hello</h1>\n<p>Start here.</p>\n</body>\n</html>`,
+  },
+  {
+    name: 'DESIGN.md', icon: 'fa-palette', type: 'design',
+    title: 'DESIGN.md',
+    content: `# Design System\n\n> Single source of truth for UI tokens, components, and patterns.\n\n## Tokens\n\n### Color\n| Token | Light | Dark | Usage |\n|-------|-------|------|-------|\n| \`--bg-base\` | #F4F2ED | #121315 | Page ground |\n| \`--bg-surface\` | #FBFAF7 | #191A1D | Chrome |\n| \`--accent\` | #3A342B | #E6E4DE | Ink |\n\n### Typography\n| Token | Value | Usage |\n|-------|-------|-------|\n| \`--font-display\` | Sora | Headings |\n| \`--font-body\` | Inter | Body |\n| \`--font-mono\` | JetBrains Mono | Code |\n\n### Spacing\n- Base unit: 4px\n- Scale: 4 / 8 / 12 / 16 / 24 / 32 / 48\n\n### Radius\n- sm: 6px, md: 8px, lg: 12px, full: 999px\n\n## Components\n\n### Button\n- Primary: ink background, paper text\n- Secondary: transparent, bordered\n- Sizes: sm / md / lg\n\n### Card\n- Surface: --bg-elevated\n- Border: 1px var(--border-soft)\n- Radius: var(--radius-sm)\n\n## Patterns\n- No pure #FFF / #000\n- Color is semantic only (success/warning/danger)\n- 120ms / 200ms micro-interactions\n`,
   },
   {
     name: 'Image studio', icon: 'fa-image', type: '_image_studio',
