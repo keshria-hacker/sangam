@@ -110,6 +110,8 @@ class Settings(BaseSettings):
     FEATURE_ANALYTICS: bool = False      # openpanel-style opt-in analytics
     FEATURE_SPEC_KIT: bool = False       # spec-kit style spec-driven workflows
     FEATURE_LEARNING: bool = False       # OpenMAIC-style interactive classroom
+    QUALITY_NO_SLOP: bool = False        # no-ai-slop style response cleanup
+    QUALITY_ADHD_FRIENDLY: bool = False  # i-have-adhd style scannable formatting
 
     # --- MCP servers (JSON list, e.g. '[{"name":"codebase","command":["codebase-memory-mcp"]}]') ---
     MCP_SERVERS_JSON: str | None = Field(

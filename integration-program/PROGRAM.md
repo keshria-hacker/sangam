@@ -85,4 +85,8 @@ integrations, then implement capabilities drawn from 22 reference repos.
   classroom — teacher agent lessons + Socratic tutor feedback, research-first
   (ECC), /api/learn/* gated by FEATURE_LEARNING, Learn modal UI,
   capability:learning extension. See LEARNING_MODE.md.
-- [ ] Theme 8–10 integrations (scoped per theme before build)
+- [x] Theme 8 — Output quality (2026-10-08, branch `output-quality`):
+  no-ai-slop cleanup + ADHD-friendly formatting as deterministic
+  post-processing passes (QUALITY_NO_SLOP / QUALITY_ADHD_FRIENDLY),
+  hooked into the persistence-time postprocessor. See OUTPUT_QUALITY.md.
+- [ ] Theme 9–10 integrations (scoped per theme before build)

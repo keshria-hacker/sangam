@@ -65,6 +65,21 @@ def post_process_response(text: str, guidance: Any) -> str:
     if not text or not text.strip():
         return text
 
+    # Output quality (no-ai-slop / ADHD-friendly): runs on the collected
+    # text at persistence time, never the live stream. Independent of the
+    # hedge logic below.
+    try:
+        from .config import settings
+        from .response_quality import apply_quality
+
+        text, _stats = apply_quality(
+            text,
+            no_slop=settings.QUALITY_NO_SLOP,
+            adhd_friendly=settings.QUALITY_ADHD_FRIENDLY,
+        )
+    except Exception:  # noqa: BLE001 — quality must never break the chat
+        pass
+
     if guidance is None:
         return text
 
