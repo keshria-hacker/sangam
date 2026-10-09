@@ -17,6 +17,8 @@ import { renderCodeAgentTab } from './features/code-agent/code-agent.js';
 import { renderDesignTab } from './features/design/design-studio.js';
 import { initTabs, openToolTab, registerTabRenderer } from './features/tabs/tabs.js';
 import { trapFocus } from './shared/focus_trap.js';
+import { setLang } from './shared/i18n.js';
+import { getSetting } from './shared/settings_store.js';
 import { renderRail, registerNavHandler } from './core/nav.js';
 import { initPopovers } from './features/composer/popovers.js';
 import { initTray } from './features/tray/tray.js';
@@ -470,6 +472,14 @@ export async function startApplication() {
   // Apply saved settings
   loadSettings();
   settingsApplySettings();
+
+  // i18n: apply the language setting
+  try { setLang(getSetting('language') || 'en'); } catch {}
+
+  // PWA: register the service worker (safe no-op if unsupported)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 
   // Initialize toast system
   initToasts();
