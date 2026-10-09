@@ -216,7 +216,17 @@ app.include_router(skills_router, prefix=settings.API_PREFIX, dependencies=[Depe
 | `files_routes.py` | Document upload (validation → storage → extraction → RAG index) |
 | `chats_routes.py` | Chat CRUD, user preferences, rolling summary, message feedback |
 | `models_routes.py` | Model catalogue (`/models`, `/models/{provider}`) |
-| `chat_stream_routes.py` | The streaming pipeline (`/chat/stream`) + `/agentic-reasoning` |
+| `chat_stream_routes.py` | The streaming pipeline (`/chat/stream`) |
+| `code_agent_routes.py` | Agent execution (`/agent/run` SSE, `/agent/approve`) + code agent (`/code-agent/*`) |
+| `agents_routes.py` | Custom agents CRUD (`/agents`) + run (`/agents/{id}/run` SSE) |
+| `teams_routes.py` | Multi-agent teams (`/teams`, `/teams/run`, `/teams/run/stream` SSE, `/teams/retry-agent`) |
+| `knowledge_routes.py` | Knowledge graph (`/knowledge/graph`, `/knowledge/search`) |
+| `artifacts_routes.py` | Typed artifacts CRUD (`/artifacts`) + versions |
+| `automations_routes.py` | Scheduled tasks (`/automations`) |
+| `compare_routes.py` | Model compare (`/compare`) + Arena (`/arena/vote`, `/arena/leaderboard`) |
+| `voice_routes.py` | Voice TTS/STT (`/voice/*`) |
+| `image_routes.py` | Image generation (`/image/*`) |
+| `learn_routes.py` | Learning mode (`/learn/*`) |
 
 `api.py` re-exports every handler so `backend.main` mounts `router`/`public_router` from one stable import surface, and tests can patch `backend.api.*` as before.
 
@@ -241,52 +251,92 @@ The frontend is a vanilla JS SPA served as static files. There is no build step,
 ### 4.2 Layout Structure
 
 ```
-┌──────────────────────────────────────────────────────┐
-│ MOBILE TOPBAR (hidden on desktop)                    │
-├──────────────┬───────────────────────────────────────┤
-│              │  TOPBAR                                │
-│  SIDEBAR     │  [Model selector] [Conn status] [...] │
-│              ├───────────────────────────────────────┤
-│  New chat    │                                        │
-│  Search      │  CHAT AREA                             │
-│              │  [Welcome screen / Messages]            │
-│  Chat list   │  [Skeleton / Error state]              │
-│  (bucketed   │                                        │
-│   by date)   ├───────────────────────────────────────┤
-│              │  COMPOSER                              │
-│  Settings    │  [Attach] [Textarea] [Send]            │
-│  Profile     │  [Temp] [Tokens] [Reasoning] [Web] [Ctrl+Enter]  │
-└──────────────┴───────────────────────────────────────┘
+┌──────┬───────────────────────────────────────────────────┐
+│ RAIL │  TAB STRIP                                         │
+│      │  [Main Chat*] [Knowledge] [Create] ... [+]         │
+│ Home ├───────────────────────────────────────────────────┤
+│ Chat │                                                    │
+│Agents│  ACTIVE TAB CONTENT                                │
+│ Know │  (chat, knowledge graph, create hub, etc.)         │
+│Create│                                                    │
+│ Code ├───────────────────────────────────────────────────┤
+│ Learn│  COMPOSER (chat tab only)                          │
+│ Lib  │  [Attach] [Textarea] [Send] [Mode] [Tools] [Tune] │
+│ ...  └───────────────────────────────────────────────────┘
+│      │  INSPECTOR (right, Ctrl+Shift+I) │ ACTIVITY TRAY   │
+└──────┴───────────────────────────────────────────────────┘
 ```
+
+The **intent-grouped rail** (left) organizes features by user intent: Home, Chat,
+Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings. The main
+chat tab is pinned and never closes. Tool tabs open side-by-side for stateful
+work. The Inspector (right panel) shows contextual details. The Activity Tray
+(bottom) tracks background jobs.
 
 ### 4.3 Module Organization
 
-The frontend now uses a **feature-based module structure** under `frontend/js/features/` — each feature owns its own DOM, state, and logic:
+The frontend uses a **feature-based module structure** under `frontend/js/` — each
+feature owns its own DOM, state, and logic. 47 modules total (verified by
+`scripts/check_frontend_modules.mjs`).
 
+**Core** (`js/core/`):
 | Module | Responsibility |
 |--------|----------------|
-| `core/state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, agenticReasoningEnabled, settings (persisted to `localStorage` as `sangam-settings`), etc. Also `createComputed` / `createSyncedSignal` helpers |
-| `shared/constants.js` | `DEFAULT_SETTINGS`, `CHAT_BUCKETS`, `STORAGE_KEYS`, provider color/label maps |
-| `shared/http.js` | `apiFetch`, `apiGet/apiPost/apiPut/apiDelete`, `apiPostForm`, `streamChatCompletion`, `parseSSE` — authenticated requests + SSE parsing |
-| `shared/markdown.js` | Streaming-safe markdown → HTML rendering (marked + highlight.js + KaTeX) |
-| `shared/toast.js` | Toast notifications |
-| `shared/utils.js` | `escapeHtml`, `formatDate`, `debounce`, etc. |
-| `features/auth/auth.js` | Login, register, forgot/reset password, session check, logout |
-| `features/chat/chat.js` | SSE streaming orchestration, send/regenerate, file attachments, clarification cards |
-| `features/chat/message_view.js` | Message DOM construction — assistant/user message nodes and in-stream status widgets (thinking, reasoning, tools, citations, artifacts) |
-| `features/chat/autoscroll.js` | Smart auto-scroll with hysteresis + a "jump to latest" affordance during streaming |
-| `features/chat/response_controller.js` | Client-side state machine for the canonical `response_event` SSE protocol |
-| `features/models/models.js` | Model selector dropdown, provider status badges, "no models" handling |
-| `features/settings/settings.js` | Theme (Paper/Ink/system), font size, chat width, code theme, animations; provider key manager (add/remove keys) |
-| `features/skills/skills.js` | Skills modal: search, category/invocation filters, detail panel, execution |
-| `features/sidebar/sidebar.js` | Chat history list (bucketed by date), new chat, delete chat |
+| `state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings, etc. Also `createComputed` / `createSyncedSignal` helpers |
+| `nav.js` | Intent-grouped rail navigation (Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings) |
+| `jobs.js` | Background job tracking for the Activity Tray |
+
+**Shared** (`js/shared/`):
+| Module | Responsibility |
+|--------|----------------|
+| `constants.js` | `DEFAULT_SETTINGS`, `CHAT_BUCKETS`, `STORAGE_KEYS`, provider color/label maps |
+| `http.js` | `apiFetch`, `apiGet/apiPost/apiPut/apiDelete`, `streamChatCompletion`, `parseSSE` |
+| `markdown.js` | Streaming-safe markdown → HTML (marked + highlight.js + KaTeX) |
+| `toast.js` | Toast notifications |
+| `utils.js` | `escapeHtml`, `formatDate`, `debounce`, etc. |
+| `settings_schema.js` | Typed settings schema (14 categories, 30+ settings) |
+| `settings_store.js` | Settings persistence (server-backed via `/api/user/settings`) |
+| `runlog.js` | Shared live execution log (agent steps, tool calls) |
+| `focus_trap.js` | Focus trap utility for modals (a11y) |
+| `i18n.js` | `t()` + `setLang()` — English + Hindi UI strings |
+
+**Features** (`js/features/`):
+| Module | Responsibility |
+|--------|----------------|
+| `auth/` | Login, register, forgot/reset password, session check, logout |
+| `chat/` | SSE streaming orchestration, send/regenerate, file attachments, clarification cards, agent mode |
+| `models/` | Model selector dropdown, provider status badges |
+| `settings/` | `settings.js` (legacy modal: theme, API keys) + `settings_page.js` (schema-driven full page) |
+| `sidebar/` | Chat history list (bucketed by date), new chat, delete chat |
+| `tabs/` | Mount-once persistent tab manager (main chat pinned) |
+| `agents/` | Agent Hub: custom agent CRUD, run with streaming, approval cards |
+| `teams/` | Multi-agent team UI |
+| `knowledge/` | Knowledge graph (SVG), search, MCP manager, memory browser |
+| `create/` | Artifact hub: docs, diagrams, code, HTML + version history |
+| `code-agent/` | Agentic coding UI with RunLog |
+| `design/` | Design Studio: prototype gen + iframe preview |
+| `learn/` | Learning mode: lessons, skill importer |
+| `library/` | Skills, MCP servers, extensions, templates browser |
+| `automations/` | Scheduled task CRUD + run-now |
+| `routing/` | Model routing rules, combos, quota display |
+| `inspector/` | Right-panel contextual inspector (Ctrl+Shift+I) |
+| `tray/` | Activity Tray for background jobs |
+| `home/` | Home dashboard |
+| `analytics/` | Insights dashboard |
+| `image/` | Image generation UI |
+| `voice/` | Voice controls (TTS/STT) |
+| `composer/` | Composer popovers (Mode, Tools, Tune) |
+| `palette/` | Command palette (Ctrl+P) |
+| `presets/` | UI presets (Minimal, Standard, Studio, etc.) |
+| `skills/` | Legacy skills browser (see Library) |
 
 **Boot sequence (`app.js` `init()`):**
-1. Initialize DOM references and inject the markdown CSP
-2. Initialize global state (`state.js`) — persisted settings are loaded from `localStorage` (`sangam-settings`)
-3. Initialize feature modules in dependency order: auth → settings → models → chat → sidebar
-4. Call `initGlobalListeners()` for topbar controls (temperature, tokens, reasoning, web search, shortcuts) and `initSkills()`
-5. `initializeAuth()` — validates the stored session, then invokes the `startApplication` callback on success
+1. Initialize DOM references
+2. Initialize global state — settings loaded from server (`/api/user/settings`)
+3. Initialize core: auth → nav → tabs → jobs
+4. Initialize feature modules
+5. `initializeAuth()` — validates session, then `startApplication()` on success
+6. Register service worker (PWA), apply i18n language
 
 ### 4.4 State Management
 
@@ -898,7 +948,10 @@ When a message is sent with `file_ids`, the backend uses **Retrieval-Augmented G
 
 ### 12.1 Test Suite Overview
 
-The test suite is a single unified tree at `tests/` (~45 files: unit, `integration/`, `e2e/`, `manual/`) consolidated by the module-split refactor — ~950 tests collect and run under pytest. The backend package is importable via the path setup in `tests/conftest.py` (plus `PYTHONPATH=mainfiles` in CI).
+The test suite is a single unified tree at `tests/` (60 test files: unit,
+`integration/`, `e2e/`, `manual/`). As of Phase 6 (2026-10-09): **1148 passed,
+1 flaky, 100 skipped**. The backend package is importable via the path setup in
+`tests/conftest.py` (plus `PYTHONPATH=mainfiles` in CI).
 
 Representative modules:
 
@@ -914,7 +967,20 @@ Representative modules:
 | Web search | `test_websearch.py` | DuckDuckGo parser, format_context, providers |
 | Memory + feedback | `test_memory.py`, `test_message_feedback.py`, `test_preferences.py` | Cross-session memory, message feedback, user preferences |
 | Streaming + frontend contract | `test_streaming.py`, `test_frontend_response_controller.py` | SSE frame format, client state machine |
+| Phase 3: Knowledge + Agents | `test_phase3.py` | Knowledge graph, approval gate (approve/deny), run history |
+| Phase 4: Create + Learn | `test_phase4.py` | Artifacts, spec wizard, quality preview |
+| Phase 5: Automations | `test_phase5.py` | Automation CRUD, scheduler |
+| Phase 6: Behaviors | `test_phase6_behaviors.py` | Budget stop, settings roundtrip, 1k-node graph perf, routing |
+| Phase 6: Teams streaming | `test_teams_streaming.py` | SSE streaming, per-agent retry |
+| Phase 6: Graph provenance | `test_graph_provenance.py` | Edge provenance, memory wings |
+| Phase 6: Compare + Arena | `test_compare_arena.py` | Parallel compare, leaderboard |
+| Phase 6: Fallback chain | `test_fallback_chain.py` | Circuit breakers, quotas, fallback |
+| E2E (Playwright) | `tests/e2e/golden_paths.spec.ts` | 6 golden paths: first run, ask/refine, knowledge, create, agents, settings |
 | Other | `test_startup.py`, `test_schemas.py`, `test_skill_registry.py`, `test_skills.py`, `test_executor_coverage.py`, `test_context_manager.py`, `test_prompt_injection_new.py`, `test_ratelimit_redis.py`, `test_main.py`, `test_e2e.py` | Launcher, validation, skills, context truncation, injection detection, Redis limiter |
+
+**Frontend module validation:** `scripts/check_frontend_modules.mjs` parses and links
+all 47 ES modules through V8 (`node --experimental-vm-modules`). This catches
+import/export errors that `node --check` misses.
 
 ### 12.2 Running Tests
 
@@ -990,21 +1056,66 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/models/{provider}` | Yes | Per-provider model listing |
 | POST | `/api/models/inaccessible/clear` | Yes | Reset inaccessible-model markers |
 | GET | `/api/providers` | Yes | Provider status |
+| GET | `/api/providers/status` | Yes | Circuit breaker + quota states (Phase 6.4d) |
 | POST | `/api/chat/stream` | Yes | Stream chat response (SSE) |
-| POST | `/api/agentic-reasoning` | Yes | Tool-calling reasoning endpoint |
+| POST | `/api/agent/run` | Yes | Run agent loop (SSE streaming) |
+| POST | `/api/agent/approve/{approval_id}` | Yes | Approve/deny tool call |
+| POST | `/api/code-agent/run` | Yes | Code agent execution (SSE) |
+| GET | `/api/code-agent/code-map` | Yes | Codebase AST graph |
 | GET | `/api/chats` | Yes | List all chats (with summaries) |
 | POST | `/api/chats` | Yes | Create a chat |
 | GET | `/api/chats/{id}` | Yes | Get chat with messages |
 | DELETE | `/api/chats/{id}` | Yes | Delete chat |
-| GET | `/api/chats/{id}/summary` | Yes | Rolling summary + topics (Phase 5) |
+| GET | `/api/chats/{id}/summary` | Yes | Rolling summary + topics |
 | POST | `/api/messages/{id}/feedback` | Yes | Message quality feedback (up/down + note) |
 | POST | `/api/files` | Yes | Upload document |
 | GET | `/api/user/preferences` | Yes | Response style preferences |
 | PUT | `/api/user/preferences` | Yes | Update response style preferences |
+| GET | `/api/user/settings` | Yes | Get all settings (Phase 2) |
+| PUT | `/api/user/settings` | Yes | Update settings |
 | GET | `/api/settings/providers` | Yes | Provider key status |
 | PUT | `/api/settings/providers/{id}/key` | Yes | Save API key |
 | DELETE | `/api/settings/providers/{id}/key` | Yes | Remove API key |
 | GET | `/api/settings/providers/{id}/models/refresh` | Yes | Re-fetch models for one provider |
+| GET | `/api/knowledge/graph` | Yes | Unified knowledge graph (Phase 3) |
+| GET | `/api/knowledge/search` | Yes | Search across memories, docs, code, chats |
+| GET | `/api/agents` | Yes | List custom agents (Phase 3) |
+| POST | `/api/agents` | Yes | Create custom agent |
+| GET | `/api/agents/{id}` | Yes | Get agent |
+| PUT | `/api/agents/{id}` | Yes | Update agent |
+| DELETE | `/api/agents/{id}` | Yes | Delete agent |
+| POST | `/api/agents/{id}/run` | Yes | Run agent (SSE) |
+| GET | `/api/teams` | Yes | List agent teams |
+| POST | `/api/teams/run` | Yes | Run team (fan-out/fan-in) |
+| POST | `/api/teams/run/stream` | Yes | Stream team run (SSE per specialist, Phase 6.4a) |
+| POST | `/api/teams/retry-agent` | Yes | Retry single specialist |
+| GET | `/api/runs` | Yes | Agent run history |
+| GET | `/api/artifacts` | Yes | List artifacts (Phase 4) |
+| POST | `/api/artifacts` | Yes | Create artifact |
+| GET | `/api/artifacts/{id}` | Yes | Get artifact |
+| PUT | `/api/artifacts/{id}` | Yes | Update artifact (new version) |
+| DELETE | `/api/artifacts/{id}` | Yes | Delete artifact |
+| GET | `/api/artifacts/{id}/versions` | Yes | Version history |
+| POST | `/api/spec/build` | Yes | Build spec from prompt (Phase 4) |
+| POST | `/api/spec/to-task` | Yes | Convert spec to task |
+| POST | `/api/quality/preview` | Yes | Preview quality cleanup diff |
+| GET | `/api/automations` | Yes | List automations (Phase 5) |
+| POST | `/api/automations` | Yes | Create automation |
+| GET | `/api/automations/{id}` | Yes | Get automation |
+| PUT | `/api/automations/{id}` | Yes | Update automation |
+| DELETE | `/api/automations/{id}` | Yes | Delete automation |
+| POST | `/api/automations/{id}/run` | Yes | Run now |
+| POST | `/api/compare` | Yes | Parallel model comparison (Phase 6.4c) |
+| POST | `/api/arena/vote` | Yes | Record Arena vote |
+| GET | `/api/arena/leaderboard` | Yes | Win rates by model |
+| POST | `/api/voice/tts` | Yes | Text-to-speech |
+| POST | `/api/voice/stt` | Yes | Speech-to-text |
+| GET | `/api/voice/voices` | Yes | Available voices |
+| GET | `/api/voice/status` | Yes | Voice engine status |
+| POST | `/api/image/generate` | Yes | Generate image |
+| GET | `/api/image/status` | Yes | Image engine status |
+| POST | `/api/learn/lesson` | Yes | Generate lesson |
+| POST | `/api/learn/feedback` | Yes | Tutor feedback |
 | GET | `/api/auth/status` | No | Registration open? |
 | POST | `/api/auth/register` | No | Create account |
 | POST | `/api/auth/login` | No | Sign in |
@@ -1016,8 +1127,11 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/skills/categories` | Yes | List categories |
 | GET | `/api/skills/{id}` | Yes | Skill detail |
 | POST | `/api/skills/execute` | Yes | Execute skill |
-| POST | `/api/skills/chain` | Yes | Chain skills |
-| POST | `/api/skills/auto-suggest` | Yes | Suggest skills |
+| GET | `/api/extensions` | Yes | List extensions |
+| POST | `/api/extensions/{name}/enable` | Yes | Enable extension |
+| POST | `/api/extensions/{name}/disable` | Yes | Disable extension |
+| GET | `/api/features` | Yes | List feature flags |
+| POST | `/api/features/{name}` | Yes | Toggle feature |
 
 ### 13.3 Database Schema
 
@@ -1077,8 +1191,47 @@ WEB_SEARCH_MAX_RESULTS=5
 │   formal)                     │
 │ expertise_level (beginner|    │
 │   general|expert)             │
+│ settings_json (TEXT)          │  ← Phase 2: typed settings
 │ updated_at                    │
 └───────────────────────────────┘
+
+┌───────────────────┐       ┌───────────────────┐
+│   custom_agents   │       │    agent_runs     │
+├───────────────────┤       ├───────────────────┤
+│ id (PK)           │       │ id (PK)           │
+│ user_id (FK)      │       │ user_id (FK)      │
+│ name              │       │ agent_id (FK)     │
+│ system_prompt     │       │ status            │
+│ tools_json        │       │ created_at        │
+│ created_at        │       └───────────────────┘
+└───────────────────┘          ↑ Phase 3: Agent Hub
+
+┌───────────────────┐       ┌───────────────────┐
+│    artifacts      │       │ artifact_versions │
+├───────────────────┤       ├───────────────────┤
+│ id (PK)           │──┐    │ id (PK)           │
+│ user_id (FK)      │  └──>│ artifact_id (FK)  │
+│ title             │       │ version           │
+│ type              │       │ content           │
+│ content           │       │ created_at        │
+│ created_at        │       └───────────────────┘
+└───────────────────┘          ↑ Phase 4: Create Hub
+
+┌───────────────────┐       ┌───────────────────┐
+│   automations     │       │  arena_results    │
+├───────────────────┤       ├───────────────────┤
+│ id (PK)           │       │ id (PK)           │
+│ user_id (FK)      │       │ user_id (FK)      │
+│ name              │       │ prompt            │
+│ trigger           │       │ winner_model      │
+│ action            │       │ loser_model       │
+│ config_json       │       │ models_compared   │
+│ enabled           │       │ created_at        │
+│ last_run          │       └───────────────────┘
+│ next_run          │          ↑ Phase 6: Arena
+│ created_at        │
+└───────────────────┘
+   ↑ Phase 5: Automations
 ```
 
 ### 13.4 Startup Sequence

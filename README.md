@@ -126,7 +126,7 @@ Opt-in, local-first analytics dashboard — your usage stays on your server, nev
 
 Press Ctrl+P for a quick launcher: new chat, skills, teams, export, theme, and more. Export any chat as Markdown.
 
-### � studio AI Studio Shell
+### 🏢 AI Studio Shell
 
 Intent-grouped navigation (Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings). Browser-style tabs for side-by-side work — main chat stays pinned. Right Inspector panel (Ctrl+Shift+I), Activity Tray for background jobs, typed settings with search.
 
@@ -140,7 +140,7 @@ Build custom agents with system prompts, tools, and approval policies. Built-in 
 
 ### 🎨 Create Hub
 
-Typed artifacts: markdown docs, diagrams (custom SVG renderer), code files, HTML previews. Version history with restore, six starter templates, image/voice studio shortcuts.
+Typed artifacts: markdown docs, diagrams (custom SVG renderer), code files, HTML previews. Version history with restore, eight starter templates, image/voice studio shortcuts.
 
 ### ⏰ Automations
 
