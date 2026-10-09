@@ -29,7 +29,7 @@ export function getVoiceStatus() {
 /** Called once at app startup. Returns true when voice UI should show. */
 export async function initVoice() {
   try {
-    const data = await apiFetch('/features', {}, false);
+    const data = await (await apiFetch('/features')).json();
     voiceEnabled = !!(data && data.features && data.features.voice);
   } catch {
     voiceEnabled = false;
@@ -37,7 +37,7 @@ export async function initVoice() {
   if (!voiceEnabled) return false;
   window.__sangamVoice = true;
   try {
-    voiceStatus = await apiFetch('/voice/status', {}, false);
+    voiceStatus = await (await apiFetch('/voice/status')).json();
   } catch {
     voiceStatus = null;
   }
@@ -180,7 +180,7 @@ export async function refreshVoiceSettings() {
 
   let voicesHtml = '<span class="memory-stat">default voice</span>';
   try {
-    const voices = await apiFetch('/voice/voices', {}, false);
+    const voices = await (await apiFetch('/voice/voices')).json();
     if (Array.isArray(voices) && voices.length) {
       voicesHtml = `<select id="voiceSelect" class="provider-key-input" aria-label="TTS voice">` +
         `<option value="">Default voice</option>` +

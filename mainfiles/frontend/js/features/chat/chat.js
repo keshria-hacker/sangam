@@ -258,13 +258,13 @@ export async function handleSend() {
             .filter(Boolean)
         : [];
 
-      const response = await apiPost('/agentic-reasoning', {
+      const response = await (await apiPost('/agentic-reasoning', {
         message: text,
         model: getSelectedModel()?.id || '',
         chat_id: getActiveChatId(),
         max_iterations: maxIterations,
         tools,
-      });
+      })).json();
 
       if (response.reasoning_used) {
         processedContent = response.enhanced_message || text;

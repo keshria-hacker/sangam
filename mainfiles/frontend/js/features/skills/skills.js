@@ -176,7 +176,7 @@ async function loadPacks() {
   const container = document.getElementById('skillsPacks');
   if (!container) return;
   try {
-    const packs = await apiFetch('/skills/packs');
+    const packs = await (await apiFetch('/skills/packs')).json();
     if (!Array.isArray(packs) || !packs.length) {
       container.innerHTML = '';
       return;

@@ -12,7 +12,7 @@ console.log('[Module] analytics.js loaded');
 export async function initAnalytics() {
   let enabled = false;
   try {
-    const data = await apiFetch('/features', {}, false);
+    const data = await (await apiFetch('/features')).json();
     enabled = !!(data && data.features && data.features.analytics);
   } catch {
     enabled = false;
@@ -69,7 +69,7 @@ async function loadStats() {
   const days = overlay.querySelector('#analyticsDays').value;
   content.innerHTML = '<div class="loading">Loading…</div>';
   try {
-    const stats = await apiFetch(`/analytics/stats?days=${encodeURIComponent(days)}`);
+    const stats = await (await apiFetch(`/analytics/stats?days=${encodeURIComponent(days)}`)).json();
     if (!stats.enabled) {
       content.innerHTML = '<p class="analytics-empty">Analytics are disabled.</p>';
       return;

@@ -38,7 +38,7 @@ export function initMemorySettings() {
   tidy.addEventListener('click', async () => {
     tidy.disabled = true;
     try {
-      const result = await apiPost('/memory/consolidate', {});
+      const result = await (await apiPost('/memory/consolidate', {})).json();
       showToast({ type: 'success', title: 'Memory tidied', message: `${result.pruned || 0} pruned, ${result.decayed || 0} decayed.` });
       await refreshMemorySection();
     } catch (err) {
@@ -53,7 +53,7 @@ export async function refreshMemorySection() {
   const { stats, search, list } = els();
   if (!stats || !list) return;
   try {
-    const data = await apiFetch('/memory/stats');
+    const data = await (await apiFetch('/memory/stats')).json();
     const byKind = data.by_kind || {};
     stats.innerHTML =
       `<span class="memory-stat"><strong>${data.total || 0}</strong>memories</span>` +
@@ -73,7 +73,7 @@ async function renderMemoryList(query) {
   try {
     const params = new URLSearchParams({ limit: '30' });
     if (query) params.set('q', query);
-    const memories = await apiFetch(`/memory?${params.toString()}`);
+    const memories = await (await apiFetch(`/memory?${params.toString()}`)).json();
     if (!memories.length) {
       list.innerHTML = `<div class="memory-empty">${query ? 'No memories match.' : 'Nothing remembered yet. Sangam will remember facts, preferences, and corrections automatically.'}</div>`;
       return;

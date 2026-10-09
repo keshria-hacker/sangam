@@ -17,7 +17,7 @@ let currentLesson = '';
 export async function initLearn() {
   let enabled = false;
   try {
-    const data = await apiFetch('/features', {}, false);
+    const data = await (await apiFetch('/features')).json();
     enabled = !!(data && data.features && data.features.learning);
   } catch {
     enabled = false;
@@ -90,7 +90,7 @@ async function startLesson() {
   answerWrap.classList.add('hidden');
   feedbackEl.classList.add('hidden');
   try {
-    const data = await apiPost('/learn/lesson', { topic });
+    const data = await (await apiPost('/learn/lesson', { topic })).json();
     currentLesson = data.lesson || '';
     lessonEl.innerHTML = renderMarkdown(currentLesson);
     lessonEl.classList.remove('hidden');
@@ -112,7 +112,7 @@ async function checkAnswer() {
   const feedbackEl = overlay.querySelector('#learnFeedback');
   setBusy(true);
   try {
-    const data = await apiPost('/learn/feedback', { topic, lesson: currentLesson, answer });
+    const data = await (await apiPost('/learn/feedback', { topic, lesson: currentLesson, answer })).json();
     feedbackEl.innerHTML = `<h4>Tutor</h4>${renderMarkdown(data.feedback || '')}`;
     feedbackEl.classList.remove('hidden');
     feedbackEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

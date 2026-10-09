@@ -136,7 +136,7 @@ export function syncSettingsUI() {
  */
 export async function loadUserPreferences() {
   try {
-    const pref = await apiGet('/user/preferences');
+    const pref = await (await apiGet('/user/preferences')).json();
     setActiveSegment(elements.responseStyleSegmented, pref.response_style || 'balanced', 'style');
     setActiveSegment(elements.formalitySegmented, pref.formality || 'neutral', 'tone');
     setActiveSegment(elements.expertiseSegmented, pref.expertise_level || 'general', 'expertise');

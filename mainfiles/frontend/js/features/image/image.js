@@ -22,7 +22,7 @@ export function isImageGenEnabled() {
 
 export async function initImage() {
   try {
-    const data = await apiFetch('/features', {}, false);
+    const data = await (await apiFetch('/features')).json();
     imageGenEnabled = !!(data && data.features && data.features.image_gen);
   } catch {
     imageGenEnabled = false;
@@ -40,7 +40,7 @@ export async function initImage() {
 async function loadStyles() {
   if (cachedStyles.length) return cachedStyles;
   try {
-    const status = await apiFetch('/image/status', {}, false);
+    const status = await (await apiFetch('/image/status')).json();
     cachedStyles = status && Array.isArray(status.styles) ? status.styles : [];
   } catch {
     cachedStyles = [];
@@ -98,12 +98,12 @@ function openImageDialog() {
     goBtn.disabled = true;
     statusEl.classList.remove('hidden');
     try {
-      const res = await apiPost('/image/generate', {
+      const res = await (await apiPost('/image/generate', {
         prompt,
         style: styleEl.value || 'none',
         size: sizeEl.value || '1024x1024',
         n: 1,
-      });
+      })).json();
       const images = (res && res.images) || [];
       if (!images.length) throw new Error('No images returned');
       const files = getAttachedFiles();

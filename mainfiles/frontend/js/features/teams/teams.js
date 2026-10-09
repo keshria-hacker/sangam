@@ -21,7 +21,7 @@ export function isTeamsEnabled() {
 
 export async function initTeams() {
   try {
-    const data = await apiFetch('/features', {}, false);
+    const data = await (await apiFetch('/features')).json();
     teamsEnabled = !!(data && data.features && data.features.multi_agent);
   } catch {
     teamsEnabled = false;
@@ -70,7 +70,7 @@ export async function openTeamsModal() {
   const select = overlay.querySelector('#teamsSelect');
   if (!teams.length) {
     try {
-      teams = await apiFetch('/teams');
+      teams = await (await apiFetch('/teams')).json();
     } catch {
       teams = [];
     }
@@ -95,7 +95,7 @@ async function runTeam() {
   resultsEl.classList.remove('hidden');
   resultsEl.innerHTML = '<div class="teams-running"><i class="fa-solid fa-circle-notch fa-spin"></i> Specialists working in parallel…</div>';
   try {
-    const result = await apiPost('/teams/run', { team_id: teamId, task });
+    const result = await (await apiPost('/teams/run', { team_id: teamId, task })).json();
     const specialists = (result.specialists || []).map((s) => `
       <details class="team-specialist">
         <summary><strong>${escapeHtml(s.role)}</strong>

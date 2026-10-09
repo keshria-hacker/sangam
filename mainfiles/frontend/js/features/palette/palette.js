@@ -22,7 +22,7 @@ function app() {
 
 async function loadFlags() {
   try {
-    const data = await apiFetch('/features', {}, false);
+    const data = await (await apiFetch('/features')).json();
     flags = (data && data.features) || {};
   } catch {
     flags = {};
