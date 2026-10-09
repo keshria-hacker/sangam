@@ -61,6 +61,8 @@ export function renderCodeAgentTab(bodyEl) {
     stopBtn.classList.remove('hidden');
     clearLog(logEl);
     abort = new AbortController();
+    const jobsMod = await import('../../core/jobs.js');
+    const jobId = jobsMod.startJob({ kind: 'code-agent', title: task.slice(0, 60), abort: () => abort?.abort() });
 
     try {
       const res = await apiFetch('/code-agent/run', {
@@ -92,8 +94,13 @@ export function renderCodeAgentTab(bodyEl) {
     } catch (err) {
       if (err?.name !== 'AbortError') {
         appendStep(logEl, { kind: 'error', content: String(err?.message || err) });
+        jobsMod.finishJob(jobId, 'failed', String(err?.message || err));
+      } else {
+        jobsMod.finishJob(jobId, 'done');
       }
     } finally {
+      const job = jobsMod.getJobs().find((j) => j.id === jobId);
+      if (job && job.status === 'running') jobsMod.finishJob(jobId, 'done');
       runBtn.classList.remove('hidden');
       stopBtn.classList.add('hidden');
       abort = null;

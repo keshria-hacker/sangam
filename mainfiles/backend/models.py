@@ -129,6 +129,8 @@ class UserPreference(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC)
     )
+    # Generic JSON blob for the typed settings schema (Phase 2)
+    settings_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="preferences")
 

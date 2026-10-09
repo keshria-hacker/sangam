@@ -253,14 +253,12 @@ async function onFeatureToggleClick(e) {
  */
 export function refreshFeatureButtons(features) {
   const show = (id, on) => document.getElementById(id)?.classList.toggle('hidden', !on);
-  show('teamsBtn', !!features.multi_agent);
-  show('learnBtn', !!features.learning);
-  show('analyticsBtn', !!features.analytics);
   show('micBtn', !!features.voice);
   show('imageBtn', !!features.image_gen);
-  show('imagesBtn', !!features.image_gen);
   // Voice settings section follows the voice flag.
   document.getElementById('voiceSettingsSectionWrap')?.classList.toggle('hidden', !features.voice);
+  // Rail re-renders with updated feature states
+  document.dispatchEvent(new CustomEvent('sangam:features-changed', { detail: { features } }));
   // Tool picker respects flags too
   import('../tabs/tabs.js').then((m) => m.invalidateFeatureCache?.()).catch(() => {});
 }

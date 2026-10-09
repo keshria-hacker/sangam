@@ -21,11 +21,7 @@ export function isImageGenEnabled() {
 }
 
 export async function initImage() {
-  const btn = document.getElementById('imageBtn');
-  if (btn && !btn.dataset.wired) {
-    btn.dataset.wired = '1';
-    btn.addEventListener('click', openImageDialog);
-  }
+  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
   const studioBtn = document.getElementById('imagesBtn');
   if (studioBtn && !studioBtn.dataset.wired) {
     studioBtn.dataset.wired = '1';

@@ -98,28 +98,8 @@ if (location.protocol === 'file:') {
         <input type="text" id="searchChats" placeholder="Search chats…" autocomplete="off">
       </div>
 
-      <nav class="tools-nav" aria-label="Tools">
-        <button class="tool-nav-item" id="skillsBtn" title="Skills & tools" aria-label="Skills and tools">
-          <i class="fa-solid fa-wand-magic-sparkles"></i><span>Skills</span>
-        </button>
-        <button class="tool-nav-item hidden" id="teamsBtn" title="Agent teams" aria-label="Agent teams">
-          <i class="fa-solid fa-users"></i><span>Agent teams</span>
-        </button>
-        <button class="tool-nav-item hidden" id="learnBtn" title="Learn" aria-label="Learn">
-          <i class="fa-solid fa-graduation-cap"></i><span>Learn</span>
-        </button>
-        <button class="tool-nav-item hidden" id="analyticsBtn" title="Usage analytics" aria-label="Usage analytics">
-          <i class="fa-solid fa-chart-simple"></i><span>Analytics</span>
-        </button>
-        <button class="tool-nav-item hidden" id="imagesBtn" title="Image studio" aria-label="Image studio">
-          <i class="fa-solid fa-image"></i><span>Image studio</span>
-        </button>
-        <button class="tool-nav-item" id="codeBtn" title="Code agent" aria-label="Code agent">
-          <i class="fa-solid fa-code"></i><span>Code agent</span>
-        </button>
-        <button class="tool-nav-item" id="designBtn" title="Design studio" aria-label="Design studio">
-          <i class="fa-solid fa-palette"></i><span>Design studio</span>
-        </button>
+      <nav class="rail-nav" id="railNav" aria-label="Studio navigation">
+        <!-- Populated by core/nav.js -->
       </nav>
 
       <nav class="chat-history" id="chatHistory" aria-label="Chat history">
@@ -400,15 +380,24 @@ if (location.protocol === 'file:') {
             </div>
           </div>
 
-          <button class="pill-control toggle-pill" id="webSearchToggle" title="Enable web search for this message" aria-pressed="false">
-            <i class="fa-solid fa-globe"></i>
-            <span>Web</span>
-          </button>
-
-          <button class="pill-control toggle-pill" id="agentModeToggle" title="Agent mode: the assistant can use tools (web, files, code) to help" aria-pressed="false">
-            <i class="fa-solid fa-robot"></i>
-            <span>Agent</span>
-          </button>
+          <div class="composer-popover-wrap">
+            <button class="pill-control" id="modeBtn" title="Composer mode" aria-haspopup="true">
+              <i class="fa-solid fa-comment"></i><span>Chat</span><i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div class="composer-popover hidden" id="modePopover" role="menu"></div>
+          </div>
+          <div class="composer-popover-wrap">
+            <button class="pill-control" id="toolsBtn" title="Tools for this message" aria-haspopup="true">
+              <i class="fa-solid fa-wrench"></i><span>Tools</span><i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div class="composer-popover hidden" id="toolsPopover" role="menu"></div>
+          </div>
+          <div class="composer-popover-wrap">
+            <button class="pill-control" id="tuneBtn" title="Tune generation" aria-haspopup="true">
+              <i class="fa-solid fa-sliders"></i><span>Tune</span><i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div class="composer-popover hidden" id="tunePopover" role="menu"></div>
+          </div>
 
           <span class="composer-hint" id="composerHint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to send</span>
           <span class="token-counter" id="tokenCounter" title="Estimated token count"></span>

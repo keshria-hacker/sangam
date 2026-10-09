@@ -16,6 +16,10 @@ import { renderImageTab } from './features/image/image.js';
 import { renderCodeAgentTab } from './features/code-agent/code-agent.js';
 import { renderDesignTab } from './features/design/design-studio.js';
 import { initTabs, openToolTab, registerTabRenderer } from './features/tabs/tabs.js';
+import { renderRail, registerNavHandler } from './core/nav.js';
+import { initPopovers } from './features/composer/popovers.js';
+import { initTray } from './features/tray/tray.js';
+import { initInspector } from './features/inspector/inspector.js';
 import { initElements as initSidebarElements, initSidebar, openMobileSidebar, closeMobileSidebar, toggleSidebarCollapse, loadChatList as sidebarLoadChatList, renderChatHistory as sidebarRenderChatHistory, openChat as sidebarOpenChat, deleteChat as sidebarDeleteChat } from './features/sidebar/sidebar.js';
 import { showToast, initToasts } from './shared/toast.js';
 import { getApiBaseUrl } from './shared/http.js';
@@ -154,6 +158,40 @@ function initDOM() {
 /**
  * Set up global event listeners that cross modules.
  */
+/**
+ * Initialize the studio rail (intent-grouped navigation).
+ */
+async function initRail() {
+  const container = document.getElementById('railNav');
+  if (!container) return;
+  // Register nav handlers
+  registerNavHandler('home', async () => {
+    const { renderHome } = await import('./features/home/home.js');
+    openToolTab('home');
+  });
+  registerNavHandler('chat', () => {
+    const { switchTab } = window.__sangamTabs || {};
+    // Fallback: main tab is the chat
+    document.getElementById('mainTab')?.click();
+  });
+  registerNavHandler('settings', async () => {
+    const { renderSettingsPage } = await import('./features/settings/settings_page.js');
+    openToolTab('settings');
+  });
+  // Load features and render
+  try {
+    const { apiFetch } = await import('./shared/http.js');
+    const data = await (await apiFetch('/features')).json();
+    renderRail(container, data.features || {});
+  } catch {
+    renderRail(container, {});
+  }
+  // Re-render rail when features change
+  document.addEventListener('sangam:features-changed', async (e) => {
+    renderRail(container, e.detail?.features || {});
+  });
+}
+
 function initGlobalListeners() {
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -488,6 +526,10 @@ async function init() {
   initSidebar();
   initGlobalListeners();
   initTabs();
+  initRail();
+  initPopovers();
+  initTray();
+  initInspector();
   registerTabRenderer('skills', renderSkillsTab);
   registerTabRenderer('teams', renderTeamsTab);
   registerTabRenderer('learn', renderLearnTab);
@@ -495,6 +537,18 @@ async function init() {
   registerTabRenderer('images', renderImageTab);
   registerTabRenderer('code', renderCodeAgentTab);
   registerTabRenderer('design', renderDesignTab);
+  registerTabRenderer('home', async (bodyEl) => {
+    const { renderHome } = await import('./features/home/home.js');
+    renderHome(bodyEl);
+  });
+  registerTabRenderer('settings', async (bodyEl) => {
+    const { renderSettingsPage } = await import('./features/settings/settings_page.js');
+    renderSettingsPage(bodyEl);
+  });
+  registerTabRenderer('knowledge', async (bodyEl) => {
+    const { renderKnowledgeTab } = await import('./features/knowledge/knowledge.js');
+    renderKnowledgeTab(bodyEl);
+  });
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

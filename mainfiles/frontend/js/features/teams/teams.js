@@ -20,14 +20,7 @@ export function isTeamsEnabled() {
 }
 
 export async function initTeams() {
-  const btn = document.getElementById('teamsBtn');
-  if (btn && !btn.dataset.wired) {
-    btn.dataset.wired = '1';
-    btn.addEventListener('click', async () => {
-      const { openToolTab } = await import('../tabs/tabs.js');
-      openToolTab('teams');
-    });
-  }
+  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
   try {
     const data = await (await apiFetch('/features')).json();
     teamsEnabled = !!(data && data.features && data.features.multi_agent);

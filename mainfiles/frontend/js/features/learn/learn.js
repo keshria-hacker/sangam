@@ -15,14 +15,7 @@ console.log('[Module] learn.js loaded');
 let currentLesson = '';
 
 export async function initLearn() {
-  const btn = document.getElementById('learnBtn');
-  if (btn && !btn.dataset.wired) {
-    btn.dataset.wired = '1';
-    btn.addEventListener('click', async () => {
-      const { openToolTab } = await import('../tabs/tabs.js');
-      openToolTab('learn');
-    });
-  }
+  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
   let enabled = false;
   try {
     const data = await (await apiFetch('/features')).json();

@@ -27,6 +27,10 @@ from .api_routes.chat_stream_routes import (  # noqa: F401
     SSE_HEARTBEAT_INTERVAL,
     chat_stream,
 )
+from .api_routes.settings_routes import (  # noqa: F401
+    get_user_settings,
+    put_user_settings,
+)
 from .api_routes.chats_routes import (  # noqa: F401
     append_messages,
     create_chat,

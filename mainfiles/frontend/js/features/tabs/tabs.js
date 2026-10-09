@@ -10,6 +10,9 @@
 import { apiFetch } from '../../shared/http.js';
 
 const TOOL_DEFS = {
+  home:      { title: 'Home',          icon: 'fa-house',               feature: null },
+  settings:  { title: 'Settings',      icon: 'fa-gear',                feature: null },
+  knowledge: { title: 'Knowledge',     icon: 'fa-brain',               feature: null },
   skills:    { title: 'Skills',        icon: 'fa-wand-magic-sparkles', feature: null },
   teams:     { title: 'Agent teams',   icon: 'fa-users',               feature: 'multi_agent' },
   learn:     { title: 'Learn',         icon: 'fa-graduation-cap',      feature: 'learning' },

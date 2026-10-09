@@ -10,14 +10,7 @@ import { escapeHtml } from '../../shared/utils.js';
 console.log('[Module] analytics.js loaded');
 
 export async function initAnalytics() {
-  const btn = document.getElementById('analyticsBtn');
-  if (btn && !btn.dataset.wired) {
-    btn.dataset.wired = '1';
-    btn.addEventListener('click', async () => {
-      const { openToolTab } = await import('../tabs/tabs.js');
-      openToolTab('analytics');
-    });
-  }
+  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
   let enabled = false;
   try {
     const data = await (await apiFetch('/features')).json();

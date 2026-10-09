@@ -75,8 +75,6 @@ export function initElements() {
     messageInput: $('#messageInput'),
     sendBtn: $('#sendBtn'),
     stopBtn: $('#stopBtn'),
-    webSearchToggle: $('#webSearchToggle'),
-    agentModeToggle: $('#agentModeToggle'),
     tempControl: $('#tempControl'),
     tempPopover: $('#tempPopover'),
     tempSlider: $('#tempSlider'),
@@ -839,21 +837,17 @@ export function initChatEvents() {
     else if (e.key === 'Enter' && e.shiftKey && window.innerWidth <= 900) { e.preventDefault(); handleSend(); }
   });
 
-  // Web search toggle
-  elements.webSearchToggle?.addEventListener('click', () => {
-    const enabled = !getWebSearchEnabled();
-    setWebSearchEnabled(enabled);
-    elements.webSearchToggle.classList.toggle('active', enabled);
-    elements.webSearchToggle.setAttribute('aria-pressed', String(enabled));
+  // Mode/Tools popovers (Phase 2) drive these states now
+  document.addEventListener('sangam:mode-changed', (e) => {
+    const mode = e.detail?.mode;
+    if (mode === 'research' && !getWebSearchEnabled()) setWebSearchEnabled(true);
+    if (mode === 'agent' || mode === 'code') {
+      showToast({ type: 'info', title: 'Agent mode', message: 'Agent can now use tools (web, files, code).' });
+    }
   });
-
-  // Agent mode toggle
-  elements.agentModeToggle?.addEventListener('click', () => {
-    const enabled = !getAgentModeEnabled();
-    setAgentModeEnabled(enabled);
-    elements.agentModeToggle.classList.toggle('active', enabled);
-    elements.agentModeToggle.setAttribute('aria-pressed', String(enabled));
-    showToast({ type: 'info', title: 'Agent mode', message: enabled ? 'Agent can now use tools (web, files, code).' : 'Agent mode off.' });
+  document.addEventListener('sangam:tools-changed', (e) => {
+    const tools = e.detail?.tools || [];
+    setWebSearchEnabled(tools.includes('web_search'));
   });
 
   // Initialize agent mode toggle state
