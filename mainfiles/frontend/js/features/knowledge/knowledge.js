@@ -204,7 +204,21 @@ function layoutAndRender(bodyEl) {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
     line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
-    line.setAttribute('class', 'kn-edge');
+    // Phase 7: provenance styling — EXTRACTED solid, INFERRED dashed, AMBIGUOUS dotted
+    const prov = (e.provenance || 'EXTRACTED').toUpperCase();
+    let cls = 'kn-edge';
+    if (prov === 'INFERRED') cls += ' kn-edge-inferred';
+    else if (prov === 'AMBIGUOUS') cls += ' kn-edge-ambiguous';
+    line.setAttribute('class', cls);
+    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    title.textContent = `${prov}${e.source ? ` · ${e.source}` : ''}`;
+    line.appendChild(title);
+    // Click edge to see provenance in the detail panel
+    line.style.cursor = 'pointer';
+    line.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      showEdgeDetail(bodyEl, e);
+    });
     g.appendChild(line);
   }
 
@@ -294,6 +308,32 @@ function renderDetail(bodyEl) {
       const target = (graphData.nodes || []).find((n) => n.id === btn.dataset.id);
       if (target) { selectedNode = target; renderDetail(bodyEl); layoutAndRender(bodyEl); }
     });
+  });
+}
+
+/** Phase 7: show edge provenance in the detail panel. */
+function showEdgeDetail(bodyEl, edge) {
+  const panel = bodyEl.querySelector('#knDetail');
+  if (!panel) return;
+  panel.classList.remove('hidden');
+  const prov = (edge.provenance || 'EXTRACTED').toUpperCase();
+  const provClass = prov === 'INFERRED' ? 'kn-prov-inferred' : prov === 'AMBIGUOUS' ? 'kn-prov-ambiguous' : 'kn-prov-extracted';
+  panel.innerHTML = `
+    <div class="kn-detail-head">
+      <span class="kn-chip ${provClass}">${escapeHtml(prov)}</span>
+      <button class="icon-btn" id="knDetailClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <h4>Connection</h4>
+    <div class="kn-meta">
+      <div class="insp-row"><span>From</span><strong>${escapeHtml(edge.from || '')}</strong></div>
+      <div class="insp-row"><span>To</span><strong>${escapeHtml(edge.to || '')}</strong></div>
+      <div class="insp-row"><span>Type</span><strong>${escapeHtml(edge.type || edge.label || '')}</strong></div>
+      <div class="insp-row"><span>Provenance</span><strong>${escapeHtml(prov)}</strong></div>
+      ${edge.source ? `<div class="insp-row"><span>Source</span><strong>${escapeHtml(edge.source)}</strong></div>` : ''}
+    </div>
+    <p class="settings-hint">${prov === 'EXTRACTED' ? 'Directly extracted from data.' : prov === 'INFERRED' ? 'Inferred by heuristic — may be wrong.' : 'Uncertain — verify before trusting.'}</p>`;
+  panel.querySelector('#knDetailClose').addEventListener('click', () => {
+    panel.classList.add('hidden');
   });
 }
 

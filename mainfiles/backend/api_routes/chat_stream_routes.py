@@ -20,6 +20,7 @@ from ..capability_orchestration import derive_interpretations, should_clarify
 from ..context_manager import create_context_manager
 from ..database import AsyncSessionLocal, get_db
 from ..domain import ChatMessage
+from ..graph_provenance import clear_current_provenance, get_current_provenance
 from ..memory import extract_from_turn_background, recall
 from ..models import Chat, Message, UploadedFile, UserPreference
 from ..rag import TOP_K as RAG_TOP_K
@@ -54,6 +55,8 @@ async def chat_stream(  # noqa: PLR0912
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    # Phase 7: clear provenance tracker for this request.
+    clear_current_provenance()
     # Validate the model exists before allocating any resources — a fast 400
     # is much better than failing mid-stream after the chat has been created.
     model_info = llm._resolve_model(payload.model)
@@ -118,11 +121,25 @@ async def chat_stream(  # noqa: PLR0912
                 file_context = "\n\n".join(
                     f"--- From {c['filename']} ---\n{c['text']}" for c in rag_chunks
                 )
+                # Phase 7: track provenance — which documents were used
+                prov = get_current_provenance()
+                for c in rag_chunks:
+                    prov.mark_used(
+                        f"doc:{c.get('file_id', c['filename'])}",
+                        "document",
+                        c['filename'],
+                        reason="RAG chunk used in context",
+                    )
             else:
                 # Fallback: use full extracted text
                 file_context = "\n\n".join(
                     f"--- {f.filename} ---\n{f.extracted_text}" for f in files if f.extracted_text
                 )
+                prov = get_current_provenance()
+                for f in files:
+                    if f.extracted_text:
+                        prov.mark_used(f"doc:{f.id}", "document", f.filename,
+                                       reason="Full document text used in context")
             if file_context:
                 messages[-1]["content"] = f"{messages[-1]['content']}\n\n[Attached files]\n{file_context}"
     if web_context and messages:
@@ -275,6 +292,15 @@ async def chat_stream(  # noqa: PLR0912
                     "content": f"[Long-term memory — relevant past conversations]\n{memory_context}",
                 })
                 logger.debug("Injected %d long-term memories", len(records))
+                # Phase 7: track provenance — which memories were used
+                prov = get_current_provenance()
+                for r in records:
+                    prov.mark_used(
+                        f"memory:{r.id}",
+                        "memory",
+                        (r.content or "")[:80],
+                        reason=f"Memory ({r.kind}) recalled into context",
+                    )
         except Exception as exc:  # noqa: BLE001 — memory must never break chat
             logger.warning("Memory retrieval failed: %s", exc)
 
@@ -407,6 +433,15 @@ async def chat_stream(  # noqa: PLR0912
                         summary_task.add_done_callback(_background_tasks.discard)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Summarize trigger failed: %s", exc)
+
+                # Phase 7: emit provenance — which nodes were used in this answer.
+                try:
+                    prov = get_current_provenance()
+                    if prov.used_nodes:
+                        import json as _json
+                        yield sse_event(_json.dumps(prov.to_dict()), event="provenance")
+                except Exception:  # noqa: BLE001 — provenance must never break chat
+                    pass
 
                 yield sse_event("[DONE]")
             except (GeneratorExit, asyncio.CancelledError):

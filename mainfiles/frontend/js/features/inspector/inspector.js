@@ -12,6 +12,7 @@ console.log('[Module] inspector.js loaded');
 
 let visible = false;
 let selectedMessage = null;
+let lastProvenance = null; // {used_nodes: [...], count} from the latest answer
 
 export function isInspectorVisible() { return visible; }
 
@@ -19,6 +20,14 @@ export function setSelectedMessage(msg) {
   selectedMessage = msg;
   if (visible) render();
 }
+
+/** Phase 7: store provenance from the latest answer for the "Used in this answer" panel. */
+export function setProvenance(prov) {
+  lastProvenance = prov;
+  if (visible) render();
+}
+
+export function getProvenance() { return lastProvenance; }
 
 export function toggleInspector() {
   visible = !visible;
@@ -70,6 +79,20 @@ function render() {
       ${m.tokens ? `<div class="insp-row"><span>Tokens</span><strong>${m.tokens}</strong></div>` : ''}
       <div class="insp-msg-preview">${escapeHtml((m.content || '').slice(0, 300))}</div>
     </section>`;
+  }
+
+  // Phase 7: Used in this answer (provenance)
+  if (lastProvenance && lastProvenance.used_nodes && lastProvenance.used_nodes.length) {
+    const typeIcon = { document: 'fa-file', memory: 'fa-brain', graph: 'fa-diagram-project' };
+    html += `<section class="insp-section"><h4>Used in this answer (${lastProvenance.count})</h4>` +
+      lastProvenance.used_nodes.map((n) => `
+        <div class="insp-prov">
+          <i class="fa-solid ${typeIcon[n.type] || 'fa-circle'}"></i>
+          <div class="insp-prov-body">
+            <div class="insp-prov-label">${escapeHtml(n.label || n.id)}</div>
+            <div class="insp-prov-meta">${escapeHtml(n.type)}${n.reason ? ` — ${escapeHtml(n.reason)}` : ''}</div>
+          </div>
+        </div>`).join('') + `</section>`;
   }
 
   if (!html) {

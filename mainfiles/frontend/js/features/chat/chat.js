@@ -621,6 +621,15 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         newChatId = data;
         continue;
       }
+      if (event === 'provenance') {
+        // Phase 7: "Used in this answer" — feed the Inspector panel.
+        try {
+          const prov = JSON.parse(data);
+          const { setProvenance } = await import('../inspector/inspector.js');
+          setProvenance(prov);
+        } catch { /* ignore malformed provenance */ }
+        continue;
+      }
       responseController.handleSSE({ event, data });
     }
     if (responseController.sawCanonical && !responseController.terminal) {
