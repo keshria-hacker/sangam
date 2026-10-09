@@ -36,17 +36,39 @@ def build_knowledge_graph(
         })
         return True
 
-    def add_edge(frm: str, to: str, etype: str):
-        if frm in seen and to in seen and len(edges) < max_nodes * 3:
-            edges.append({"from": frm, "to": to, "type": etype})
+    def add_edge(frm: str, to: str, etype: str,
+                 provenance: str = "EXTRACTED", source: str | None = None):
+        """Add an edge with provenance tracking.
 
-    # Memories
+        Provenance: EXTRACTED (from actual data), INFERRED (from heuristics),
+                    AMBIGUOUS (uncertain match).
+        Source: where this edge came from (e.g. 'code_ast', 'keyword_match').
+        """
+        if frm in seen and to in seen and len(edges) < max_nodes * 3:
+            edges.append({
+                "from": frm, "to": to, "type": etype,
+                "provenance": provenance,
+                "source": source,
+            })
+
+    # Memories (grouped into wings/rooms by kind)
+    wings: dict[str, list[str]] = {}  # kind -> [node_ids]
     for m in memories or []:
         mid = f"mem:{m.get('id', '')}"
+        kind = m.get("kind", "semantic")
         if add_node(mid, "memory", m.get("content", "")[:60] or "memory",
-                    {"kind": m.get("kind"), "importance": m.get("importance")}):
-            # Link memories sharing keywords (simple related edges)
-            pass
+                    {"kind": kind, "importance": m.get("importance"),
+                     "wing": kind}):
+            wings.setdefault(kind, []).append(mid)
+
+    # Wing hub nodes (rooms)
+    for wing, members in wings.items():
+        wing_id = f"wing:{wing}"
+        if add_node(wing_id, "wing", f"{wing.title()} memories",
+                    {"member_count": len(members)}):
+            for mid in members:
+                add_edge(wing_id, mid, "contains",
+                         provenance="EXTRACTED", source="memory_kind")
 
     # Documents
     for d in documents or []:
@@ -60,11 +82,12 @@ def build_knowledge_graph(
             nid = f"code:{sym_id}"
             if add_node(nid, "code", sym.get("name", sym_id),
                         {"kind": sym.get("kind"), "file": sym.get("file")}):
-                # Call edges
+                # Call edges (EXTRACTED from AST)
                 for callee in sym.get("calls", [])[:10]:
                     cid = f"code:{callee}"
                     if cid in seen:
-                        add_edge(nid, cid, "calls")
+                        add_edge(nid, cid, "calls",
+                                 provenance="EXTRACTED", source="code_ast")
 
     # Chats (as context hubs)
     for c in chats or []:
@@ -100,4 +123,11 @@ def _link_by_keywords(nodes: list[dict], edges: list[dict], seen: set[str]):
         for j in range(i + 1, len(ids)):
             shared = keywords[ids[i]] & keywords[ids[j]]
             if len(shared) >= 2 and len(edges) < 600:
-                edges.append({"from": ids[i], "to": ids[j], "type": "related"})
+                # INFERRED: keyword overlap is heuristic, not certain
+                # AMBIGUOUS if only 2 shared words, INFERRED if 3+
+                prov = "INFERRED" if len(shared) >= 3 else "AMBIGUOUS"
+                edges.append({
+                    "from": ids[i], "to": ids[j], "type": "related",
+                    "provenance": prov, "source": "keyword_match",
+                    "shared_keywords": sorted(shared)[:5],
+                })
