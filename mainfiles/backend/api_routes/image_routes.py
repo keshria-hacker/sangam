@@ -12,13 +12,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..feature_flags import is_enabled
 from ..database import get_db
 from ..image_gen import ImageGenError, generate_images, image_status
 from .common import router
 
 
 def _require_image_gen() -> None:
-    if not settings.FEATURE_IMAGE_GEN:
+    if not is_enabled("image_gen"):
         raise HTTPException(status_code=404, detail="Image generation is not enabled")
 
 

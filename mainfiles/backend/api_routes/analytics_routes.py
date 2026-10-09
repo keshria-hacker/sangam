@@ -12,12 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..analytics import get_stats
 from ..auth import get_current_user
 from ..config import settings
+from ..feature_flags import is_enabled
 from ..database import get_db
 from .common import router
 
 
 def _require_analytics() -> None:
-    if not settings.FEATURE_ANALYTICS:
+    if not is_enabled("analytics"):
         raise HTTPException(status_code=404, detail="Analytics are not enabled")
 
 

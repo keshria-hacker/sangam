@@ -14,6 +14,7 @@ from ..config import settings
 from ..schemas import MediaAttachment
 from .engines import describe_image_engines, resolve_image_engine
 from .styles import enhance_prompt, list_styles
+from ..feature_flags import is_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def image_status() -> dict:
     """Status payload for GET /api/image/status."""
     engine = _get_engine()
     return {
-        "enabled": settings.FEATURE_IMAGE_GEN,
+        "enabled": is_enabled("image_gen"),
         "engine": getattr(engine, "name", None),
         "engines": describe_image_engines(),
         "styles": list_styles(),

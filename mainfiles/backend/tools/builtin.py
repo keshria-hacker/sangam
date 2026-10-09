@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import settings
+from ..feature_flags import is_enabled
 from .registry import registry
 from .schemas import ToolDefinition
 
@@ -266,7 +267,7 @@ async def generate_image_handler(
     """Generate an image from a text prompt via the configured engine."""
     from ..config import settings as _settings
 
-    if not _settings.FEATURE_IMAGE_GEN:
+    if not is_enabled("image_gen"):
         return {"error": "Image generation is not enabled (FEATURE_IMAGE_GEN=false)."}
     try:
         from ..image_gen import ImageGenError, generate_images

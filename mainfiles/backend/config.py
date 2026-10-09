@@ -103,13 +103,13 @@ class Settings(BaseSettings):
     # --- Feature flags (foundation for upcoming integrations) ---
     # Each flag gates a capability end-to-end (backend + UI). Override via env,
     # e.g. FEATURE_VOICE=true. The GET /api/features endpoint exposes them.
-    FEATURE_VOICE: bool = False          # VoiceStudio-style local TTS/STT
-    FEATURE_IMAGE_GEN: bool = False      # Fooocus-style local image generation
+    FEATURE_VOICE: bool = True           # VoiceStudio-style local TTS/STT
+    FEATURE_IMAGE_GEN: bool = True       # Fooocus-style local image generation
     FEATURE_MCP: bool = True             # MCP client: consume external MCP servers
-    FEATURE_MULTI_AGENT: bool = False    # munder-difflin/orca-style agent teams
-    FEATURE_ANALYTICS: bool = False      # openpanel-style opt-in analytics
+    FEATURE_MULTI_AGENT: bool = True     # munder-difflin/orca-style agent teams
+    FEATURE_ANALYTICS: bool = False      # openpanel-style analytics (opt-in: privacy)
     FEATURE_SPEC_KIT: bool = False       # spec-kit style spec-driven workflows
-    FEATURE_LEARNING: bool = False       # OpenMAIC-style interactive classroom
+    FEATURE_LEARNING: bool = True        # OpenMAIC-style interactive classroom
     QUALITY_NO_SLOP: bool = False        # no-ai-slop style response cleanup
     QUALITY_ADHD_FRIENDLY: bool = False  # i-have-adhd style scannable formatting
 

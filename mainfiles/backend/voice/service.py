@@ -11,6 +11,7 @@ import logging
 import re
 
 from ..config import settings
+from ..feature_flags import is_enabled
 from .engines import (
     EngineStatus,
     VoiceInfo,
@@ -128,7 +129,7 @@ def voice_status() -> dict:
     tts = _tts()
     stt = _stt()
     return {
-        "enabled": settings.FEATURE_VOICE,
+        "enabled": is_enabled("voice"),
         "tts_engine": getattr(tts, "name", None),
         "stt_engine": getattr(stt, "name", None),
         "engines": [

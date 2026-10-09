@@ -116,4 +116,6 @@ mainfiles/extensions_state.json
 .venv-res/
 # Skill-pack enable/disable state (user-local)
 mainfiles/config/skills/.pack_state.json
+# Feature flag runtime overrides (user-local)
+mainfiles/feature_flags.json
 test-results:

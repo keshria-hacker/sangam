@@ -13,13 +13,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..feature_flags import is_enabled
 from ..database import get_db
 from ..teams import TeamError, list_teams, run_team
 from .common import router
 
 
 def _require_teams() -> None:
-    if not settings.FEATURE_MULTI_AGENT:
+    if not is_enabled("multi_agent"):
         raise HTTPException(status_code=404, detail="Multi-agent teams are not enabled")
 
 

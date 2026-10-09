@@ -188,6 +188,66 @@ export function openSettings() {
       m.refreshVoiceSettings();
     }
   }).catch(() => {});
+  loadFeatureToggles();
+}
+
+/**
+ * Features section: load current flags and wire the toggles.
+ */
+async function loadFeatureToggles() {
+  const wrap = document.getElementById('featureToggles');
+  if (!wrap) return;
+  let features = {};
+  try {
+    const data = await (await apiFetch('/features')).json();
+    features = data.features || {};
+  } catch {
+    features = {};
+  }
+  wrap.querySelectorAll('[data-feature]').forEach((btn) => {
+    const on = !!features[btn.dataset.feature];
+    setFeatureToggle(btn, on);
+  });
+}
+
+function setFeatureToggle(btn, on) {
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', String(on));
+  const label = btn.querySelector('span');
+  if (label) label.textContent = on ? 'On' : 'Off';
+}
+
+async function onFeatureToggleClick(e) {
+  const btn = e.target.closest('[data-feature]');
+  if (!btn || btn.disabled) return;
+  const name = btn.dataset.feature;
+  const want = !btn.classList.contains('active');
+  btn.disabled = true;
+  try {
+    const res = await apiPost(`/features/${encodeURIComponent(name)}`, { enabled: want });
+    const data = await res.json();
+    setFeatureToggle(btn, !!data.enabled);
+    refreshFeatureButtons(data.features || {});
+    showToast({ type: 'success', title: `Feature ${want ? 'enabled' : 'disabled'}`, message: name.replace(/_/g, ' ') });
+  } catch (err) {
+    showToast({ type: 'error', title: 'Could not toggle feature', message: err.message });
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/**
+ * Show/hide feature buttons across the UI after a flag change.
+ */
+export function refreshFeatureButtons(features) {
+  const show = (id, on) => document.getElementById(id)?.classList.toggle('hidden', !on);
+  show('teamsBtn', !!features.multi_agent);
+  show('learnBtn', !!features.learning);
+  show('analyticsBtn', !!features.analytics);
+  show('micBtn', !!features.voice);
+  show('imageBtn', !!features.image_gen);
+  // Voice settings section follows the voice flag.
+  document.getElementById('voiceSettingsSectionWrap')?.classList.toggle('hidden', !features.voice);
 }
 
 /**
@@ -379,6 +439,9 @@ export function initSettings() {
   elements.settingsBtn?.addEventListener('click', openSettings);
   elements.closeSettings?.addEventListener('click', closeSettingsModal);
   elements.settingsOverlay?.addEventListener('click', (e) => { if (e.target === elements.settingsOverlay) closeSettingsModal(); });
+
+  // Feature toggles (delegated)
+  document.getElementById('featureToggles')?.addEventListener('click', onFeatureToggleClick);
 
   // Theme options
   elements.themeOptions?.addEventListener('click', (e) => {

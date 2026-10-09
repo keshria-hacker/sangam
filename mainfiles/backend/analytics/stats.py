@@ -11,13 +11,14 @@ from typing import Any
 
 from sqlalchemy import func, select
 
+from ..feature_flags import is_enabled
+
 
 async def get_stats(db: Any, user_id: str, days: int = 14) -> dict[str, Any]:
     """Usage stats for the last `days` days."""
-    from ..config import settings
     from ..models import AnalyticsEvent
 
-    if not settings.FEATURE_ANALYTICS:
+    if not is_enabled("analytics"):
         return {"enabled": False}
     since = datetime.now(UTC) - timedelta(days=days)
 

@@ -443,6 +443,58 @@ if (location.protocol === 'file:') {
           </div>
         </section>
 
+        <section class="settings-section">
+          <h3>Features</h3>
+          <p class="settings-hint">Toggle capabilities on or off. Changes apply immediately and are remembered.</p>
+          <div id="featureToggles" class="feature-toggles">
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-microphone"></i> Voice</span>
+                <small>Speech-to-text dictation and text-to-speech</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="voice" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-image"></i> Image generation</span>
+                <small>Generate images from the composer</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="image_gen" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-users"></i> Agent teams</span>
+                <small>Multi-agent research, code and writing teams</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="multi_agent" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-graduation-cap"></i> Learning mode</span>
+                <small>Interactive lessons with Socratic feedback</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="learning" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">
+                <span><i class="fa-solid fa-chart-simple"></i> Usage analytics</span>
+                <small>Local-only usage stats (opt-in, nothing leaves your machine)</small>
+              </div>
+              <div class="setting-control">
+                <button class="pill-control toggle-pill" data-feature="analytics" type="button" aria-pressed="false"><i class="fa-solid fa-power-off"></i><span>Off</span></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
           <section class="settings-section">
             <h3>Appearance</h3>
 

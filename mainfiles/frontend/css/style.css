@@ -1833,6 +1833,13 @@ a.sidebar-footer-btn{text-decoration:none; cursor:pointer;}
 .settings-section h3{font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-tertiary); margin-bottom:12px;}
 .settings-hint{font-size:12px;color:var(--text-tertiary);margin:-6px 0 12px;}
 
+/* Features section toggles */
+.feature-toggles .setting-row{padding:10px 0;}
+.feature-toggles .setting-label span{display:flex; align-items:center; gap:8px;}
+.feature-toggles .setting-label span i{color:var(--text-secondary); width:16px; text-align:center;}
+.feature-toggles .toggle-pill{min-width:76px; justify-content:center;}
+.feature-toggles .toggle-pill span{font-size:12px; font-weight:600;}
+
 .setting-row{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; flex-wrap:wrap;}
 .setting-row > *{min-width:0;}
 .setting-label{display:flex; flex-direction:column; gap:2px;}

@@ -21,6 +21,11 @@ export function isImageGenEnabled() {
 }
 
 export async function initImage() {
+  const btn = document.getElementById('imageBtn');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', openImageDialog);
+  }
   try {
     const data = await (await apiFetch('/features')).json();
     imageGenEnabled = !!(data && data.features && data.features.image_gen);
@@ -29,11 +34,7 @@ export async function initImage() {
   }
   if (!imageGenEnabled) return false;
   window.__sangamImageGen = true;
-  const btn = document.getElementById('imageBtn');
-  if (btn) {
-    btn.classList.remove('hidden');
-    btn.addEventListener('click', openImageDialog);
-  }
+  btn?.classList.remove('hidden');
   return true;
 }
 

@@ -13,13 +13,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..feature_flags import is_enabled
 from ..database import get_db
 from ..voice import VoiceError, list_voices, synthesize, transcribe, voice_status
 from .common import router
 
 
 def _require_voice() -> None:
-    if not settings.FEATURE_VOICE:
+    if not is_enabled("voice"):
         raise HTTPException(status_code=404, detail="Voice is not enabled")
 
 

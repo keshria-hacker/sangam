@@ -15,6 +15,11 @@ console.log('[Module] learn.js loaded');
 let currentLesson = '';
 
 export async function initLearn() {
+  const btn = document.getElementById('learnBtn');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', openLearnModal);
+  }
   let enabled = false;
   try {
     const data = await (await apiFetch('/features')).json();
@@ -23,11 +28,7 @@ export async function initLearn() {
     enabled = false;
   }
   if (!enabled) return false;
-  const btn = document.getElementById('learnBtn');
-  if (btn) {
-    btn.classList.remove('hidden');
-    btn.addEventListener('click', openLearnModal);
-  }
+  btn?.classList.remove('hidden');
   return true;
 }
 

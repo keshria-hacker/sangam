@@ -186,8 +186,9 @@ function runSelected() {
   }
 }
 
-export function openPalette() {
+export async function openPalette() {
   ensurePalette();
+  await loadFlags();
   paletteEl.classList.remove('hidden');
   selectedIndex = 0;
   const input = paletteEl.querySelector('#paletteInput');

@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Any
+from ..feature_flags import is_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ async def start_lesson(topic: str, model_id: str, db: Any) -> Lesson:
     """Teacher agent produces a structured lesson on the topic."""
     from ..config import settings
 
-    if not settings.FEATURE_LEARNING:
+    if not is_enabled("learning"):
         raise LearnError("Learning mode is not enabled (FEATURE_LEARNING=false).")
     topic = (topic or "").strip()
     if not topic:
@@ -99,7 +100,7 @@ async def tutor_feedback(topic: str, lesson: str, answer: str, model_id: str, db
     """Tutor agent evaluates the learner's answer Socratically."""
     from ..config import settings
 
-    if not settings.FEATURE_LEARNING:
+    if not is_enabled("learning"):
         raise LearnError("Learning mode is not enabled (FEATURE_LEARNING=false).")
     if not (answer or "").strip():
         raise LearnError("Empty answer.")

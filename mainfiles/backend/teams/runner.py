@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .definitions import AgentSpec, TeamDefinition, get_team
+from ..feature_flags import is_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ async def run_team(
     """Run a team: fan-out to specialists, fan-in through the coordinator."""
     from ..config import settings
 
-    if not settings.FEATURE_MULTI_AGENT:
+    if not is_enabled("multi_agent"):
         raise TeamError("Multi-agent teams are not enabled (FEATURE_MULTI_AGENT=false).")
     team: TeamDefinition | None = get_team(team_id)
     if team is None:

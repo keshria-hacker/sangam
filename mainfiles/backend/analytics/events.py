@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from ..feature_flags import is_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +60,8 @@ async def record_event(
     properties: dict[str, Any] | None = None,
 ) -> bool:
     """Record an analytics event. Returns True if stored."""
-    from ..config import settings
 
-    if not settings.FEATURE_ANALYTICS:
+    if not is_enabled("analytics"):
         return False
     if not user_id:
         return False

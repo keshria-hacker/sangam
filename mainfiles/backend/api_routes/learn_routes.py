@@ -12,13 +12,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..feature_flags import is_enabled
 from ..database import get_db
 from ..learn import LearnError, start_lesson, tutor_feedback
 from .common import router
 
 
 def _require_learn() -> None:
-    if not settings.FEATURE_LEARNING:
+    if not is_enabled("learning"):
         raise HTTPException(status_code=404, detail="Learning mode is not enabled")
 
 

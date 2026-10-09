@@ -10,6 +10,11 @@ import { escapeHtml } from '../../shared/utils.js';
 console.log('[Module] analytics.js loaded');
 
 export async function initAnalytics() {
+  const btn = document.getElementById('analyticsBtn');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', openAnalyticsModal);
+  }
   let enabled = false;
   try {
     const data = await (await apiFetch('/features')).json();
@@ -18,11 +23,7 @@ export async function initAnalytics() {
     enabled = false;
   }
   if (!enabled) return false;
-  const btn = document.getElementById('analyticsBtn');
-  if (btn) {
-    btn.classList.remove('hidden');
-    btn.addEventListener('click', openAnalyticsModal);
-  }
+  btn?.classList.remove('hidden');
   return true;
 }
 

@@ -28,6 +28,11 @@ export function getVoiceStatus() {
 
 /** Called once at app startup. Returns true when voice UI should show. */
 export async function initVoice() {
+  const micBtn = document.getElementById('micBtn');
+  if (micBtn && !micBtn.dataset.wired) {
+    micBtn.dataset.wired = '1';
+    micBtn.addEventListener('click', toggleRecording);
+  }
   try {
     const data = await (await apiFetch('/features')).json();
     voiceEnabled = !!(data && data.features && data.features.voice);
@@ -41,11 +46,7 @@ export async function initVoice() {
   } catch {
     voiceStatus = null;
   }
-  const micBtn = document.getElementById('micBtn');
-  if (micBtn) {
-    micBtn.classList.remove('hidden');
-    micBtn.addEventListener('click', toggleRecording);
-  }
+  micBtn?.classList.remove('hidden');
   return true;
 }
 

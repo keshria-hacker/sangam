@@ -20,6 +20,11 @@ export function isTeamsEnabled() {
 }
 
 export async function initTeams() {
+  const btn = document.getElementById('teamsBtn');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', openTeamsModal);
+  }
   try {
     const data = await (await apiFetch('/features')).json();
     teamsEnabled = !!(data && data.features && data.features.multi_agent);
@@ -28,11 +33,7 @@ export async function initTeams() {
   }
   if (!teamsEnabled) return false;
   window.__sangamTeams = true;
-  const btn = document.getElementById('teamsBtn');
-  if (btn) {
-    btn.classList.remove('hidden');
-    btn.addEventListener('click', openTeamsModal);
-  }
+  btn?.classList.remove('hidden');
   return true;
 }
 
