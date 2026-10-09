@@ -54,6 +54,16 @@ const TEMPLATES = [
     title: 'Landing page',
     content: `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>Page</title>\n<style>body{font-family:system-ui;max-width:640px;margin:40px auto;padding:0 16px}</style></head>\n<body>\n<h1>Hello</h1>\n<p>Start here.</p>\n</body>\n</html>`,
   },
+  {
+    name: 'Image studio', icon: 'fa-image', type: '_image_studio',
+    title: 'Generate an image',
+    content: '',
+  },
+  {
+    name: 'Voice studio', icon: 'fa-microphone', type: '_voice_studio',
+    title: 'Record or synthesize voice',
+    content: '',
+  },
 ];
 
 // --- module state (one hub instance per mount) ---
@@ -125,14 +135,26 @@ function wireNewMenu() {
 
 function renderTemplates() {
   const wrap = root.querySelector('#createTemplates');
-  wrap.innerHTML = TEMPLATES.map((t, i) => `
+  wrap.innerHTML = TEMPLATES.map((t, i) => {
+    const label = t.type.startsWith('_') ? 'Studio' : escapeHtml(TYPE_META[t.type].label);
+    return `
     <button type="button" class="hub-card create-tpl" data-tpl="${i}">
       <div class="hub-card-head"><i class="fa-solid ${t.icon}"></i><strong>${escapeHtml(t.name)}</strong></div>
-      <span class="settings-hint">${escapeHtml(TYPE_META[t.type].label)}</span>
-    </button>`).join('');
+      <span class="settings-hint">${label}</span>
+    </button>`;
+  }).join('');
   wrap.querySelectorAll('[data-tpl]').forEach((b) => {
     b.addEventListener('click', () => {
       const t = TEMPLATES[Number(b.dataset.tpl)];
+      // Studio entries navigate to the respective tab
+      if (t.type === '_image_studio') {
+        document.querySelector('[data-nav="images"]')?.click();
+        return;
+      }
+      if (t.type === '_voice_studio') {
+        document.querySelector('[data-nav="voice"]')?.click();
+        return;
+      }
       createArtifact(t.type, t.title, t.content);
     });
   });
