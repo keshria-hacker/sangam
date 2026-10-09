@@ -116,3 +116,4 @@ mainfiles/extensions_state.json
 .venv-res/
 # Skill-pack enable/disable state (user-local)
 mainfiles/config/skills/.pack_state.json
+test-results:

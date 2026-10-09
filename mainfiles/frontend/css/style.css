@@ -467,6 +467,7 @@ button:active, .model-option:active, .suggestion-card:active,
   transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .sidebar-footer-btn:hover{background:var(--bg-hover); color:var(--text-primary);}
+a.sidebar-footer-btn{text-decoration:none; cursor:pointer;}
 
 .profile-section{
   display:flex; align-items:center; gap:10px; padding:9px 8px; border-radius:var(--radius-sm);

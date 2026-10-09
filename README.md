@@ -90,6 +90,42 @@ A **Paper / Ink** design system — warm paper whites (PAPER) or deep charcoal (
 
 Local authentication, encrypted provider keys, secure password hashing, and local conversation storage.
 
+### 🧠 Memory++
+
+Typed long-term memory (episodic, semantic, procedural) with importance-ranked recall, automatic extraction from conversations, and consolidation — managed from Settings.
+
+### 🎙️ Voice
+
+Local-first text-to-speech and speech-to-text with pluggable engines (Kokoro, faster-whisper, OpenAI-compatible APIs). Mic dictation in the composer, per-message Speak, auto-speak setting.
+
+### 🎨 Image Generation
+
+Fooocus-inspired style presets with pluggable engines (OpenAI-compatible image APIs, experimental local Fooocus). Generate images from the composer and attach them to chats.
+
+### 📦 Skill Packs
+
+Curated skill bundles — spec-driven development workflows, Mermaid architecture diagramming, science research essentials, and agent-loop discipline. Enable/disable packs from the Skills browser.
+
+### 👥 Multi-Agent Teams
+
+Research, Code, and Writing teams: specialist agents work in parallel while a coordinator synthesizes the final answer. Watch each specialist's output unfold.
+
+### 🎓 Learning Mode
+
+Interactive classroom: a teacher agent delivers structured, research-first lessons and a tutor gives Socratic feedback on your answers.
+
+### ✨ Response Quality
+
+Optional AI-slop cleanup and ADHD-friendly formatting (answer-first, scannable) applied safely at persistence time.
+
+### 📊 Usage Analytics
+
+Opt-in, local-first analytics dashboard — your usage stays on your server, never shared.
+
+### ⌨️ Command Palette
+
+Press Ctrl+P for a quick launcher: new chat, skills, teams, export, theme, and more. Export any chat as Markdown.
+
 ---
 
 ## 🤖 Supported AI Providers
@@ -325,7 +361,13 @@ venv\Scripts\python.exe -m pytest tests -v
 
 The test suite lives in a single unified tree at `tests/` (unit, `integration/`, `e2e/`, `manual/`), consolidated by the module-split refactor.
 
-Tests cover core functionality including authentication, document processing, model discovery, streaming, response intelligence, Skills, and web search.
+Tests cover core functionality including authentication, document processing, model discovery, streaming, response intelligence, Skills, web search, voice, image generation, skill packs, multi-agent teams, learning mode, response quality, and analytics.
+
+---
+
+## ⭐ Star Sangam
+
+If Sangam is useful to you, [star it on GitHub](https://github.com/keshria-hacker/sangam) — it helps others discover the project.
 
 ---
 
