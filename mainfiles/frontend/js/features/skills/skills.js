@@ -249,8 +249,11 @@ export function closeSkillsModal() {
  */
 export function init(overlay) {
   initElements(overlay);
-  if (!elements.list || !elements.detail) return;
+  wireEvents();
+}
 
+function wireEvents() {
+  if (!elements.list || !elements.detail) return;
   elements.search.oninput = (event) => { state.query = event.target.value; applyFilters(); renderList(); };
   elements.categories.onclick = (event) => {
     const button = event.target.closest('[data-category]');
@@ -266,4 +269,44 @@ export function init(overlay) {
     elements.invocations.querySelectorAll('button').forEach((item) => item.classList.toggle('active', item === button));
     applyFilters(); renderList();
   };
+}
+
+/**
+ * Render the Skills browser into a tab body (replaces the old modal).
+ */
+export function renderSkillsTab(bodyEl) {
+  bodyEl.innerHTML = `
+    <div id="skillsPacks" class="skills-packs"></div>
+    <div class="skills-layout">
+      <div class="skills-sidebar">
+        <div class="skills-search-wrap">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="skillsSearch" placeholder="Search skills…" autocomplete="off">
+        </div>
+        <div class="skills-categories" id="skillsCategories">
+          <button type="button" data-category="all" class="active">All</button>
+          <button type="button" data-category="engineering">Engineering</button>
+          <button type="button" data-category="knowledge">Knowledge</button>
+          <button type="button" data-category="productivity">Productivity</button>
+          <button type="button" data-category="design">Design</button>
+          <button type="button" data-category="system">System</button>
+          <button type="button" data-category="behavioral">Behavioral</button>
+        </div>
+        <div class="skills-invocations" id="skillsInvocations">
+          <button type="button" data-invocation="all" class="active">All triggers</button>
+          <button type="button" data-invocation="user">Manual</button>
+          <button type="button" data-invocation="auto">Auto</button>
+        </div>
+      </div>
+      <div class="skills-list" id="skillsList">
+        <div class="no-results">Loading skills…</div>
+      </div>
+      <div class="skills-detail" id="skillsDetail">
+        <div class="no-results">Select a skill from the list to see its details.</div>
+      </div>
+    </div>`;
+  initElements(bodyEl);
+  wireEvents();
+  loadPacks();
+  loadSkills();
 }

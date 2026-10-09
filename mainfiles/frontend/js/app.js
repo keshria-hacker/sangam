@@ -8,7 +8,12 @@ import { initElements as initChatElements, initChatEvents, handleSend, regenerat
 import { initElements as initModelsElements, loadProvidersAndModels, renderModelList, renderProviderFilters, renderProviderStatusList, renderConnPulse, selectModel, openModelDropdown, closeModelDropdown, initModelSelector } from './features/models/models.js';
 import { initElements as initSettingsElements, openSettings, closeSettingsModal, applySettings as settingsApplySettings, loadSettings, syncSettingsUI, initSettings, renderProviderStatusList as settingsRenderProviderStatusList } from './features/settings/settings.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
-import { init as initSkills, openSkillsModal, closeSkillsModal } from './features/skills/skills.js';
+import { renderSkillsTab } from './features/skills/skills.js';
+import { renderTeamsTab } from './features/teams/teams.js';
+import { renderLearnTab } from './features/learn/learn.js';
+import { renderAnalyticsTab } from './features/analytics/analytics.js';
+import { renderImageTab } from './features/image/image.js';
+import { initTabs, openToolTab, registerTabRenderer } from './features/tabs/tabs.js';
 import { initElements as initSidebarElements, initSidebar, openMobileSidebar, closeMobileSidebar, toggleSidebarCollapse, loadChatList as sidebarLoadChatList, renderChatHistory as sidebarRenderChatHistory, openChat as sidebarOpenChat, deleteChat as sidebarDeleteChat } from './features/sidebar/sidebar.js';
 import { showToast, initToasts } from './shared/toast.js';
 import { getApiBaseUrl } from './shared/http.js';
@@ -125,9 +130,7 @@ function initDOM() {
     authResetSubmit: $('#authResetSubmit'),
     authForgotBack: $('#authForgotBack'),
     authResetBack: $('#authResetBack'),
-    skillsOverlay: $('#skillsOverlay'),
     skillsBtn: $('#skillsBtn'),
-    closeSkills: $('#closeSkills'),
     shortcutsOverlay: $('#shortcutsOverlay'),
     closeShortcuts: $('#closeShortcuts'),
     backendUrlInput: $('#backendUrlInput'),
@@ -160,7 +163,6 @@ function initGlobalListeners() {
       closeModelDropdown();
       closeSettingsModal();
       elements.tempPopover?.classList.add('hidden');
-      if (!elements.skillsOverlay?.classList?.contains('hidden')) closeSkillsModal();
     }
     // Ctrl+Shift+C - Copy last assistant message
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
@@ -228,10 +230,8 @@ function initGlobalListeners() {
   });
   elements.closeShortcuts?.addEventListener('click', () => elements.shortcutsOverlay.classList.add('hidden'));
 
-  // Skills button
-  elements.skillsBtn?.addEventListener('click', () => openSkillsModal(document.getElementById('skillsOverlay')));
-  elements.closeSkills?.addEventListener('click', () => closeSkillsModal());
-  elements.skillsOverlay?.addEventListener('click', (e) => { if (e.target === elements.skillsOverlay) closeSkillsModal(); });
+  // Skills button -> opens Skills tab
+  elements.skillsBtn?.addEventListener('click', () => openToolTab('skills'));
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 
@@ -344,8 +344,7 @@ function setupGlobalNamespace() {
     closeMobileSidebar,
     toggleSidebarCollapse,
     // Skills
-    openSkillsModal: () => openSkillsModal(document.getElementById('skillsOverlay')),
-    closeSkillsModal,
+    openSkillsTab: () => openToolTab('skills'),
     // Auth
     initializeAuth,
     // Utils
@@ -450,7 +449,12 @@ async function init() {
   initChatEvents();
   initSidebar();
   initGlobalListeners();
-  initSkills(document.getElementById('skillsOverlay'));
+  initTabs();
+  registerTabRenderer('skills', renderSkillsTab);
+  registerTabRenderer('teams', renderTeamsTab);
+  registerTabRenderer('learn', renderLearnTab);
+  registerTabRenderer('analytics', renderAnalyticsTab);
+  registerTabRenderer('images', renderImageTab);
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

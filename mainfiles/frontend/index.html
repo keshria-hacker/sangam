@@ -111,6 +111,9 @@ if (location.protocol === 'file:') {
         <button class="tool-nav-item hidden" id="analyticsBtn" title="Usage analytics" aria-label="Usage analytics">
           <i class="fa-solid fa-chart-simple"></i><span>Analytics</span>
         </button>
+        <button class="tool-nav-item hidden" id="imagesBtn" title="Image studio" aria-label="Image studio">
+          <i class="fa-solid fa-image"></i><span>Image studio</span>
+        </button>
       </nav>
 
       <nav class="chat-history" id="chatHistory" aria-label="Chat history">
@@ -166,6 +169,20 @@ if (location.protocol === 'file:') {
 
   <!-- ============ MAIN ============ -->
   <main class="main-panel">
+
+    <!-- ============ TAB STRIP (browser-like) ============ -->
+    <div class="tab-strip" id="tabStrip" role="tablist" aria-label="Open tabs">
+      <div class="tab tab-pinned tab-active" id="mainTab" role="tab" aria-selected="true" data-tab-id="main">
+        <i class="fa-solid fa-message"></i><span>Chat</span>
+      </div>
+      <div class="tab-list" id="toolTabList"></div>
+      <button class="tab-add" id="tabAddBtn" title="Open a tool in a new tab" aria-label="Open new tab">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+    </div>
+
+    <!-- Chat view (main tab) -->
+    <div class="chat-view" id="chatView">
 
     <!-- Top bar -->
     <header class="topbar">
@@ -416,6 +433,18 @@ if (location.protocol === 'file:') {
           <span class="token-counter" id="tokenCounter" title="Estimated token count"></span>
         </div>
       </div>
+    </div>
+    </div><!-- /chat-view -->
+
+    <!-- Tool tab view -->
+    <div class="tool-view hidden" id="toolView">
+      <div class="tool-view-header" id="toolViewHeader">
+        <h2 id="toolViewTitle">Tool</h2>
+        <button class="icon-btn ghost" id="toolViewClose" title="Close tab" aria-label="Close tab">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="tool-view-body" id="toolViewBody"></div>
     </div>
 
   </main>
@@ -751,44 +780,6 @@ if (location.protocol === 'file:') {
   </div>
 </div>
 
-<!-- ============ SKILLS MODAL ============ -->
-<div class="modal-overlay hidden" id="skillsOverlay">
-  <div class="modal skills-modal" role="dialog" aria-modal="true" aria-labelledby="skillsModalTitle">
-    <div class="modal-header">
-      <h2 id="skillsModalTitle"><i class="fa-solid fa-wand-magic-sparkles"></i> Skills</h2>
-      <button class="icon-btn ghost close-skills-btn" id="closeSkills" aria-label="Close skills"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div id="skillsPacks" class="skills-packs"></div>
-    <div class="skills-layout">
-      <div class="skills-sidebar">
-        <div class="skills-search-wrap">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="skillsSearch" placeholder="Search skills…" autocomplete="off">
-        </div>
-        <div class="skills-categories" id="skillsCategories">
-          <button type="button" data-category="all" class="active">All</button>
-          <button type="button" data-category="engineering">Engineering</button>
-          <button type="button" data-category="knowledge">Knowledge</button>
-          <button type="button" data-category="productivity">Productivity</button>
-          <button type="button" data-category="design">Design</button>
-          <button type="button" data-category="system">System</button>
-          <button type="button" data-category="behavioral">Behavioral</button>
-        </div>
-        <div class="skills-invocations" id="skillsInvocations">
-          <button type="button" data-invocation="all" class="active">All triggers</button>
-          <button type="button" data-invocation="user">Manual</button>
-          <button type="button" data-invocation="auto">Auto</button>
-        </div>
-      </div>
-      <div class="skills-list" id="skillsList">
-        <div class="no-results">Loading skills…</div>
-      </div>
-      <div class="skills-detail" id="skillsDetail">
-        <div class="no-results">Select a skill from the list to see its details.</div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- ============ SHORTCUTS MODAL ============ -->
 <div class="modal-overlay hidden" id="shortcutsOverlay">

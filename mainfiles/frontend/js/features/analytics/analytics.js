@@ -13,7 +13,10 @@ export async function initAnalytics() {
   const btn = document.getElementById('analyticsBtn');
   if (btn && !btn.dataset.wired) {
     btn.dataset.wired = '1';
-    btn.addEventListener('click', openAnalyticsModal);
+    btn.addEventListener('click', async () => {
+      const { openToolTab } = await import('../tabs/tabs.js');
+      openToolTab('analytics');
+    });
   }
   let enabled = false;
   try {
@@ -27,47 +30,35 @@ export async function initAnalytics() {
   return true;
 }
 
-function ensureModal() {
-  let overlay = document.getElementById('analyticsOverlay');
-  if (overlay) return overlay;
-  overlay = document.createElement('div');
-  overlay.id = 'analyticsOverlay';
-  overlay.className = 'modal-overlay hidden';
-  overlay.innerHTML = `
-    <div class="modal analytics-modal" role="dialog" aria-modal="true" aria-labelledby="analyticsModalTitle">
-      <div class="modal-header">
-        <h2 id="analyticsModalTitle"><i class="fa-solid fa-chart-simple"></i> Usage</h2>
-        <button class="icon-btn ghost" id="closeAnalytics" aria-label="Close analytics"><i class="fa-solid fa-xmark"></i></button>
+/**
+ * Render the Analytics dashboard into a tab body (replaces the old modal).
+ */
+export function renderAnalyticsTab(bodyEl) {
+  bodyEl.innerHTML = `
+    <div class="analytics-tab">
+      <div class="analytics-controls">
+        <span class="analytics-note">Private — stored only on this server, never shared.</span>
+        <select id="analyticsDays" class="provider-key-input" aria-label="Days">
+          <option value="7">Last 7 days</option>
+          <option value="14" selected>Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
       </div>
-      <div class="analytics-body">
-        <div class="analytics-controls">
-          <span class="analytics-note">Private — stored only on this server, never shared.</span>
-          <select id="analyticsDays" class="provider-key-input" aria-label="Days">
-            <option value="7">Last 7 days</option>
-            <option value="14" selected>Last 14 days</option>
-            <option value="30">Last 30 days</option>
-          </select>
-        </div>
-        <div id="analyticsContent"><div class="loading">Loading…</div></div>
-      </div>
+      <div id="analyticsContent"><div class="loading">Loading…</div></div>
     </div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#closeAnalytics').addEventListener('click', () => overlay.classList.add('hidden'));
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('hidden'); });
-  overlay.querySelector('#analyticsDays').addEventListener('change', loadStats);
-  return overlay;
+  bodyEl.querySelector('#analyticsDays').addEventListener('change', () => loadStats(bodyEl));
+  loadStats(bodyEl);
 }
 
+// Back-compat: old modal entry point now opens the tab
 export function openAnalyticsModal() {
-  const overlay = ensureModal();
-  overlay.classList.remove('hidden');
-  loadStats();
+  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('analytics'));
 }
 
-async function loadStats() {
-  const overlay = document.getElementById('analyticsOverlay');
-  const content = overlay.querySelector('#analyticsContent');
-  const days = overlay.querySelector('#analyticsDays').value;
+async function loadStats(container) {
+  const root = container || document.getElementById('toolViewBody') || document;
+  const content = root.querySelector('#analyticsContent');
+  const days = root.querySelector('#analyticsDays').value;
   content.innerHTML = '<div class="loading">Loading…</div>';
   try {
     const stats = await (await apiFetch(`/analytics/stats?days=${encodeURIComponent(days)}`)).json();

@@ -23,7 +23,10 @@ export async function initTeams() {
   const btn = document.getElementById('teamsBtn');
   if (btn && !btn.dataset.wired) {
     btn.dataset.wired = '1';
-    btn.addEventListener('click', openTeamsModal);
+    btn.addEventListener('click', async () => {
+      const { openToolTab } = await import('../tabs/tabs.js');
+      openToolTab('teams');
+    });
   }
   try {
     const data = await (await apiFetch('/features')).json();
@@ -37,38 +40,21 @@ export async function initTeams() {
   return true;
 }
 
-function ensureModal() {
-  let overlay = document.getElementById('teamsOverlay');
-  if (overlay) return overlay;
-  overlay = document.createElement('div');
-  overlay.id = 'teamsOverlay';
-  overlay.className = 'modal-overlay hidden';
-  overlay.innerHTML = `
-    <div class="modal teams-modal" role="dialog" aria-modal="true" aria-labelledby="teamsModalTitle">
-      <div class="modal-header">
-        <h2 id="teamsModalTitle"><i class="fa-solid fa-users"></i> Agent teams</h2>
-        <button class="icon-btn ghost" id="closeTeams" aria-label="Close teams"><i class="fa-solid fa-xmark"></i></button>
+/**
+ * Render the Agent teams UI into a tab body (replaces the old modal).
+ */
+export async function renderTeamsTab(bodyEl) {
+  bodyEl.innerHTML = `
+    <div class="teams-tab">
+      <div class="teams-controls">
+        <select id="teamsSelect" class="provider-key-input" aria-label="Team"></select>
+        <textarea id="teamsTask" rows="3" placeholder="Describe the task for the team…" aria-label="Team task"></textarea>
+        <button class="btn-primary" id="teamsRun" type="button">Run team</button>
       </div>
-      <div class="teams-body">
-        <div class="teams-controls">
-          <select id="teamsSelect" class="provider-key-input" aria-label="Team"></select>
-          <textarea id="teamsTask" rows="3" placeholder="Describe the task for the team…" aria-label="Team task"></textarea>
-          <button class="btn-primary" id="teamsRun" type="button">Run team</button>
-        </div>
-        <div class="teams-results hidden" id="teamsResults"></div>
-      </div>
+      <div class="teams-results hidden" id="teamsResults"></div>
     </div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#closeTeams').addEventListener('click', () => overlay.classList.add('hidden'));
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('hidden'); });
-  overlay.querySelector('#teamsRun').addEventListener('click', runTeam);
-  return overlay;
-}
-
-export async function openTeamsModal() {
-  const overlay = ensureModal();
-  overlay.classList.remove('hidden');
-  const select = overlay.querySelector('#teamsSelect');
+  bodyEl.querySelector('#teamsRun').addEventListener('click', () => runTeam(bodyEl));
+  const select = bodyEl.querySelector('#teamsSelect');
   if (!teams.length) {
     try {
       teams = await (await apiFetch('/teams')).json();
@@ -79,15 +65,21 @@ export async function openTeamsModal() {
   select.innerHTML = teams.length
     ? teams.map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)} — ${escapeHtml(t.description.slice(0, 80))}</option>`).join('')
     : '<option value="">No teams available</option>';
-  setTimeout(() => overlay.querySelector('#teamsTask')?.focus(), 0);
+  setTimeout(() => bodyEl.querySelector('#teamsTask')?.focus(), 0);
 }
 
-async function runTeam() {
-  const overlay = document.getElementById('teamsOverlay');
-  const teamId = overlay.querySelector('#teamsSelect').value;
-  const task = overlay.querySelector('#teamsTask').value.trim();
-  const resultsEl = overlay.querySelector('#teamsResults');
-  const runBtn = overlay.querySelector('#teamsRun');
+// Back-compat: old modal entry point now opens the tab
+export async function openTeamsModal() {
+  const { openToolTab } = await import('../tabs/tabs.js');
+  openToolTab('teams');
+}
+
+async function runTeam(container) {
+  const root = container || document;
+  const teamId = root.querySelector('#teamsSelect').value;
+  const task = root.querySelector('#teamsTask').value.trim();
+  const resultsEl = root.querySelector('#teamsResults');
+  const runBtn = root.querySelector('#teamsRun');
   if (!teamId || !task) {
     showToast({ type: 'info', title: 'Pick a team and describe the task' });
     return;

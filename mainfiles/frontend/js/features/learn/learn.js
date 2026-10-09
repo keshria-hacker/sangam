@@ -18,7 +18,10 @@ export async function initLearn() {
   const btn = document.getElementById('learnBtn');
   if (btn && !btn.dataset.wired) {
     btn.dataset.wired = '1';
-    btn.addEventListener('click', openLearnModal);
+    btn.addEventListener('click', async () => {
+      const { openToolTab } = await import('../tabs/tabs.js');
+      openToolTab('learn');
+    });
   }
   let enabled = false;
   try {
@@ -32,61 +35,50 @@ export async function initLearn() {
   return true;
 }
 
-function ensureModal() {
-  let overlay = document.getElementById('learnOverlay');
-  if (overlay) return overlay;
-  overlay = document.createElement('div');
-  overlay.id = 'learnOverlay';
-  overlay.className = 'modal-overlay hidden';
-  overlay.innerHTML = `
-    <div class="modal learn-modal" role="dialog" aria-modal="true" aria-labelledby="learnModalTitle">
-      <div class="modal-header">
-        <h2 id="learnModalTitle"><i class="fa-solid fa-graduation-cap"></i> Learn</h2>
-        <button class="icon-btn ghost" id="closeLearn" aria-label="Close learn"><i class="fa-solid fa-xmark"></i></button>
+/**
+ * Render the Learn UI into a tab body (replaces the old modal).
+ */
+export function renderLearnTab(bodyEl) {
+  bodyEl.innerHTML = `
+    <div class="learn-tab">
+      <div class="learn-controls">
+        <input id="learnTopic" class="provider-key-input" placeholder="What do you want to learn?" aria-label="Topic">
+        <button class="btn-primary" id="learnStart" type="button">Start lesson</button>
       </div>
-      <div class="learn-body">
-        <div class="learn-controls">
-          <input id="learnTopic" class="provider-key-input" placeholder="What do you want to learn?" aria-label="Topic">
-          <button class="btn-primary" id="learnStart" type="button">Start lesson</button>
-        </div>
-        <div class="learn-lesson hidden" id="learnLesson"></div>
-        <div class="learn-answer hidden" id="learnAnswerWrap">
-          <textarea id="learnAnswer" rows="3" placeholder="Your answer to the check question…" aria-label="Your answer"></textarea>
-          <button class="btn-secondary" id="learnCheck" type="button">Check my answer</button>
-        </div>
-        <div class="learn-feedback hidden" id="learnFeedback"></div>
+      <div class="learn-lesson hidden" id="learnLesson"></div>
+      <div class="learn-answer hidden" id="learnAnswerWrap">
+        <textarea id="learnAnswer" rows="3" placeholder="Your answer to the check question…" aria-label="Your answer"></textarea>
+        <button class="btn-secondary" id="learnCheck" type="button">Check my answer</button>
       </div>
+      <div class="learn-feedback hidden" id="learnFeedback"></div>
     </div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#closeLearn').addEventListener('click', () => overlay.classList.add('hidden'));
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('hidden'); });
-  overlay.querySelector('#learnStart').addEventListener('click', startLesson);
-  overlay.querySelector('#learnTopic').addEventListener('keydown', (e) => { if (e.key === 'Enter') startLesson(); });
-  overlay.querySelector('#learnCheck').addEventListener('click', checkAnswer);
-  return overlay;
+  bodyEl.querySelector('#learnStart').addEventListener('click', () => startLesson(bodyEl));
+  bodyEl.querySelector('#learnTopic').addEventListener('keydown', (e) => { if (e.key === 'Enter') startLesson(bodyEl); });
+  bodyEl.querySelector('#learnCheck').addEventListener('click', () => checkAnswer(bodyEl));
+  setTimeout(() => bodyEl.querySelector('#learnTopic')?.focus(), 0);
 }
 
+// Back-compat: old modal entry point now opens the tab
 export function openLearnModal() {
-  const overlay = ensureModal();
-  overlay.classList.remove('hidden');
-  setTimeout(() => overlay.querySelector('#learnTopic')?.focus(), 0);
+  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('learn'));
 }
 
-function setBusy(busy, label) {
-  const btn = document.getElementById('learnStart');
+function setBusy(busy, label, root) {
+  const scope = root || document;
+  const btn = scope.querySelector('#learnStart');
   if (btn) { btn.disabled = busy; if (label) btn.textContent = label; }
-  const check = document.getElementById('learnCheck');
+  const check = scope.querySelector('#learnCheck');
   if (check) check.disabled = busy;
 }
 
-async function startLesson() {
-  const overlay = document.getElementById('learnOverlay');
+async function startLesson(container) {
+  const overlay = container || document.getElementById('toolViewBody') || document;
   const topic = overlay.querySelector('#learnTopic').value.trim();
   if (!topic) return;
   const lessonEl = overlay.querySelector('#learnLesson');
   const answerWrap = overlay.querySelector('#learnAnswerWrap');
   const feedbackEl = overlay.querySelector('#learnFeedback');
-  setBusy(true, 'Teaching…');
+  setBusy(true, 'Teaching…', overlay);
   lessonEl.classList.add('hidden');
   answerWrap.classList.add('hidden');
   feedbackEl.classList.add('hidden');
@@ -101,17 +93,17 @@ async function startLesson() {
   } catch (err) {
     showToast({ type: 'error', title: 'Lesson failed', message: err?.message || String(err) });
   } finally {
-    setBusy(false, 'Start lesson');
+    setBusy(false, 'Start lesson', overlay);
   }
 }
 
-async function checkAnswer() {
-  const overlay = document.getElementById('learnOverlay');
+async function checkAnswer(container) {
+  const overlay = container || document.getElementById('toolViewBody') || document;
   const topic = overlay.querySelector('#learnTopic').value.trim();
   const answer = overlay.querySelector('#learnAnswer').value.trim();
   if (!answer || !currentLesson) return;
   const feedbackEl = overlay.querySelector('#learnFeedback');
-  setBusy(true);
+  setBusy(true, null, overlay);
   try {
     const data = await (await apiPost('/learn/feedback', { topic, lesson: currentLesson, answer })).json();
     feedbackEl.innerHTML = `<h4>Tutor</h4>${renderMarkdown(data.feedback || '')}`;
