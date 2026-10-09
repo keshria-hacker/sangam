@@ -264,3 +264,16 @@ class Automation(Base):
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+class ArenaResult(Base):
+    """Arena vote: which model won a comparison (Phase 6.4c)."""
+
+    __tablename__ = "arena_results"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    prompt: Mapped[str] = mapped_column(String(500))
+    winner_model: Mapped[str] = mapped_column(String(200))
+    loser_model: Mapped[str] = mapped_column(String(200))
+    models_compared: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

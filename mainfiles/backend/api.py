@@ -61,6 +61,11 @@ from .api_routes.automations_routes import (  # noqa: F401
     run_automation_now,
     update_automation,
 )
+from .api_routes.compare_routes import (  # noqa: F401
+    arena_leaderboard,
+    arena_vote,
+    compare_models,
+)
 from .api_routes.chats_routes import (  # noqa: F401
     append_messages,
     create_chat,
