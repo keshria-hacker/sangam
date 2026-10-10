@@ -390,9 +390,8 @@ export function initSidebar() {
 }
 
 export function updateBodyScrollLock() {
-  var anyOpen = !document.getElementById('settingsOverlay')?.classList.contains('hidden') ||
-                !document.getElementById('confirmOverlay')?.classList.contains('hidden') ||
-                !document.getElementById('skillsOverlay')?.classList.contains('hidden') ||
+  // Phase 8 B2: settingsOverlay and skillsOverlay are deleted.
+  var anyOpen = !document.getElementById('confirmOverlay')?.classList.contains('hidden') ||
                 document.getElementById('profilePopup')?.classList.contains('show');
   document.body.style.overflow = anyOpen ? 'hidden' : '';
 }
