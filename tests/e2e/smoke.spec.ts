@@ -170,14 +170,13 @@ test.describe.serial('Smoke (required gate)', () => {
     // 5. Send one chat message against the mock model
     await page.locator('.rail-item[data-nav="chat"]').first().click();
     await page.waitForTimeout(800);
-    // Select the mock model
+    // Select the mock model — it MUST exist (SANGAM_MOCK_PROVIDER=1).
     await page.locator('#modelSelectorBtn').click();
     await page.waitForTimeout(600);
     const mockOption = page.locator('.model-option', { hasText: /Mock/i }).first();
-    if (await mockOption.count()) {
-      await mockOption.click();
-      await page.waitForTimeout(500);
-    }
+    await expect(mockOption, 'mock model option not found in selector').toBeVisible({ timeout: 10000 });
+    await mockOption.click();
+    await page.waitForTimeout(500);
     await page.fill('#messageInput', 'Smoke test hello');
     await page.locator('#sendBtn').click();
     await expect(page.locator('#messages')).toContainText('Smoke test reply', { timeout: 30000 });
