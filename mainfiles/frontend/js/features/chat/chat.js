@@ -355,7 +355,9 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       <div class="msg-meta"><span class="msg-author">${escapeHtml(model.name)}</span><span class="msg-provider-tag" style="color:${info.color}">${escapeHtml(info.label)}</span></div>
       <article class="assistant-response" aria-live="polite" aria-busy="true"><div class="typing-indicator" aria-label="Generating response">thinking<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></div></article>
     </div>`;
-  elements.messages?.appendChild(typingNode);
+  // Phase 8: use live DOM lookup — elements.messages may be stale after view re-mounts.
+  const messagesEl = document.getElementById('messages') || elements.messages;
+  messagesEl?.appendChild(typingNode);
   scrollToBottom(true);
 
   var _thinkStartTime = Date.now();
@@ -445,6 +447,11 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         }
 
         collected += text;
+        // Phase 8: re-attach if detached (view re-mounts during streaming).
+        if (!document.contains(typingNode)) {
+          const liveMessages = document.getElementById('messages');
+          liveMessages?.appendChild(typingNode);
+        }
         const responseEl = typingNode.querySelector('.assistant-response');
         if (responseEl) {
           // Use streaming markdown renderer for visually stable incremental updates
