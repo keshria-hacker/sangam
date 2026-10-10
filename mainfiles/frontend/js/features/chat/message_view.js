@@ -11,7 +11,7 @@ import { apiFetch } from '../../shared/http.js';
 import { renderMarkdown } from '../../shared/markdown.js';
 import { PROVIDER_COLORS } from '../../shared/constants.js';
 import {
-  getMessages, setMessages, getSelectedModel, setLastUserText,
+  getMessages, setMessages, getSelectedModel, setLastUserText, getIsGenerating,
 } from '../../core/state.js';
 
 // Set by chat.js to break the circular dependency (render -> generate).
@@ -344,6 +344,12 @@ export function buildMessageNode(msg) {
         ta.focus();
 
         function doSave() {
+          // Never edit mid-stream: _rerender would kill the in-flight
+          // typing node and _runGeneration would start a second stream.
+          if (getIsGenerating()) {
+            showToast({ type: 'info', title: 'Still generating', message: 'Wait for the response to finish before editing.' });
+            return;
+          }
           var nt = ta.value.trim();
           if (nt && nt !== origText) {
             msg.content = nt;

@@ -46,6 +46,14 @@ export function showToast({ type = 'info', title = '', message = '', duration = 
   container.appendChild(toast);
   VISIBLE_TOASTS.set(dedupKey, toast);
 
+  // Cap visible toasts — repeated failures must not pile up unboundedly.
+  const MAX_VISIBLE = 4;
+  while (container.children.length > MAX_VISIBLE) {
+    const oldest = container.firstElementChild;
+    if (oldest?.dataset?.dedup) VISIBLE_TOASTS.delete(oldest.dataset.dedup);
+    oldest?.remove();
+  }
+
   const remove = () => {
     removeClass(toast, 'visible');
     addClass(toast, 'leaving');
@@ -68,19 +76,28 @@ export function showToast({ type = 'info', title = '', message = '', duration = 
 
   // Click to dismiss
   toast.querySelector('.toast-close').addEventListener('click', remove);
-  setTimeout(remove, duration);
+  // Store the dismiss timer on the element so dedup resets can re-arm it.
+  toast._dismissTimer = setTimeout(remove, duration);
 }
 
 /**
  * Reset timer on existing toast (for deduplication).
  */
 function resetToastTimer(toast, duration) {
+  // Clear the original dismiss timer — otherwise the toast vanishes early
+  // while the progress bar refills.
+  if (toast._dismissTimer) clearTimeout(toast._dismissTimer);
   const bar = toast.querySelector('.toast-bar');
   if (bar) {
     bar.style.animation = 'none';
     bar.offsetHeight; // force reflow
     bar.style.animation = `toastShrink ${duration}ms linear forwards`;
   }
+  // Re-arm dismissal for the full duration. Reuse the same remove path:
+  // dispatch through the close button so animation + map cleanup run.
+  toast._dismissTimer = setTimeout(() => {
+    toast.querySelector('.toast-close')?.click();
+  }, duration);
 }
 
 /**

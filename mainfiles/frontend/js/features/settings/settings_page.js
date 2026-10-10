@@ -282,28 +282,46 @@ export function renderSettingsPage(bodyEl) {
 
   /**
    * Custom (non-schema) sections per category, migrated from the old modal.
-   * Rendered after the schema rows.
+   * Rendered after the schema rows. Each render is guarded: a throwing
+   * section shows an inline error instead of hanging on "Loading…".
    */
+  function safeRender(fn, list, label) {
+    try {
+      const r = fn(list);
+      if (r && typeof r.catch === 'function') {
+        r.catch((err) => {
+          console.warn(`[settings] section "${label}" failed`, err);
+          const hint = document.createElement('p');
+          hint.className = 'settings-hint settings-error-hint';
+          hint.textContent = `Couldn't load the ${label} section. ${err?.message || err}`;
+          list.appendChild(hint);
+        });
+      }
+    } catch (err) {
+      console.warn(`[settings] section "${label}" threw`, err);
+    }
+  }
+
   function renderCustomSections(list, category) {
     if (category === 'models') {
-      renderProviderKeysSection(list);
-      renderOmnirouteSection(list);
-      renderRoutesSection(list);
-      renderDoctorSection(list);
+      safeRender(renderProviderKeysSection, list, 'provider keys');
+      safeRender(renderOmnirouteSection, list, 'OmniRoute');
+      safeRender(renderRoutesSection, list, 'routing');
+      safeRender(renderDoctorSection, list, 'doctor');
     } else if (category === 'knowledge') {
-      renderMemorySection(list);
+      safeRender(renderMemorySection, list, 'memory');
     } else if (category === 'voice') {
-      renderVoiceSection(list);
+      safeRender(renderVoiceSection, list, 'voice');
     } else if (category === 'workspace') {
-      renderFeatureTogglesSection(list);
+      safeRender(renderFeatureTogglesSection, list, 'features');
     } else if (category === 'learn') {
-      renderLearnSection(list);
+      safeRender(renderLearnSection, list, 'learn');
     } else if (category === 'insights') {
-      renderInsightsSection(list);
+      safeRender(renderInsightsSection, list, 'insights');
     } else if (category === 'output') {
-      renderQualityPreview(list);
+      safeRender(renderQualityPreview, list, 'quality');
     } else if (category === 'general') {
-      renderPresetsSection(list);
+      safeRender(renderPresetsSection, list, 'presets');
     }
   }
 

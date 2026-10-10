@@ -6,6 +6,7 @@
  * Emits 'sangam:settings-changed' { key, value } on change.
  */
 import { apiFetch } from './http.js';
+import { showToast } from './toast.js';
 import { getAllDefaults, SETTINGS_SCHEMA } from './settings_schema.js';
 
 console.log('[Module] settings_store.js loaded');
@@ -14,6 +15,8 @@ const CACHE_KEY = 'sangam:settings-cache';
 let settings = { ...getAllDefaults() };
 let loaded = false;
 let saveTimer = null;
+let saveRetries = 0;
+const MAX_SAVE_RETRIES = 3;
 
 function validate(key, value) {
   const def = SETTINGS_SCHEMA.find((s) => s.key === key);
@@ -74,8 +77,15 @@ async function saveNow() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings }),
     });
+    saveRetries = 0;
   } catch (e) {
+    // Never fail silently: the UI applied the value optimistically, so tell
+    // the user it didn't persist (they'd otherwise discover the revert later).
     console.warn('[settings] save failed', e);
+    showToast({ type: 'error', title: 'Settings not saved', message: 'Will retry on your next change.' });
+    // Bounded retry — a dead backend must not spin the save loop forever.
+    if (++saveRetries <= MAX_SAVE_RETRIES) scheduleSave();
+    else saveRetries = 0;
   }
 }
 

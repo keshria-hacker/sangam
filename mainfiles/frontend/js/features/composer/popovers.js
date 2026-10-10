@@ -157,11 +157,7 @@ export function initPopovers() {
           <select id="tuneThinking">
             <option value="expand">Always expand</option><option value="collapse">Collapsed</option>
             <option value="hide">Hide</option>
-          </select></div>
-        <div class="tune-row"><label class="popover-check">
-          <input type="checkbox" id="tuneStream" checked>
-          <span><strong>Streaming</strong><small>Show tokens as they arrive</small></span>
-        </label></div>`;
+          </select></div>`;
       tunePop.classList.remove('hidden');
       // Init values
       tunePop.querySelector('#tuneEffort').value = getReasoningEffort();
@@ -180,9 +176,6 @@ export function initPopovers() {
       });
       tunePop.querySelector('#tuneStyle').addEventListener('change', (e) => setSetting('outputStyle', e.target.value));
       tunePop.querySelector('#tuneThinking').addEventListener('change', (e) => setThinkingDisplayPref(e.target.value));
-      tunePop.querySelector('#tuneStream').addEventListener('change', (e) => {
-        document.dispatchEvent(new CustomEvent('sangam:streaming-toggled', { detail: { on: e.target.checked } }));
-      });
     }
   });
 

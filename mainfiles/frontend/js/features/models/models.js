@@ -92,6 +92,14 @@ function handleNoModels() {
   renderProviderStatusList();
   renderConnPulse();
   elements.onboardingHint?.classList.remove('hidden');
+  // Wire the onboarding card's Settings button (was dead — no listener).
+  const onboardingBtn = document.getElementById('onboardingOpenSettings');
+  if (onboardingBtn && !onboardingBtn.dataset.wired) {
+    onboardingBtn.dataset.wired = '1';
+    onboardingBtn.addEventListener('click', () => {
+      import('../settings/open.js').then((m) => m.openSettings());
+    });
+  }
   showToast({ type: 'info', title: 'No models available', message: 'Start Ollama with a downloaded model, or link a provider key in Settings.' });
 }
 

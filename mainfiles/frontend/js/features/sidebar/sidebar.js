@@ -271,6 +271,9 @@ function buildChatItem(chat, isPinned) {
 }
 
 export async function openChat(chatId) {
+  // Abort any in-flight generation BEFORE wiping the message DOM, so the
+  // orphaned stream can't render into (or persist state into) the new chat.
+  try { await callChatModule('stopGeneration'); } catch (_) { /* chat module not loaded yet */ }
   closeProfilePopup();
   document.dispatchEvent(new CustomEvent('sangam:chat-switched'));
   setActiveChatId(chatId);

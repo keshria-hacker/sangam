@@ -248,6 +248,8 @@ export async function handleSend() {
   autoResizeTextarea();
 
   const fileIds = files.map((f) => f.id).filter(Boolean);
+  // Capture media ids BEFORE clearing attachments — runGeneration reads them later.
+  const mediaIds = files.map((f) => f.mediaId).filter(Boolean);
   setAttachedFiles([]);
   renderFileChips();
   setFollowingStream(true); // a new send re-engages auto-following
@@ -294,7 +296,7 @@ export async function handleSend() {
     return;
   }
 
-  runGeneration({ content: userMsg.content, fileIds, regenerate: false });
+  runGeneration({ content: userMsg.content, fileIds, mediaIds, regenerate: false });
 }
 
 /**
@@ -322,7 +324,7 @@ export function regenerate() {
 /**
  * Core generation logic with SSE streaming.
  */
-export async function runGeneration({ content, fileIds, regenerate }) {
+export async function runGeneration({ content, fileIds, mediaIds, regenerate }) {
   const model = getSelectedModel();
   if (!model) {
     showToast({ type: 'info', title: 'Model required', message: 'Select a model before sending a message.' });
@@ -338,7 +340,10 @@ export async function runGeneration({ content, fileIds, regenerate }) {
 
   const genStartedAt = Date.now();
   const genId = ++_genCounter;
-  const MIN_STOP_VISIBLE_MS = 2000;
+  const genChatId = getActiveChatId();
+  // A generation is stale once a newer one starts or the user switches chats.
+  // Stale generations must not touch the DOM node or the current chat's state.
+  const isStale = () => genId !== _genCounter || getActiveChatId() !== genChatId;
 
   elements.errorState?.classList.add('hidden');
   const info = getProviderInfo(model);
@@ -355,11 +360,9 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       <div class="msg-meta"><span class="msg-author">${escapeHtml(model.name)}</span><span class="msg-provider-tag" style="color:${info.color}">${escapeHtml(info.label)}</span></div>
       <article class="assistant-response" aria-live="polite" aria-busy="true"><div class="typing-indicator" aria-label="Generating response">thinking<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></div></article>
     </div>`;
-  // Phase 8: use live DOM lookup — elements.messages may be stale after view re-mounts.
+  // Use live DOM lookup — elements.messages may be stale after view re-mounts.
   const messagesEl = document.getElementById('messages') || elements.messages;
-  console.log('[DEBUG] appending typingNode, messagesEl exists:', !!messagesEl);
   messagesEl?.appendChild(typingNode);
-  console.log('[DEBUG] typingNode in DOM after append:', document.contains(typingNode));
   scrollToBottom(true);
 
   var _thinkStartTime = Date.now();
@@ -389,7 +392,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
     model: model.id,
     messages: getMessages().map(({ role, content }) => ({ role, content })),
     file_ids: fileIds,
-    media_ids: getAttachedFiles().map((f) => f.mediaId).filter(Boolean),
+    media_ids: mediaIds || [],
     temperature: getTemperature(),
     max_tokens: getMaxTokens() === 'auto' ? null : parseInt(getMaxTokens(), 10),
     reasoning_effort: getReasoningEffort() === 'none' ? null : getReasoningEffort(),
@@ -431,6 +434,8 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         }
       },
       textDelta: (text) => {
+        // Drop late tokens from a superseded generation or a previous chat.
+        if (isStale()) return;
         if (!sawFirstToken) {
           sawFirstToken = true;
           const metaEl = typingNode.querySelector('.msg-meta');
@@ -662,7 +667,11 @@ export async function runGeneration({ content, fileIds, regenerate }) {
   }
 
   try {
-    if (streamError) {
+    // Superseded (newer generation started) or chat switched mid-stream:
+    // drop the orphaned node without mutating the current chat's state.
+    if (isStale()) {
+      typingNode.remove();
+    } else if (streamError) {
       typingNode.remove();
       elements.errorState?.classList.remove('hidden');
       const providerLabel = info.label || model.provider || 'Provider';
@@ -766,16 +775,13 @@ export async function runGeneration({ content, fileIds, regenerate }) {
   setAbortController(null);
   if (_thinkTimer) { clearInterval(_thinkTimer); _thinkTimer = null; }
 
-  // Enforce minimum stop-button visibility
-  const elapsed = Date.now() - genStartedAt;
-  if (elapsed < MIN_STOP_VISIBLE_MS) {
-    await new Promise((r) => setTimeout(r, MIN_STOP_VISIBLE_MS - elapsed));
-  }
-  await new Promise((r) => setTimeout(r, 16));
-
+  // Swap Stop back to Send as soon as THIS generation ends. A visible Stop
+  // button that can no longer stop anything is worse than a quick swap, so
+  // there is no artificial minimum-visibility delay.
   if (genId === _genCounter) {
     setSendButtonState(false);
   }
+  await new Promise((r) => setTimeout(r, 16));
   scrollToBottomIfNearBottom();
 }
 

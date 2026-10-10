@@ -80,7 +80,6 @@ function initDOM() {
     fileInput: $('#fileInput'),
     messageInput: $('#messageInput'),
     sendBtn: $('#sendBtn'),
-    webSearchToggle: $('#webSearchToggle'),
     // Phase 8 B4: temp/token/reasoning pills removed — Tune popover owns them.
     authOverlay: $('#authOverlay'),
     authLoading: $('#authLoading'),
@@ -229,8 +228,9 @@ function initGlobalListeners() {
       e.preventDefault();
       elements.modelSelector.classList.contains('open') ? closeModelDropdown() : openModelDropdown();
     }
-    // / (when not in input) - Focus composer
-    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && !document.activeElement.isContentEditable) {
+    // / (when not in input) - Focus composer. Never steal focus from an open modal.
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && !document.activeElement.isContentEditable
+        && !document.querySelector('.modal-overlay:not(.hidden), .confirm-overlay:not(.hidden), .auth-overlay:not(.hidden)')) {
       e.preventDefault();
       elements.messageInput?.focus();
     }
@@ -239,10 +239,15 @@ function initGlobalListeners() {
       e.preventDefault();
       import('./features/settings/appearance.js').then((m) => m.toggleTheme());
     }
-    // Ctrl+Shift+W - Toggle web search
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'w') {
+    // Alt+W - Toggle web search (Ctrl+Shift+W is reserved by browsers to close
+    // the window and cannot be intercepted — the old binding was dangerous.)
+    if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'w') {
       e.preventDefault();
-      elements.webSearchToggle?.click();
+      import('./features/composer/popovers.js').then(({ isToolEnabled, setToolEnabled }) => {
+        const on = !isToolEnabled('web_search');
+        setToolEnabled('web_search', on);
+        showToast({ type: 'info', title: on ? 'Web search on' : 'Web search off' });
+      });
     }
     // Ctrl+/ - Shortcuts help
     if ((e.ctrlKey || e.metaKey) && e.key === '/') {

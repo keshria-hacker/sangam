@@ -45,6 +45,27 @@ export function navigate(action) {
   }
 }
 
+/** Mark one rail item active (visual + aria-current) and move focus into
+ *  the newly shown view so keyboard/screen-reader users land on content. */
+export function markRailActive(container, itemId) {
+  container.querySelectorAll('.rail-item').forEach((b) => {
+    b.classList.remove('active');
+    b.removeAttribute('aria-current');
+  });
+  const btn = container.querySelector(`.rail-item[data-nav="${itemId}"]`);
+  if (btn) {
+    btn.classList.add('active');
+    btn.setAttribute('aria-current', 'page');
+  }
+  const toolHidden = document.getElementById('toolView')?.classList.contains('hidden');
+  const title = document.getElementById('toolViewTitle');
+  const target = (!toolHidden && title) ? title : document.getElementById('chatView');
+  if (target) {
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+  }
+}
+
 /** Build the rail DOM into a container. */
 export function renderRail(container, features = {}) {
   container.innerHTML = '';
@@ -66,9 +87,8 @@ export function renderRail(container, features = {}) {
         enableAndOpen(item, btn, container);
       } else {
         navigate(item.action);
+        markRailActive(container, item.id);
       }
-      container.querySelectorAll('.rail-item').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
     });
     if (item.id === 'settings') btn.classList.add('rail-bottom');
     container.appendChild(btn);
@@ -89,9 +109,7 @@ async function enableAndOpen(item, btn, container) {
     const features = data.features || {};
     renderRail(container, features);
     navigate(item.action);
-    const fresh = container.querySelector(`.rail-item[data-nav="${item.id}"]`);
-    container.querySelectorAll('.rail-item').forEach((b) => b.classList.remove('active'));
-    fresh?.classList.add('active');
+    markRailActive(container, item.id);
   } catch (err) {
     showToast({ type: 'error', title: `Could not turn on ${item.label}`, message: err?.message || String(err) });
     btn.disabled = false;
