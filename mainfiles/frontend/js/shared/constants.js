@@ -85,7 +85,7 @@ export const NON_CHAT_MARKERS = [
 export const STORAGE_KEYS = {
   API_BASE: 'sangam-api-base',
   ACCESS_TOKEN: 'sangam-access-token',
-  SETTINGS: 'sangam-settings',
+  // Phase 8 B3: SETTINGS ('sangam-settings') removed — /user/settings is the source of truth.
 };
 
 // Auth settings
