@@ -214,10 +214,6 @@ export async function initPalette() {
       closePalette();
     }
   });
-  // Also add a topbar button for discoverability.
-  const btn = document.getElementById('paletteBtn');
-  if (btn) {
-    btn.classList.remove('hidden');
-    btn.addEventListener('click', openPalette);
-  }
+  // Phase 8 B5: the topbar terminal button is removed (redundant with Ctrl+P).
+  // The palette stays available via Ctrl+P / Cmd+P.
 }

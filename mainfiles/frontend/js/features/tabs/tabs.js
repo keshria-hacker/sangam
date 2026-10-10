@@ -183,43 +183,6 @@ export function initTabs() {
   if (mainTab && !mainTab.hasAttribute('tabindex')) mainTab.setAttribute('tabindex', '0');
   initTabKeyboard();
   $('#toolViewClose')?.addEventListener('click', () => closeTab(activeTabId));
-  $('#tabAddBtn')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleToolPicker();
-  });
-  document.addEventListener('click', () => closeToolPicker());
   renderTabStrip();
 }
 
-async function toggleToolPicker() {
-  closeToolPicker();
-  const features = await getFeatures();
-  const btn = $('#tabAddBtn');
-  const menu = document.createElement('div');
-  menu.id = 'toolPickerMenu';
-  menu.className = 'tool-picker-menu';
-  menu.innerHTML = Object.entries(TOOL_DEFS).map(([key, def]) => {
-    const off = def.feature && !features[def.feature];
-    return `
-    <button type="button" data-tool="${key}"${off ? ' disabled' : ''} title="${off ? 'Enable in Settings → Features' : def.title}">
-      <i class="fa-solid ${def.icon}"></i><span>${def.title}</span>
-      ${off ? '<span class="tool-off">off</span>' : ''}
-    </button>`;
-  }).join('');
-  menu.querySelectorAll('button:not([disabled])').forEach((b) => {
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openToolTab(b.dataset.tool);
-      closeToolPicker();
-    });
-  });
-  const rect = btn.getBoundingClientRect();
-  menu.style.position = 'fixed';
-  menu.style.left = `${rect.left}px`;
-  menu.style.top = `${rect.bottom + 6}px`;
-  document.body.appendChild(menu);
-}
-
-function closeToolPicker() {
-  document.getElementById('toolPickerMenu')?.remove();
-}
