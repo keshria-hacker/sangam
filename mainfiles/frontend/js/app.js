@@ -3,7 +3,7 @@
  * Main entry point - bootstraps all feature modules.
  */
 
-import { initAppState, getMessages, getIsGenerating, getLastUserText, getTemperature, setTemperature, getMaxTokens, setMaxTokens, getReasoningEffort, setReasoningEffort, setThinkingDisplayPref, getThinkingDisplay } from './core/state.js';
+import { initAppState, getMessages, getIsGenerating, getLastUserText } from './core/state.js';
 import { initElements as initChatElements, initChatEvents, handleSend, regenerate, runGeneration, stopGeneration, autoResizeTextarea, scrollToBottom, buildMessageNode, renderMessages, startNewChat as chatStartNewChat } from './features/chat/chat.js';
 import { initElements as initModelsElements, loadProvidersAndModels, renderModelList, renderProviderFilters, renderProviderStatusList, renderConnPulse, selectModel, openModelDropdown, closeModelDropdown, initModelSelector } from './features/models/models.js';
 import { openSettings } from './features/settings/open.js';
@@ -88,19 +88,7 @@ function initDOM() {
     messageInput: $('#messageInput'),
     sendBtn: $('#sendBtn'),
     webSearchToggle: $('#webSearchToggle'),
-    tempControl: $('#tempControl'),
-    tempPopover: $('#tempPopover'),
-    tempSlider: $('#tempSlider'),
-    tempValue: $('#tempValue'),
-    tempPopoverValue: $('#tempPopoverValue'),
-    tokenBtn: $('#tokenBtn'),
-    tokenLabel: $('#tokenLabel'),
-    tokenDropdown: $('#tokenDropdown'),
-    tokenSelect: $('#tokenSelect'),
-    reasoningBtn: $('#reasoningBtn'),
-    reasoningLabel: $('#reasoningLabel'),
-    reasoningDropdown: $('#reasoningDropdown'),
-    reasoningSelect: $('#reasoningSelect'),
+    // Phase 8 B4: temp/token/reasoning pills removed — Tune popover owns them.
     authOverlay: $('#authOverlay'),
     authLoading: $('#authLoading'),
     authLoadingText: $('#authLoadingText'),
@@ -313,95 +301,6 @@ function initGlobalListeners() {
 
   // (Footer Settings button removed in Phase 8 B1 — rail Settings is the single entry.)
 
-  // ── Temperature popover ──
-  elements.tempControl?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.tempPopover?.classList.toggle('hidden');
-  });
-  document.addEventListener('click', (e) => {
-    if (!elements.tempControl?.contains(e.target) && !elements.tempPopover?.contains(e.target)) {
-      elements.tempPopover?.classList.add('hidden');
-    }
-  });
-  elements.tempSlider?.addEventListener('input', () => {
-    const val = elements.tempSlider.value;
-    elements.tempValue.textContent = val;
-    elements.tempPopoverValue.textContent = val;
-    setTemperature(parseFloat(val));
-  });
-
-  // ── Token dropdown ──
-  elements.tokenBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.tokenDropdown?.classList.toggle('hidden');
-  });
-  elements.tokenDropdown?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-value]');
-    if (!btn) return;
-    const val = btn.dataset.value;
-    renderTokenLabel(val);
-    setMaxTokens(val);
-    elements.tokenDropdown.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    elements.tokenDropdown.classList.add('hidden');
-  });
-
-  // ── Reasoning dropdown ──
-  elements.reasoningBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.reasoningDropdown?.classList.toggle('hidden');
-  });
-  // Think mode: grey out effort control for models without reasoning support
-  window.addEventListener('sangam:model-changed', (e) => {
-    const model = e.detail?.model;
-    const caps = model?.capabilities || {};
-    const supported = !!(caps.reasoning || caps.thinking);
-    const wrap = elements.reasoningSelect;
-    if (wrap) {
-      wrap.classList.toggle('reasoning-unsupported', !supported);
-      wrap.title = supported
-        ? 'Reasoning effort (Think mode)'
-        : `${model?.name || 'This model'} does not support reasoning effort — control disabled`;
-      elements.reasoningBtn.disabled = !supported;
-    }
-  });
-
-  elements.reasoningDropdown?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-value],button[data-thinking]');
-    if (!btn) return;
-    // Thinking block display preference
-    if (btn.dataset.thinking) {
-      setThinkingDisplayPref(btn.dataset.thinking);
-      elements.reasoningDropdown.querySelectorAll('button[data-thinking]').forEach((b) => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      elements.reasoningDropdown.classList.add('hidden');
-      return;
-    }
-    const val = btn.dataset.value;
-    const labels = { none: 'Auto', low: 'Low', medium: 'Medium', high: 'High', extra_high: 'Extra High' };
-    elements.reasoningLabel.textContent = labels[val] || val;
-    setReasoningEffort(val);
-    elements.reasoningDropdown.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    elements.reasoningDropdown.classList.add('hidden');
-  });
-  // Init thinking display selection from saved preference
-  {
-    const pref = getThinkingDisplay();
-    elements.reasoningDropdown?.querySelectorAll('button[data-thinking]').forEach((b) =>
-      b.classList.toggle('selected', b.dataset.thinking === pref));
-  }
-
-
-  // Close select dropdowns when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!elements.tokenSelect?.contains(e.target)) {
-      elements.tokenDropdown?.classList.add('hidden');
-    }
-    if (!elements.reasoningSelect?.contains(e.target)) {
-      elements.reasoningDropdown?.classList.add('hidden');
-    }
-  });
 }
 
 /**
@@ -446,37 +345,6 @@ function setupGlobalNamespace() {
 }
 
 /**
- * Render the max-tokens label. 'auto' (or anything non-numeric) shows "Auto".
- * Single owner for this label (A2: parseInt('auto') produced NaN).
- */
-function renderTokenLabel(val) {
-  const label = (val === 'auto' || val == null || Number.isNaN(parseInt(val, 10)))
-    ? 'Auto'
-    : parseInt(val, 10).toLocaleString();
-  if (elements.tokenLabel) elements.tokenLabel.textContent = label;
-}
-
-/**
- * Sync token and reasoning dropdowns with current state.
- */
-function syncDropdownsFromState() {
-  // Token dropdown
-  const maxTokens = getMaxTokens();
-  renderTokenLabel(maxTokens);
-  elements.tokenDropdown?.querySelectorAll('button').forEach((b) => {
-    b.classList.toggle('selected', b.dataset.value === maxTokens);
-  });
-
-  // Reasoning dropdown
-  const reasoningEffort = getReasoningEffort();
-  const labels = { none: 'Auto', low: 'Low', medium: 'Medium', high: 'High', extra_high: 'Extra High' };
-  elements.reasoningLabel.textContent = labels[reasoningEffort] || reasoningEffort;
-  elements.reasoningDropdown?.querySelectorAll('button').forEach((b) => {
-    b.classList.toggle('selected', b.dataset.value === reasoningEffort);
-  });
-}
-
-/**
  * Main bootstrap function - called after auth succeeds.
  */
 export async function startApplication() {
@@ -501,9 +369,6 @@ export async function startApplication() {
 
   // Set up global namespace for inline handlers
   setupGlobalNamespace();
-
-  // Sync dropdowns with current state
-  syncDropdownsFromState();
 
   // Load providers and models from backend
   try {

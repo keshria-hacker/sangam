@@ -75,19 +75,7 @@ export function initElements() {
     messageInput: $('#messageInput'),
     sendBtn: $('#sendBtn'),
     stopBtn: $('#stopBtn'),
-    tempControl: $('#tempControl'),
-    tempPopover: $('#tempPopover'),
-    tempSlider: $('#tempSlider'),
-    tempValue: $('#tempValue'),
-    tempPopoverValue: $('#tempPopoverValue'),
-    tokenBtn: $('#tokenBtn'),
-    tokenLabel: $('#tokenLabel'),
-    tokenDropdown: $('#tokenDropdown'),
-    tokenSelect: $('#tokenSelect'),
-    reasoningBtn: $('#reasoningBtn'),
-    reasoningLabel: $('#reasoningLabel'),
-    reasoningDropdown: $('#reasoningDropdown'),
-    reasoningSelect: $('#reasoningSelect'),
+    // Phase 8 B4: temp/token/reasoning pills removed — Tune popover owns them.
   };
 }
 

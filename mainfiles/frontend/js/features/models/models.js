@@ -7,7 +7,7 @@ import { showToast } from '../../shared/toast.js';
 import { escapeHtml, bucketFor } from '../../shared/utils.js';
 import {
   getProviders, setProviders, getModels, setModels, getSelectedModel, setSelectedModel,
-  getActiveProviderFilter, setActiveProviderFilter, getReasoningEffort
+  getActiveProviderFilter, setActiveProviderFilter
 } from '../../core/state.js';
 import { PROVIDER_COLORS } from '../../shared/constants.js';
 
@@ -253,20 +253,8 @@ export function selectModel(model, opts = {}) {
   statusEl.className = `status-dot ${info.state}`;
   statusEl.title = info.state === 'online' ? 'Connected' : info.state === 'local' ? 'Local runtime' : 'Not linked';
 
-  // Update reasoning effort indicator
-  const reasoningEl = elements.modelSelectorBtn.querySelector('.reasoning-effort');
-  const effort = getReasoningEffort();
-  const hasReasoning = effort !== 'none';
-
-  if (reasoningEl) {
-    if (hasReasoning) {
-      const labels = { low: 'Low', medium: 'Medium', high: 'High', extra_high: 'Extra High' };
-      reasoningEl.innerHTML = `<i class="fa-solid fa-brain"></i> ${labels[effort] || effort}`;
-      reasoningEl.classList.remove('hidden');
-    } else {
-      reasoningEl.classList.add('hidden');
-    }
-  }
+  // Phase 8 B4: model-selector reasoning badge removed — reasoning effort
+  // lives in Tune only.
 
   const sendBtn = document.getElementById('sendBtn');
   if (sendBtn) sendBtn.disabled = false;

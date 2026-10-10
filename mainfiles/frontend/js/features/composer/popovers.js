@@ -10,6 +10,7 @@ import { getSetting, setSetting } from '../../shared/settings_store.js';
 import {
   getReasoningEffort, setReasoningEffort, getMaxTokens, setMaxTokens,
   getTemperature, setTemperature, getAgentModeEnabled, setAgentModeEnabled,
+  getThinkingDisplay, setThinkingDisplayPref,
 } from '../../core/state.js';
 
 console.log('[Module] popovers.js loaded');
@@ -152,6 +153,11 @@ export function initPopovers() {
             <option value="adhd">ADHD-friendly</option><option value="no-slop">No-slop</option>
             <option value="verbose">Verbose</option><option value="teacher">Teacher</option>
           </select></div>
+        <div class="tune-row"><label>Thinking block</label>
+          <select id="tuneThinking">
+            <option value="expand">Always expand</option><option value="collapse">Collapsed</option>
+            <option value="hide">Hide</option>
+          </select></div>
         <div class="tune-row"><label class="popover-check">
           <input type="checkbox" id="tuneStream" checked>
           <span><strong>Streaming</strong><small>Show tokens as they arrive</small></span>
@@ -164,6 +170,7 @@ export function initPopovers() {
       tempEl.value = getTemperature();
       tunePop.querySelector('#tuneTempVal').textContent = getTemperature().toFixed(1);
       tunePop.querySelector('#tuneStyle').value = getSetting('outputStyle') || 'normal';
+      tunePop.querySelector('#tuneThinking').value = getThinkingDisplay();
       // Wire
       tunePop.querySelector('#tuneEffort').addEventListener('change', (e) => setReasoningEffort(e.target.value));
       tunePop.querySelector('#tuneTokens').addEventListener('change', (e) => setMaxTokens(e.target.value));
@@ -172,6 +179,7 @@ export function initPopovers() {
         tunePop.querySelector('#tuneTempVal').textContent = parseFloat(e.target.value).toFixed(1);
       });
       tunePop.querySelector('#tuneStyle').addEventListener('change', (e) => setSetting('outputStyle', e.target.value));
+      tunePop.querySelector('#tuneThinking').addEventListener('change', (e) => setThinkingDisplayPref(e.target.value));
       tunePop.querySelector('#tuneStream').addEventListener('change', (e) => {
         document.dispatchEvent(new CustomEvent('sangam:streaming-toggled', { detail: { on: e.target.checked } }));
       });
