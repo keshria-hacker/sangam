@@ -47,7 +47,6 @@ function initDOM() {
     mobileNewChat: $('#mobileNewChat'),
     searchChats: $('#searchChats'),
     chatHistory: $('#chatHistory'),
-    settingsBtn: $('#settingsBtn'),
     settingsOverlay: $('#settingsOverlay'),
     closeSettings: $('#closeSettings'),
     themeOptions: $('#themeOptions'),
@@ -320,8 +319,7 @@ function initGlobalListeners() {
       : `<i class="fa-solid fa-chevron-down"></i> Show details`;
   });
 
-  // Settings button
-  elements.settingsBtn?.addEventListener('click', openSettings);
+  // (Footer Settings button removed in Phase 8 B1 — rail Settings is the single entry.)
 
   // ── Temperature popover ──
   elements.tempControl?.addEventListener('click', (e) => {
