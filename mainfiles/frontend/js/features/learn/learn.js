@@ -67,7 +67,7 @@ export function renderLearnTab(bodyEl) {
 
 // Back-compat: old modal entry point now opens the tab
 export function openLearnModal() {
-  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('learn'));
+  import('../tabs/tabs.js').then(({ showTool }) => showTool('learn'));
 }
 
 function setBusy(busy, label, root) {

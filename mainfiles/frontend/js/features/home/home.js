@@ -10,7 +10,7 @@ import { apiFetch } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { getJobs } from '../../core/jobs.js';
-import { openToolTab } from '../tabs/tabs.js';
+import { showTool } from '../tabs/tabs.js';
 
 console.log('[Module] home.js loaded');
 
@@ -82,7 +82,7 @@ export async function renderHome(bodyEl) {
     btn.addEventListener('click', () => {
       const def = SUGGESTED_STARTS.find((s) => s.id === btn.dataset.start);
       if (!def) return;
-      if (def.tool) openToolTab(def.tool);
+      if (def.tool) showTool(def.tool);
       else import('../chat/chat.js').then((m) => m.startNewChat()).catch(() => {});
     });
   });

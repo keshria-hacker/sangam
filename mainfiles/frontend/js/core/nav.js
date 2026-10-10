@@ -5,7 +5,7 @@
  * action. Feeds the rail, command palette, and deep links.
  * Features that are off show as muted with "Turn on" (never invisible).
  */
-import { openToolTab } from '../features/tabs/tabs.js';
+import { showTool } from '../features/tabs/tabs.js';
 import { apiPost } from '../shared/http.js';
 import { showToast } from '../shared/toast.js';
 
@@ -40,9 +40,9 @@ export function navigate(action) {
     handlers[action]();
     return;
   }
-  // Default: tab:xxx opens the tool tab
+  // Default: tab:xxx shows the tool in the main view (Phase 8 B6: rail replaces view)
   if (action.startsWith('tab:')) {
-    openToolTab(action.slice(4));
+    showTool(action.slice(4));
   }
 }
 

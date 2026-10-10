@@ -115,6 +115,11 @@ function initTabKeyboard() {
 export function openToolTab(tool) {
   const def = TOOL_DEFS[tool];
   if (!def) return null;
+  // Phase 8 B6: cap explicit split-view tabs at 2 (plus pinned main).
+  if (openTabs.length >= 2 && !openTabs.some((t) => t.tool === tool)) {
+    const oldest = openTabs[0];
+    closeTab(oldest.id);
+  }
   let tab = openTabs.find((t) => t.tool === tool);
   if (!tab) {
     tab = { id: `tool-${tool}`, tool, title: def.title, icon: def.icon, mounted: false };
@@ -123,6 +128,52 @@ export function openToolTab(tool) {
   switchTab(tab.id);
   return tab.id;
 }
+
+// ---------------------------------------------------------------------------
+// Main-view navigation (Phase 8 B6).
+//
+// Rail items REPLACE the main view — one page at a time, no strip tab.
+// The strip tabs remain only for explicit "open beside chat" split views
+// (max 2, enforced above). Main-view containers are mount-once like tabs.
+// ---------------------------------------------------------------------------
+
+const viewCache = new Map(); // tool -> container
+let activeViewTool = null;
+
+/** Show a tool in the main view (rail navigation). Mount-once per tool. */
+export function showTool(tool) {
+  const def = TOOL_DEFS[tool];
+  if (!def) return;
+  activeViewTool = tool;
+  activeTabId = 'main'; // strip shows main active; the rail owns the highlight
+  const body = $('#toolViewBody');
+  let container = viewCache.get(tool);
+  if (!container || !container.isConnected) {
+    container = document.createElement('div');
+    container.id = `viewbody-${tool}`;
+    container.className = 'tool-tab-body';
+    container.dataset.tool = tool;
+    body.appendChild(container);
+    const render = renderers[tool];
+    if (render) {
+      try { render(container); } catch (err) { console.error('view render failed', tool, err); }
+    } else {
+      container.innerHTML = `<p class="settings-hint">Loading ${def.title}…</p>`;
+    }
+    viewCache.set(tool, container);
+  }
+  document.querySelectorAll('#toolViewBody .tool-tab-body').forEach((el) => {
+    el.classList.toggle('hidden', el !== container);
+  });
+  $('#chatView')?.classList.add('hidden');
+  $('#toolView')?.classList.remove('hidden');
+  const titleEl = $('#toolViewTitle');
+  if (titleEl) titleEl.innerHTML = `<i class="fa-solid ${def.icon}"></i> ${def.title}`;
+  renderTabStrip();
+}
+
+/** Which tool (if any) is currently shown in the main view. */
+export function getActiveViewTool() { return activeViewTool; }
 
 export function closeTab(tabId) {
   if (tabId === 'main') return;
@@ -156,6 +207,7 @@ function mountTab(tab) {
 
 export function switchTab(tabId) {
   activeTabId = tabId;
+  activeViewTool = null; // leaving the rail view (if any)
   const isMain = tabId === 'main';
   $('#chatView')?.classList.toggle('hidden', !isMain);
   $('#toolView')?.classList.toggle('hidden', isMain);
@@ -182,7 +234,11 @@ export function initTabs() {
   mainTab?.addEventListener('click', () => switchTab('main'));
   if (mainTab && !mainTab.hasAttribute('tabindex')) mainTab.setAttribute('tabindex', '0');
   initTabKeyboard();
-  $('#toolViewClose')?.addEventListener('click', () => closeTab(activeTabId));
+  $('#toolViewClose')?.addEventListener('click', () => {
+    // Closing a rail view returns to chat; closing a strip tab closes it.
+    if (activeViewTool) switchTab('main');
+    else closeTab(activeTabId);
+  });
   renderTabStrip();
 }
 

@@ -72,10 +72,10 @@ export async function renderTeamsTab(bodyEl) {
   stopAllBtn.addEventListener('click', () => { abort?.abort(); });
 }
 
-// Back-compat: old modal entry point now opens the tab
+// Back-compat: old modal entry point now shows the Teams view
 export async function openTeamsModal() {
-  const { openToolTab } = await import('../tabs/tabs.js');
-  openToolTab('teams');
+  const { showTool } = await import('../tabs/tabs.js');
+  showTool('teams');
 }
 
 function cardFor(container, agentId, role) {

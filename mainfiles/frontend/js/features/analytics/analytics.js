@@ -45,7 +45,7 @@ export function renderAnalyticsTab(bodyEl) {
 
 // Back-compat: old modal entry point now opens the tab
 export function openAnalyticsModal() {
-  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('analytics'));
+  import('../tabs/tabs.js').then(({ showTool }) => showTool('analytics'));
 }
 
 async function loadStats(container) {

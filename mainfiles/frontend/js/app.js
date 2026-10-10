@@ -16,7 +16,7 @@ import { renderAnalyticsTab } from './features/analytics/analytics.js';
 import { renderImageTab } from './features/image/image.js';
 import { renderCodeAgentTab } from './features/code-agent/code-agent.js';
 import { renderDesignTab } from './features/design/design-studio.js';
-import { initTabs, openToolTab, registerTabRenderer } from './features/tabs/tabs.js';
+import { initTabs, openToolTab, showTool, registerTabRenderer } from './features/tabs/tabs.js';
 import { trapFocus } from './shared/focus_trap.js';
 import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';
@@ -155,18 +155,16 @@ async function initRail() {
   const container = document.getElementById('railNav');
   if (!container) return;
   // Register nav handlers
-  registerNavHandler('home', async () => {
-    const { renderHome } = await import('./features/home/home.js');
-    openToolTab('home');
+  registerNavHandler('home', () => {
+    showTool('home');
   });
   registerNavHandler('chat', () => {
     const { switchTab } = window.__sangamTabs || {};
     // Fallback: main tab is the chat
     document.getElementById('mainTab')?.click();
   });
-  registerNavHandler('settings', async () => {
-    const { renderSettingsPage } = await import('./features/settings/settings_page.js');
-    openToolTab('settings');
+  registerNavHandler('settings', () => {
+    showTool('settings');
   });
   // Load features and render
   // (moved to loadRailFeatures — called post-auth from startApplication)
@@ -281,11 +279,11 @@ function initGlobalListeners() {
   elements.closeShortcuts?.addEventListener('click', closeShortcutsModal);
 
   // Skills button -> opens Skills tab
-  elements.skillsBtn?.addEventListener('click', () => openToolTab('skills'));
+  elements.skillsBtn?.addEventListener('click', () => showTool('skills'));
   // Code agent button -> opens Code agent tab
-  elements.codeBtn?.addEventListener('click', () => openToolTab('code'));
+  elements.codeBtn?.addEventListener('click', () => showTool('code'));
   // Design studio button -> opens Design studio tab
-  elements.designBtn?.addEventListener('click', () => openToolTab('design'));
+  elements.designBtn?.addEventListener('click', () => showTool('design'));
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 
@@ -336,7 +334,7 @@ function setupGlobalNamespace() {
     closeMobileSidebar,
     toggleSidebarCollapse,
     // Skills
-    openSkillsTab: () => openToolTab('skills'),
+    openSkillsTab: () => showTool('skills'),
     // Auth
     initializeAuth,
     // Utils
