@@ -61,6 +61,11 @@ async def test_record_event_stores(tmp_path):
     maker = await _db_session(tmp_path)
     async with maker() as db:
         uid = await _make_user(db, "analytics_u1")
+        # Phase 8 C: analyticsOptIn must be set for events to record.
+        from backend.models import UserPreference
+        import json as _json
+        db.add(UserPreference(user_id=uid, settings_json=_json.dumps({'analyticsOptIn': True})))
+        await db.commit()
         assert await record_event(db, uid, ae.MESSAGE_SENT, {"model": "m1"}) is True
         assert await record_event(db, uid, ae.TEAM_RUN, {"team_id": "research"}) is True
 
@@ -95,6 +100,12 @@ async def test_get_stats_aggregates(tmp_path):
     async with maker() as db:
         uid = await _make_user(db, "analytics_u2")
         other = await _make_user(db, "analytics_u3")
+        # Phase 8 C: analyticsOptIn must be set for events to record.
+        from backend.models import UserPreference
+        import json as _json
+        for u in (uid, other):
+            db.add(UserPreference(user_id=u, settings_json=_json.dumps({'analyticsOptIn': True})))
+        await db.commit()
         for _ in range(3):
             await record_event(db, uid, ae.MESSAGE_SENT, {"model": "m1"})
         await record_event(db, uid, ae.MESSAGE_SENT, {"model": "m2"})
