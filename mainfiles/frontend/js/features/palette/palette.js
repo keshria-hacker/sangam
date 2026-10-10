@@ -91,9 +91,8 @@ async function exportChat() {
 function toggleTheme() {
   const cur = document.documentElement.getAttribute('data-theme');
   const next = cur === 'dark' ? 'light' : 'dark';
-  import('../../core/state.js').then((m) => {
-    m.setSettings({ ...m.getSettings(), theme: next });
-    app().applySettings?.();
+  import('../../shared/settings_store.js').then((m) => {
+    m.setSetting('theme', next); // appearance re-applies via settings-changed
   });
 }
 

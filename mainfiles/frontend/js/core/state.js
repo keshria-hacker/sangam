@@ -4,7 +4,7 @@
  * subscriber callbacks for reactivity.
  */
 
-import { DEFAULT_SETTINGS, CHAT_BUCKETS, PROVIDER_COLORS } from '../shared/constants.js';
+import { CHAT_BUCKETS, PROVIDER_COLORS } from '../shared/constants.js';
 import { bucketFor } from '../shared/utils.js';
 
 /**
@@ -129,30 +129,10 @@ export const [getMaxTokens, setMaxTokens] = createSignal('auto');
 export const [getReasoningEffort, setReasoningEffort] = createSignal('medium');
 export const [getTemperature, setTemperature] = createSignal(0.7);
 
-// Settings state (persisted to localStorage)
-let _savedSettings = null;
-try {
-  const saved = localStorage.getItem('sangam-settings');
-  _savedSettings = saved ? JSON.parse(saved) : null;
-} catch {
-  _savedSettings = null;
-}
-
-const [getSettings, setSettings, subscribeSettings] = createSignal({
-  ...DEFAULT_SETTINGS,
-  ..._savedSettings,
-});
-
-// Persist settings changes
-subscribeSettings((newSettings) => {
-  try {
-    localStorage.setItem('sangam-settings', JSON.stringify(newSettings));
-  } catch (e) {
-    console.warn('Failed to persist settings:', e);
-  }
-});
-
-export { getSettings, setSettings };
+// Phase 8 B3: the legacy settings blob (localStorage 'sangam-settings') is
+// gone. All settings live in the typed store (shared/settings_store.js),
+// persisted via /user/settings. One-time migration runs in
+// settings_store.initSettingsStore().
 
 // Provider metadata cache
 export const [getProviderMeta, setProviderMeta] = createSignal({});

@@ -480,6 +480,11 @@ function syncDropdownsFromState() {
  * Main bootstrap function - called after auth succeeds.
  */
 export async function startApplication() {
+  // Load settings from the server (source of truth); one-time legacy migration
+  try {
+    const { loadSettings } = await import('./shared/settings_store.js');
+    await loadSettings();
+  } catch (e) { console.warn('[settings] startup load failed', e); }
   // Apply saved appearance settings (theme/font/density from settings store)
   applyAppearance();
 

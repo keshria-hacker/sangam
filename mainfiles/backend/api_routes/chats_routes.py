@@ -13,13 +13,11 @@ from sqlalchemy.orm import selectinload
 from .. import llm
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import Chat, Message, UserPreference
+from ..models import Chat, Message
 from ..schemas import (
     ChatDetailOut,
     ChatOut,
     FeedbackIn,
-    UserPreferenceIn,
-    UserPreferenceOut,
 )
 from .common import router
 
@@ -151,47 +149,10 @@ async def delete_chat(chat_id: str, db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# User preferences (response style)
+# Phase 8 B3: /user/preferences removed. Response-style prefs (formality,
+# expertise) now live in the typed settings schema, persisted via
+# /user/settings. The UserPreference table is left in place (no migration).
 # ---------------------------------------------------------------------------
-
-
-@router.get("/user/preferences", response_model=UserPreferenceOut)
-async def get_preferences(
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """Return the caller's stored response-style preferences (defaults if unset)."""
-    pref = await db.get(UserPreference, user.id)
-    if pref is None:
-        # An unpersisted ORM instance would serialize None for every field and
-        # fail response validation, so return explicit defaults instead.
-        return UserPreferenceOut(
-            user_id=user.id,
-            response_style="balanced",
-            formality="neutral",
-            expertise_level="general",
-            updated_at=datetime.now(UTC),
-        )
-    return pref
-
-
-@router.put("/user/preferences", response_model=UserPreferenceOut)
-async def update_preferences(
-    body: UserPreferenceIn,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """Create-or-update the caller's response-style preferences (upsert)."""
-    pref = await db.get(UserPreference, user.id)
-    if pref is None:
-        pref = UserPreference(user_id=user.id)
-        db.add(pref)
-    pref.response_style = body.response_style
-    pref.formality = body.formality
-    pref.expertise_level = body.expertise_level
-    await db.commit()
-    await db.refresh(pref)
-    return pref
 
 
 # ---------------------------------------------------------------------------

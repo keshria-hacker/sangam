@@ -12,7 +12,7 @@
  */
 import { apiFetch } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
-import { getSettings } from '../../core/state.js';
+import { getSetting } from '../../shared/settings_store.js';
 
 console.log('[Module] voice/controller.js loaded');
 
@@ -50,8 +50,7 @@ export async function speak(text, node = null) {
   }
   stopSpeaking();
   const token = ++speechToken;
-  const settings = getSettings();
-  const voiceId = settings.voiceId || null;
+  const voiceId = getSetting('voiceId') || null;
   setSpeechState('fetching', node);
 
   fetchController = new AbortController();

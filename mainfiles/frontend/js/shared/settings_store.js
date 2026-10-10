@@ -89,18 +89,73 @@ export async function loadSettings() {
     }
   } catch {}
   // Then server (source of truth)
+  let serverSettings = {};
   try {
     const data = await (await apiFetch('/user/settings')).json();
-    const server = data.settings || {};
-    for (const [k, v] of Object.entries(server)) {
+    serverSettings = data.settings || {};
+    for (const [k, v] of Object.entries(serverSettings)) {
       if (validate(k, v)) settings[k] = v;
     }
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(settings)); } catch {}
   } catch (e) {
     console.warn('[settings] load failed, using cache', e);
   }
+  // Phase 8 B3: one-time migration from the legacy localStorage blob.
+  // If the server has no settings but the legacy key exists, push the mapped
+  // values once, then delete the legacy key.
+  if (Object.keys(serverSettings).length === 0) {
+    await migrateLegacyBlob();
+  }
   loaded = true;
   return { ...settings };
+}
+
+/**
+ * One-time migration from legacy `localStorage 'sangam-settings'`.
+ * Maps old keys onto the schema, pushes to the server, clears the old key.
+ */
+async function migrateLegacyBlob() {
+  let legacy = null;
+  try {
+    legacy = JSON.parse(localStorage.getItem('sangam-settings') || 'null');
+  } catch { /* ignore */ }
+  if (!legacy || typeof legacy !== 'object') return;
+
+  const FONT_SIZE_MAP = { sm: 12, md: 14, lg: 16 };
+  const mapped = {};
+  if (legacy.theme && validate('theme', legacy.theme)) mapped.theme = legacy.theme;
+  if (legacy.fontSize != null) {
+    const n = typeof legacy.fontSize === 'number' ? legacy.fontSize
+      : FONT_SIZE_MAP[legacy.fontSize];
+    if (n && validate('fontSize', n)) mapped.fontSize = n;
+  }
+  if (typeof legacy.voiceAutoSpeak === 'boolean') mapped.voiceAutoSpeak = legacy.voiceAutoSpeak;
+  if (typeof legacy.voiceId === 'string') mapped.voiceId = legacy.voiceId;
+
+  // Opportunistic: pull formality/expertise from the dying /user/preferences
+  // endpoint before it is removed (B3 deletes it).
+  try {
+    const pref = await (await apiFetch('/user/preferences')).json();
+    if (pref) {
+      if (validate('formality', pref.formality)) mapped.formality = pref.formality;
+      if (validate('expertise', pref.expertise_level)) mapped.expertise = pref.expertise_level;
+    }
+  } catch { /* endpoint gone or offline — skip */ }
+
+  for (const [k, v] of Object.entries(mapped)) settings[k] = v;
+  if (Object.keys(mapped).length) {
+    try {
+      await apiFetch('/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+      });
+      console.log('[settings] migrated legacy settings:', Object.keys(mapped).join(', '));
+    } catch (e) {
+      console.warn('[settings] migration push failed', e);
+    }
+  }
+  try { localStorage.removeItem('sangam-settings'); } catch {}
 }
 
 export function isSettingsLoaded() { return loaded; }
