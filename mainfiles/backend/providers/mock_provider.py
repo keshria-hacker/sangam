@@ -102,4 +102,4 @@ class MockProvider(BaseProvider):
         )
         # Yield in small chunks to exercise the streaming path.
         for i in range(0, len(reply), 24):
-            yield reply[i : i + 24]
+            yield ProviderStreamChunk(text=reply[i : i + 24])
