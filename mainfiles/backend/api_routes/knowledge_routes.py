@@ -28,9 +28,9 @@ async def get_knowledge_graph(
         for f in files
     ]
 
-    # Chats
+    # Chats (same query shape as chats_routes.list_chats — Chat has no user_id column)
     chats = (await db.execute(
-        select(Chat).where(Chat.user_id == user.id).order_by(Chat.updated_at.desc()).limit(50)
+        select(Chat).order_by(Chat.updated_at.desc()).limit(50)
     )).scalars().all()
     chat_dicts = [{"id": c.id, "title": c.title, "model": c.model} for c in chats]
 

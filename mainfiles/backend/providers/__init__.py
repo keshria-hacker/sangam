@@ -249,6 +249,26 @@ def _ensure_initialized() -> None:
             ),
             OmniRouteProvider
         )
+        # Mock provider for smoke testing — test infrastructure only.
+        # Enabled via SANGAM_MOCK_PROVIDER=1; never shown to real users.
+        from .mock_provider import MockProvider, mock_enabled
+
+        if mock_enabled():
+            registry.register(
+                ProviderConfig(
+                    provider_id="mock",
+                    label="Mock",
+                    local=True,
+                    env_key_name="",
+                    api_base="",
+                    model_endpoint="",
+                    auth_type="bearer",
+                    json_path="data",
+                    id_field="id",
+                    litellm_prefix="mock/",
+                ),
+                MockProvider,
+            )
         _init_done = True
 
 
@@ -270,6 +290,11 @@ async def list_models(db: Any) -> list[ModelInfo]:
 
     # Cloud providers - fetch concurrently
     async def _fetch_one(pid: str) -> list[ModelInfo]:
+        # Mock provider (smoke test): static list, no HTTP, no key.
+        if pid == "mock":
+            from .mock_provider import mock_enabled, mock_model_info
+
+            return [mock_model_info()] if mock_enabled() else []
         api_key = await resolve_api_key(pid, db)
         if not api_key:
             return []

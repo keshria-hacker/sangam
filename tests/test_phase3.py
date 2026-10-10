@@ -139,3 +139,60 @@ def test_approve_endpoint_registered():
     from backend.main import app
     paths = TestClient(app).get("/openapi.json").json()["paths"].keys()
     assert "/api/agent/approve/{approval_id}" in paths
+
+
+# --- A1 regression: /api/knowledge/graph must not 500 on real DB ---------------
+# The old code filtered Chat by a non-existent `user_id` column. The unit test
+# above never caught it because it called build_knowledge_graph() with
+# hand-made dicts. This test hits the real endpoint with a real database.
+
+def test_knowledge_graph_endpoint_returns_200_with_real_db(tmp_path, monkeypatch):
+    """GET /api/knowledge/graph returns 200 and includes a real chat node.
+
+    No mocks: real SQLite file, real tables, chat created through the real
+    POST /api/chats endpoint, then the graph endpoint that previously 500'd
+    on `Chat.user_id`.
+    """
+    import sys
+    from pathlib import Path
+
+    _ROOT = Path(__file__).resolve().parents[1]
+    if str(_ROOT / "mainfiles") not in sys.path:
+        sys.path.insert(0, str(_ROOT / "mainfiles"))
+
+    from backend.config import settings
+    from backend.database import Base, get_engine, reset_engine_for_testing
+    from backend.main import create_app
+    from fastapi.testclient import TestClient
+
+    import asyncio
+
+    monkeypatch.setattr(settings, "DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/t.db")
+    reset_engine_for_testing()
+
+    async def _create_all():
+        engine = get_engine()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(_create_all())
+    client = TestClient(create_app())
+
+    # Register a real user
+    r = client.post("/api/auth/register", json={"username": "graphreg", "password": "StrongPass123!"})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    h = {"Authorization": f"Bearer {data['access_token']}", "X-CSRF-Token": data["csrf_token"]}
+
+    # Create a real chat row through the API
+    r = client.post("/api/chats", json={"title": "Graph regression chat", "model": "openai::gpt-4o"}, headers=h)
+    assert r.status_code == 200, r.text
+    chat_id = r.json()["id"]
+
+    # The endpoint under test — real DB query, no mocks
+    r = client.get("/api/knowledge/graph", headers=h)
+    assert r.status_code == 200, r.text[:500]
+    body = r.json()
+    assert "nodes" in body and "edges" in body
+    node_ids = [n["id"] for n in body["nodes"]]
+    assert f"chat:{chat_id}" in node_ids

@@ -61,4 +61,10 @@ async def list_linked_providers(db: AsyncSession) -> set[str]:
         if get_static_env_key(provider_id):
             linked.add(provider_id)
 
+    # Mock provider for smoke testing (test infrastructure, env-gated).
+    import os
+
+    if os.environ.get("SANGAM_MOCK_PROVIDER") == "1":
+        linked.add("mock")
+
     return linked

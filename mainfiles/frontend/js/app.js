@@ -337,7 +337,7 @@ function initGlobalListeners() {
     const btn = e.target.closest('button[data-value]');
     if (!btn) return;
     const val = btn.dataset.value;
-    elements.tokenLabel.textContent = val === 'auto' ? 'Auto' : parseInt(val, 10).toLocaleString();
+    renderTokenLabel(val);
     setMaxTokens(val);
     elements.tokenDropdown.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
     btn.classList.add('selected');
@@ -446,12 +446,23 @@ function setupGlobalNamespace() {
 }
 
 /**
+ * Render the max-tokens label. 'auto' (or anything non-numeric) shows "Auto".
+ * Single owner for this label (A2: parseInt('auto') produced NaN).
+ */
+function renderTokenLabel(val) {
+  const label = (val === 'auto' || val == null || Number.isNaN(parseInt(val, 10)))
+    ? 'Auto'
+    : parseInt(val, 10).toLocaleString();
+  if (elements.tokenLabel) elements.tokenLabel.textContent = label;
+}
+
+/**
  * Sync token and reasoning dropdowns with current state.
  */
 function syncDropdownsFromState() {
   // Token dropdown
   const maxTokens = getMaxTokens();
-  elements.tokenLabel.textContent = parseInt(maxTokens).toLocaleString();
+  renderTokenLabel(maxTokens);
   elements.tokenDropdown?.querySelectorAll('button').forEach((b) => {
     b.classList.toggle('selected', b.dataset.value === maxTokens);
   });

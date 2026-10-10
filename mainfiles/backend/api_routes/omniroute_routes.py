@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import llm
 from ..database import get_db
 from ..models import ProviderKey
+from ..providers.model_discovery import fetch_models_from_provider
 from ..omniroute_config import (
     DEFAULT_CLOUD_ENDPOINT,
     DEFAULT_LOCAL_ENDPOINT,
@@ -111,7 +112,7 @@ async def omniroute_sync(db: AsyncSession = Depends(get_db)):
     if not api_key:
         raise HTTPException(status_code=400, detail="No OmniRoute API key saved")
     try:
-        models = await llm.fetch_models_from_provider(api_key, config)
+        models = await fetch_models_from_provider(api_key, config)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Sync failed: {exc}") from exc
     return {

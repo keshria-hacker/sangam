@@ -1,0 +1,197 @@
+/**
+ * Smoke Test (Phase 8, rule 4) — REQUIRED GATE.
+ *
+ * Boots the app against a fresh backend (SANGAM_MOCK_PROVIDER=1 for the
+ * mock LLM), registers a new user, visits every rail item, opens every
+ * composer popover, opens Settings, sends one chat message against the
+ * mock model, and opens the Knowledge graph.
+ *
+ * FAILS on:
+ *  - any HTTP response with status >= 400 (401s allowed only before login)
+ *  - any console.error or uncaught page error
+ *  - any visible "NaN", "undefined" or "[object ...]" text on screen
+ *  - any CSS var(--x) used in style.css but never defined
+ *
+ * Run via: tests/e2e/run_smoke.sh  (starts backend + frontend, fresh DB)
+ */
+import { test, expect, Page } from '@playwright/test';
+
+const FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://127.0.0.1:5500';
+const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:8001';
+const USER = `smokeuser${Date.now().toString(36)}`;
+const PASS = 'Smoke-Test-Password-123';
+
+interface BadResponse { url: string; status: number; method: string }
+interface Ctx {
+  badResponses: BadResponse[];
+  consoleErrors: string[];
+  pageErrors: string[];
+  loggedIn: boolean;
+}
+
+function attachGuards(page: Page, ctx: Ctx) {
+  page.on('response', (r) => {
+    const status = r.status();
+    if (status >= 400) {
+      if (status === 401 && !ctx.loggedIn) return; // allowed before login
+      ctx.badResponses.push({ url: r.url(), status, method: r.request().method() });
+    }
+  });
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') ctx.consoleErrors.push(msg.text().slice(0, 300));
+  });
+  page.on('pageerror', (err) => {
+    ctx.pageErrors.push(String(err).slice(0, 300));
+  });
+}
+
+function assertClean(ctx: Ctx, where: string) {
+  expect(ctx.badResponses, `HTTP >= 400 at ${where}: ${JSON.stringify(ctx.badResponses)}`).toEqual([]);
+  expect(ctx.consoleErrors, `console.error at ${where}: ${JSON.stringify(ctx.consoleErrors)}`).toEqual([]);
+  expect(ctx.pageErrors, `pageerror at ${where}: ${JSON.stringify(ctx.pageErrors)}`).toEqual([]);
+}
+
+async function assertNoBadText(page: Page, where: string) {
+  const text = await page.evaluate(() => document.body.innerText || '');
+  const bad = text.match(/\bNaN\b|undefined|\[object [A-Za-z]+\]/g);
+  expect(bad, `bad on-screen text at ${where}: ${JSON.stringify(bad)}`).toBeNull();
+}
+
+async function register(page: Page, ctx: Ctx) {
+  await page.goto(FRONTEND_URL);
+  await expect(page.locator('#authForm')).toBeVisible({ timeout: 20000 });
+  // Fresh DB => form is in "Create your Sangam account" register mode.
+  await expect(page.locator('#authTitle')).toContainText(/Create your|Sign in/, { timeout: 10000 });
+  const mode = await page.locator('#authForm').getAttribute('data-mode');
+  if (mode === 'register') {
+    await page.fill('#authUsername', USER);
+    await page.fill('#authPassword', PASS);
+    await page.fill('#authConfirmPassword', PASS);
+  } else {
+    // DB wasn't fresh; fall back to login with the golden-path user.
+    await page.fill('#authUsername', process.env.E2E_TEST_USERNAME || 'goldenpath');
+    await page.fill('#authPassword', process.env.E2E_TEST_PASSWORD || 'goldenpath123');
+  }
+  await page.click('#authSubmit');
+  await expect(page.locator('#authOverlay')).toHaveClass(/hidden/, { timeout: 20000 });
+  ctx.loggedIn = true;
+  await page.waitForTimeout(1500); // let /features + initial fetches settle
+}
+
+test.describe('Smoke (required gate)', () => {
+  test('CSS variables: every var() used is defined', async ({ page }) => {
+    const css = await (await fetch(`${FRONTEND_URL}/css/style.css`)).text();
+    // Vars used WITHOUT a fallback: var(--x) — these break if undefined.
+    // Vars with fallbacks var(--x, ...) are safe and not flagged.
+    const usedNoFallback = new Set(
+      [...css.matchAll(/var\(--([a-zA-Z0-9_-]+)\)/g)].map((m) => m[1])
+    );
+    const defined = new Set([...css.matchAll(/--([a-zA-Z0-9_-]+)\s*:/g)].map((m) => m[1]));
+    const missing = [...usedNoFallback].filter((v) => !defined.has(v)).sort();
+    expect(missing, `undefined CSS vars (no fallback): ${missing.join(', ')}`).toEqual([]);
+  });
+
+  test('full pass: register, rail, popovers, settings, chat, knowledge', async ({ page }) => {
+    const ctx: Ctx = { badResponses: [], consoleErrors: [], pageErrors: [], loggedIn: false };
+    attachGuards(page, ctx);
+    test.setTimeout(180000);
+
+    // 1. Boot + register
+    await register(page, ctx);
+    assertClean(ctx, 'register');
+    await assertNoBadText(page, 'post-register');
+
+    // 2. Visit every rail item
+    const railIds: string[] = await page.evaluate(() =>
+      [...document.querySelectorAll('.rail-item[data-nav]')].map((el) =>
+        (el as HTMLElement).dataset.nav as string
+      )
+    );
+    expect(railIds.length).toBeGreaterThan(3);
+    for (const id of railIds) {
+      const item = page.locator(`.rail-item[data-nav="${id}"]`).first();
+      if (!(await item.isVisible())) continue;
+      await item.click();
+      await page.waitForTimeout(900);
+      assertClean(ctx, `rail:${id}`);
+      await assertNoBadText(page, `rail:${id}`);
+      await page.screenshot({ path: `tests/e2e/screenshots/smoke-rail-${id}.png` });
+    }
+
+    // 3. Composer popovers (back on chat view)
+    await page.locator('.rail-item[data-nav="chat"]').first().click();
+    await page.waitForTimeout(800);
+    for (const btn of ['#modeBtn', '#toolsBtn', '#tuneBtn', '#tokenBtn']) {
+      const el = page.locator(btn);
+      if ((await el.count()) === 0 || !(await el.first().isVisible())) continue;
+      await el.first().click();
+      await page.waitForTimeout(500);
+      assertClean(ctx, `popover:${btn}`);
+      await page.screenshot({ path: `tests/e2e/screenshots/smoke-popover-${btn.slice(1)}.png` });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    }
+    await assertNoBadText(page, 'popovers');
+
+    // 4. Settings page
+    const settingsNav = page.locator('.rail-item[data-nav="settings"]').first();
+    if (await settingsNav.count()) {
+      await settingsNav.click();
+      await page.waitForTimeout(1200);
+      assertClean(ctx, 'settings');
+      await assertNoBadText(page, 'settings');
+      await page.screenshot({ path: 'tests/e2e/screenshots/smoke-settings.png' });
+    }
+
+    // 5. Send one chat message against the mock model
+    await page.locator('.rail-item[data-nav="chat"]').first().click();
+    await page.waitForTimeout(800);
+    // Select the mock model
+    await page.locator('#modelSelectorBtn').click();
+    await page.waitForTimeout(600);
+    const mockOption = page.locator('.model-option', { hasText: /Mock/i }).first();
+    if (await mockOption.count()) {
+      await mockOption.click();
+      await page.waitForTimeout(500);
+    }
+    await page.fill('#messageInput', 'Smoke test hello');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('#messages')).toContainText('Smoke test reply', { timeout: 30000 });
+    assertClean(ctx, 'chat-send');
+    await assertNoBadText(page, 'chat-send');
+    await page.screenshot({ path: 'tests/e2e/screenshots/smoke-chat.png' });
+
+    // 6. Knowledge graph must load (not stuck, not error)
+    await page.locator('.rail-item[data-nav="knowledge"]').first().click();
+    await page.waitForTimeout(4000);
+    const graphText = await page.evaluate(() => document.body.innerText || '');
+    expect(graphText, 'knowledge graph failed to load').not.toContain('Could not load graph');
+    assertClean(ctx, 'knowledge');
+    await assertNoBadText(page, 'knowledge');
+    await page.screenshot({ path: 'tests/e2e/screenshots/smoke-knowledge.png' });
+
+    // Final gate
+    assertClean(ctx, 'final');
+  });
+
+  test('mobile 390px: rail reachable via menu button', async ({ page }) => {
+    const ctx: Ctx = { badResponses: [], consoleErrors: [], pageErrors: [], loggedIn: false };
+    attachGuards(page, ctx);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await register(page, ctx);
+    const menuBtn = page.locator('#mobileSidebarToggle');
+    await expect(menuBtn, 'mobile menu button not visible at 390px').toBeVisible({ timeout: 10000 });
+    await menuBtn.click();
+    await page.waitForTimeout(800);
+    const railVisible = await page.evaluate(() => {
+      const rail = document.querySelector('#sidebar, .rail, nav');
+      if (!rail) return false;
+      const r = rail.getBoundingClientRect();
+      return r.width > 0 && r.left < 390;
+    });
+    expect(railVisible, 'rail did not open from mobile menu').toBe(true);
+    await page.screenshot({ path: 'tests/e2e/screenshots/smoke-mobile.png' });
+    assertClean(ctx, 'mobile');
+    await assertNoBadText(page, 'mobile');
+  });
+});
