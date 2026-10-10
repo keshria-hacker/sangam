@@ -341,8 +341,14 @@ function setupGlobalNamespace() {
 export async function startApplication() {
   // Load settings from the server (source of truth); one-time legacy migration
   try {
-    const { loadSettings } = await import('./shared/settings_store.js');
+    const { loadSettings, getSetting } = await import('./shared/settings_store.js');
     await loadSettings();
+    // Phase 8 C: apply defaultTemperature/defaultMaxTokens to composer signals.
+    const { setTemperature, setMaxTokens } = await import('./core/state.js');
+    const defTemp = getSetting('defaultTemperature');
+    if (typeof defTemp === 'number') setTemperature(defTemp);
+    const defTokens = getSetting('defaultMaxTokens');
+    if (defTokens) setMaxTokens(defTokens);
   } catch (e) { console.warn('[settings] startup load failed', e); }
   // Apply saved appearance settings (theme/font/density from settings store)
   applyAppearance();

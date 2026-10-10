@@ -81,7 +81,7 @@ export async function speak(text, node = null) {
   }
 }
 
-function browserSpeak(text, token, node) {
+async function browserSpeak(text, token, node) {
   try {
     if (!('speechSynthesis' in window)) {
       showToast({ type: 'error', title: 'No speech engine available' });
@@ -90,6 +90,12 @@ function browserSpeak(text, token, node) {
     }
     setSpeechState('speaking', node);
     const utter = new SpeechSynthesisUtterance(text.slice(0, 4000));
+    // Phase 8 C: voiceSpeed setting controls speech rate.
+    try {
+      const { getSetting } = await import('../../shared/settings_store.js');
+      const speed = getSetting('voiceSpeed');
+      if (typeof speed === 'number' && speed > 0) utter.rate = speed;
+    } catch { /* use default rate */ }
     utter.onend = () => { if (token === speechToken) setSpeechState('idle'); };
     utter.onerror = () => { if (token === speechToken) setSpeechState('idle'); };
     window.speechSynthesis.cancel();

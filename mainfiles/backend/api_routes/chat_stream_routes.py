@@ -386,7 +386,22 @@ async def chat_stream(  # noqa: PLR0912
                 # (and what reloads from history) carries the hedge.
                 if guidance is not None and ri_config.UNCERTAINTY_HEDGING_ENABLED:
                     try:
-                        collected = post_process_response(collected, guidance)
+                        # Phase 8 C: user noSlop/adhdFriendly settings override env.
+                        _no_slop = None
+                        _adhd = None
+                        try:
+                            from ..models import UserPreference
+                            import json as _json2
+                            _pref = await stream_db.get(UserPreference, user.id)
+                            if _pref and _pref.settings_json:
+                                _s = _json2.loads(_pref.settings_json)
+                                if 'noSlop' in _s:
+                                    _no_slop = bool(_s['noSlop'])
+                                if 'adhdFriendly' in _s:
+                                    _adhd = bool(_s['adhdFriendly'])
+                        except Exception:
+                            pass
+                        collected = post_process_response(collected, guidance, no_slop=_no_slop, adhd_friendly=_adhd)
                     except Exception as exc:  # noqa: BLE001 — never break persistence
                         logger.warning("Uncertainty post-processing failed: %s", exc)
 
@@ -417,10 +432,25 @@ async def chat_stream(  # noqa: PLR0912
                 # Memory++: fire-and-forget extraction of durable facts from
                 # this turn (preferences, corrections, "remember this").
                 # Offline heuristics; never blocks the response.
+                # Phase 8 C: gated by the memoryAutoExtract setting.
                 if not payload.regenerate:
-                    extract_from_turn_background(
-                        payload.messages[-1].content, chat_id=chat.id
-                    )
+                    try:
+                        from ..models import UserPreference
+                        import json as _json
+                        pref = await stream_db.get(UserPreference, user.id)
+                        auto_extract = True
+                        if pref and pref.settings_json:
+                            s = _json.loads(pref.settings_json)
+                            auto_extract = s.get('memoryAutoExtract', True)
+                        if auto_extract:
+                            extract_from_turn_background(
+                                payload.messages[-1].content, chat_id=chat.id
+                            )
+                    except Exception:
+                        # On any error, fall back to extracting (conservative).
+                        extract_from_turn_background(
+                            payload.messages[-1].content, chat_id=chat.id
+                        )
 
                 # Phase 5: fire-and-forget rolling summarization. Checked every
                 # threshold crossing; failures are logged inside summarize_chat.

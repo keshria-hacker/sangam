@@ -66,10 +66,13 @@ async function renderCodeAgentView(bodyEl) {
     const jobId = jobsMod.startJob({ kind: 'code-agent', title: task.slice(0, 60), abort: () => abort?.abort() });
 
     try {
+      // Phase 8 C: pass requireApproval setting to the agent run.
+      const { getSetting } = await import('../../shared/settings_store.js');
+      const requireApproval = getSetting('requireApproval') || [];
       const res = await apiFetch('/code-agent/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task, max_iterations: maxIterations, tdd_mode: tddMode }),
+        body: JSON.stringify({ task, max_iterations: maxIterations, tdd_mode: tddMode, require_approval: requireApproval }),
         signal: abort.signal,
       });
       if (!res.ok && res.status !== 200) throw new Error(`HTTP ${res.status}`);

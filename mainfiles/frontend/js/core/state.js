@@ -283,5 +283,7 @@ export function initAppState() {
   root.setAttribute('data-theme', effectiveTheme);
   document.body.setAttribute('data-font-size', settings.fontSize);
   document.body.setAttribute('data-chat-width', settings.chatWidth);
-  document.body.setAttribute('data-animations', settings.animations ? 'on' : 'off');
+  // Phase 8 C: reduceMotion wired — disables animations.
+  const reduceMotion = settings.reduceMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.body.setAttribute('data-animations', reduceMotion ? 'off' : 'on');
 }

@@ -65,6 +65,22 @@ async def record_event(
         return False
     if not user_id:
         return False
+    # Phase 8 C: respect the per-user analyticsOptIn setting.
+    try:
+        from ..models import UserPreference
+        import json as _json
+        # db is an AsyncSession; get the user's preference.
+        pref = await db.get(UserPreference, user_id)
+        if pref and pref.settings_json:
+            s = _json.loads(pref.settings_json)
+            if not s.get('analyticsOptIn', False):
+                return False
+        else:
+            # No settings => opt-in not granted.
+            return False
+    except Exception:
+        # On error, do not record (privacy-conservative).
+        return False
     try:
         from ..models import AnalyticsEvent
 
