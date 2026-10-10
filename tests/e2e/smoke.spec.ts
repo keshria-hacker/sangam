@@ -83,20 +83,27 @@ async function register(page: Page, ctx: Ctx) {
   expect(resp.ok(), `API register/login failed: ${resp.status()} ${await resp.text()}`).toBe(true);
 
   await page.goto(FRONTEND_URL);
-  await expect(page.locator('#authForm')).toBeVisible({ timeout: 20000 });
-  // The form may be in register or login mode; use login mode explicitly.
-  // If it's in register mode, our user already exists via API, so switch
-  // is not needed — just fill and submit; backend will 400, so instead
-  // always drive the login path: fill credentials and submit.
-  await page.fill('#authUsername', USER);
-  await page.fill('#authPassword', PASS);
-  const confirmVisible = await page.locator('#authConfirmWrap:not(.hidden)').count();
-  if (confirmVisible) {
-    // Form is in register mode but user exists — this means the DB wasn't
-    // fresh. Fail fast: the smoke backend must start with a clean DB.
-    throw new Error('Auth form in register mode but API user already exists — stale DB');
+  // The API login above sets a session cookie, so the page may load already
+  // authenticated (form hidden). If the form is visible, log in via UI.
+  await page.waitForFunction(
+    () => {
+      const form = document.querySelector('#authForm');
+      const overlay = document.querySelector('#authOverlay');
+      return (form && !form.classList.contains('hidden')) ||
+             (overlay && overlay.classList.contains('hidden'));
+    },
+    { timeout: 20000 }
+  );
+  const formVisible = await page.locator('#authForm:not(.hidden)').count();
+  if (formVisible) {
+    await page.fill('#authUsername', USER);
+    await page.fill('#authPassword', PASS);
+    const confirmVisible = await page.locator('#authConfirmWrap:not(.hidden)').count();
+    if (confirmVisible) {
+      throw new Error('Auth form in register mode on non-fresh DB — stale state');
+    }
+    await page.click('#authSubmit');
   }
-  await page.click('#authSubmit');
   await expect(page.locator('#authOverlay')).toHaveClass(/hidden/, { timeout: 20000 });
   ctx.loggedIn = true;
   await page.waitForTimeout(1500); // let /features + initial fetches settle
