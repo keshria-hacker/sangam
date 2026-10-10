@@ -60,9 +60,11 @@ export async function applyPreset(presetId) {
           body: JSON.stringify({ enabled: on }),
         });
       }
-      const { refreshFeatureButtons } = await import('./settings/settings.js');
       const data = await (await apiFetch('/features')).json();
-      refreshFeatureButtons(data.features || {});
+      // Phase 8 B2: refreshFeatureButtons lived in the deleted settings.js;
+      // the rail + feature buttons listen for this event directly now.
+      document.dispatchEvent(new CustomEvent('sangam:features-changed',
+        { detail: { features: data.features || {} } }));
     } catch (e) {
       console.warn('[presets] feature flags failed', e);
     }

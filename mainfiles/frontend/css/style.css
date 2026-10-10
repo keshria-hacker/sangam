@@ -2783,6 +2783,12 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .sp-setting-desc{font-size:12px; color:var(--text-tertiary); margin-top:4px; line-height:1.5;}
 .sp-cat-badge{display:inline-block; font-size:10px; font-weight:600; color:var(--text-tertiary); background:var(--bg-elevated); border-radius:4px; padding:2px 8px; margin-top:6px;}
 .sp-setting-right{display:flex; align-items:center; gap:8px; flex-shrink:0;}
+/* Phase 8 B2: custom sections migrated from the legacy modal */
+.sp-custom-section{margin-top:20px; border-top:1px solid var(--border-soft); padding-top:16px;}
+.sp-section-title{font-size:13px; font-weight:700; color:var(--text-primary); margin:0 0 8px; display:flex; align-items:center; gap:8px;}
+.sp-section-title i{color:var(--text-tertiary);}
+.sp-section-body .provider-status-row{margin-bottom:6px;}
+.sp-section-body .memory-stats{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px;}
 .sp-setting-right select{min-width:160px;}
 .sp-setting-right input[type="text"]{min-width:200px;}
 .sp-number{width:100px;}
