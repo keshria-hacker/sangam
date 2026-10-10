@@ -32,6 +32,11 @@ interface Ctx {
 }
 
 function attachGuards(page: Page, ctx: Ctx) {
+  page.on('request', (r) => {
+    if (r.url().includes('/chat/') || r.url().includes('/models')) {
+      console.log('NET REQ:', r.method(), r.url());
+    }
+  });
   page.on('response', (r) => {
     const status = r.status();
     if (status >= 400) {
