@@ -179,7 +179,15 @@ test.describe.serial('Smoke (required gate)', () => {
     await page.waitForTimeout(500);
     await page.fill('#messageInput', 'Smoke test hello');
     await page.locator('#sendBtn').click();
-    await expect(page.locator('#messages')).toContainText('Smoke test reply', { timeout: 30000 });
+    try {
+      await expect(page.locator('#messages')).toContainText('Smoke test reply', { timeout: 30000 });
+    } catch (e) {
+      // Debug: log what went wrong
+      console.log('CHAT DEBUG badResponses:', JSON.stringify(ctx.badResponses));
+      console.log('CHAT DEBUG consoleErrors:', JSON.stringify(ctx.consoleErrors));
+      console.log('CHAT DEBUG messages HTML:', (await page.locator('#messages').innerHTML()).slice(0, 500));
+      throw e;
+    }
     assertClean(ctx, 'chat-send');
     await assertNoBadText(page, 'chat-send');
     await page.screenshot({ path: 'tests/e2e/screenshots/smoke-chat.png' });
