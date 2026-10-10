@@ -6,6 +6,7 @@
 
 import { CHAT_BUCKETS, PROVIDER_COLORS } from '../shared/constants.js';
 import { bucketFor } from '../shared/utils.js';
+import { getAllSettings } from '../shared/settings_store.js';
 
 /**
  * Create a reactive signal.
@@ -272,8 +273,8 @@ export function resetAllState() {
  * Initialize app state on boot.
  */
 export function initAppState() {
-  // Load persisted settings
-  const settings = getSettings();
+  // Load persisted settings (Phase 8 B3: typed store, not the legacy blob).
+  const settings = getAllSettings();
   const root = document.documentElement;
   const effectiveTheme = settings.theme === 'system'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
