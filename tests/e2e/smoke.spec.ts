@@ -184,7 +184,8 @@ test.describe.serial('Smoke (required gate)', () => {
     await page.waitForTimeout(500);
     await page.fill('#messageInput', 'Smoke test hello');
     await page.locator('#sendBtn').click();
-    await page.waitForTimeout(8000);
+    // Wait for the streaming to complete (mock is fast, but re-attach needs time)
+    await page.waitForTimeout(15000);
     const msgCount = await page.locator('#messages').count();
     console.log('MESSAGES COUNT:', msgCount);
     const dbgHtml = await page.locator('#messages').innerHTML();
