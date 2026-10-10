@@ -440,3 +440,49 @@ export function renderQualityPreview(container) {
     }
   });
 }
+
+/**
+ * B8: workspace presets (features/presets/presets.js was unimported).
+ * One-click configurations, wired into Settings → General.
+ */
+export function renderPresetsSection(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `
+    <h3 class="sp-section-title"><i class="fa-solid fa-layer-group"></i> Workspace presets</h3>
+    <p class="settings-hint">One-click configurations for settings and features.</p>
+    <div class="sp-section-body" data-presets-body><p class="settings-hint">Loading…</p></div>`;
+  container.appendChild(wrap);
+  import('../presets/presets.js').then((m) => {
+    const body = wrap.querySelector('[data-presets-body]');
+    const active = m.getActivePreset?.() || 'standard';
+    body.innerHTML = `<div class="lib-grid">${Object.entries(m.PRESETS).map(([id, p]) => `
+      <div class="lib-card">
+        <div class="lib-card-head">
+          <i class="fa-solid ${escapeHtml(p.icon)}"></i>
+          <strong>${escapeHtml(p.label)}</strong>
+          ${id === active ? '<span class="sp-cat-badge">active</span>' : ''}
+        </div>
+        <p class="lib-desc">${escapeHtml(p.desc)}</p>
+        <div class="lib-card-foot">
+          <button class="btn-secondary btn-sm" type="button" data-preset="${id}">Apply</button>
+        </div>
+      </div>`).join('')}</div>`;
+    body.querySelectorAll('[data-preset]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await m.applyPreset(btn.dataset.preset);
+          // Re-render to update the "active" badge
+          wrap.remove();
+          renderPresetsSection(container);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }).catch(() => {
+    wrap.querySelector('[data-presets-body]').innerHTML =
+      '<p class="settings-hint">Presets unavailable.</p>';
+  });
+}

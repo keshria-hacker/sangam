@@ -21,7 +21,7 @@ import { escapeHtml } from '../../shared/utils.js';
 import {
   renderProviderKeysSection, renderOmnirouteSection, renderFeatureTogglesSection,
   renderMemorySection, renderVoiceSection, renderRoutesSection, renderDoctorSection,
-  renderLearnSection, renderInsightsSection, renderQualityPreview,
+  renderLearnSection, renderInsightsSection, renderQualityPreview, renderPresetsSection,
 } from './sections.js';
 
 console.log('[Module] settings_page.js loaded');
@@ -302,6 +302,8 @@ export function renderSettingsPage(bodyEl) {
       renderInsightsSection(list);
     } else if (category === 'output') {
       renderQualityPreview(list);
+    } else if (category === 'general') {
+      renderPresetsSection(list);
     }
   }
 
