@@ -37,7 +37,16 @@ cd "$REPO/mainfiles"
 BACKEND_PID=$!
 
 cd "$REPO/mainfiles/frontend"
-"$VENV" -m http.server "$FRONTEND_PORT" >/dev/null 2>&1 &
+# No-cache headers: the smoke test iterates on frontend files.
+"$VENV" -c "
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+class H(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, must-revalidate')
+        super().end_headers()
+    def log_message(self, *a): pass
+HTTPServer(('127.0.0.1', $FRONTEND_PORT), H).serve_forever()
+" >/dev/null 2>&1 &
 FRONTEND_PID=$!
 
 echo "Waiting for backend on :$BACKEND_PORT ..."
