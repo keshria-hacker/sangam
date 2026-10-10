@@ -683,7 +683,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         link.className = 'btn-secondary error-settings-link';
         link.textContent = 'Open Settings';
         link.addEventListener('click', () => {
-          import('../../features/settings/settings.js').then(m => m.openSettings());
+          import('../../features/settings/open.js').then(m => m.openSettings());
         });
         btnWrapper.appendChild(link);
       }

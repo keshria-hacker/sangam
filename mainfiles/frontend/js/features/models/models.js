@@ -156,7 +156,7 @@ export function renderModelList(filter = '') {
     list.innerHTML = `<div class="no-results">No selectable models yet.<br><button class="btn-secondary" type="button" id="openProviderSettingsBtn">Link a provider key or start Ollama</button></div>`;
     $('#openProviderSettingsBtn')?.addEventListener('click', () => {
       closeModelDropdown();
-      import('../features/settings/settings.js').then((m) => m.openSettings());
+      import('../features/settings/open.js').then((m) => m.openSettings());
     });
     return;
   }

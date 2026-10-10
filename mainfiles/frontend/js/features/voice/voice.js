@@ -139,3 +139,51 @@ export async function refreshVoiceSettings() {
     setSettings({ ...getSettings(), voiceId: e.target.value || null });
   });
 }
+
+/**
+ * Phase 8 B2: container-scoped voice settings for the Settings page.
+ * Builds the same UI as refreshVoiceSettings but inside `host`.
+ */
+export async function renderVoiceSettings(host) {
+  if (!host || host.dataset.voiceWired) return;
+  host.dataset.voiceWired = '1';
+  host.innerHTML = '<p class="settings-hint">Loading voice settings…</p>';
+  const settings = getSettings();
+  const status = voiceStatus || {};
+  const ttsEngine = status.tts_engine;
+  const sttEngine = status.stt_engine;
+
+  let voicesHtml = '<span class="memory-stat">default voice</span>';
+  try {
+    const voices = await (await apiFetch('/voice/voices')).json();
+    if (Array.isArray(voices) && voices.length) {
+      voicesHtml = `<select data-voice-select class="provider-key-input" aria-label="TTS voice">` +
+        `<option value="">Default voice</option>` +
+        voices.map((v) => `<option value="${escapeHtml(v.id)}"${settings.voiceId === v.id ? ' selected' : ''}>${escapeHtml(v.name)} (${escapeHtml(v.engine)})</option>`).join('') +
+        `</select>`;
+    }
+  } catch { /* keep default */ }
+
+  host.innerHTML = `
+    <div class="memory-stats">
+      <span class="memory-stat"><strong>TTS</strong>${escapeHtml(ttsEngine || 'unavailable')}</span>
+      <span class="memory-stat"><strong>STT</strong>${escapeHtml(sttEngine || 'unavailable')}</span>
+    </div>
+    <div class="memory-controls">${voicesHtml}</div>
+    <div class="voice-settings-row">
+      <span class="switch-label">Read responses aloud automatically</span>
+      <label class="switch">
+        <input type="checkbox" data-voice-autospeak${settings.voiceAutoSpeak ? ' checked' : ''}>
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
+    </div>
+    ${!ttsEngine && !sttEngine ? '<p class="settings-hint">No voice engine installed. Install <code>kokoro</code> + <code>faster-whisper</code>, or point VOICE_OPENAI_BASE_URL at an OpenAI-compatible voice server.</p>' : ''}`;
+
+  host.querySelector('[data-voice-autospeak]')?.addEventListener('change', (e) => {
+    setSettings({ ...getSettings(), voiceAutoSpeak: e.target.checked });
+    if (!e.target.checked) controllerStop();
+  });
+  host.querySelector('[data-voice-select]')?.addEventListener('change', (e) => {
+    setSettings({ ...getSettings(), voiceId: e.target.value || null });
+  });
+}

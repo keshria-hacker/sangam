@@ -6,7 +6,8 @@
 import { initAppState, getMessages, getIsGenerating, getLastUserText, getTemperature, setTemperature, getMaxTokens, setMaxTokens, getReasoningEffort, setReasoningEffort, setThinkingDisplayPref, getThinkingDisplay } from './core/state.js';
 import { initElements as initChatElements, initChatEvents, handleSend, regenerate, runGeneration, stopGeneration, autoResizeTextarea, scrollToBottom, buildMessageNode, renderMessages, startNewChat as chatStartNewChat } from './features/chat/chat.js';
 import { initElements as initModelsElements, loadProvidersAndModels, renderModelList, renderProviderFilters, renderProviderStatusList, renderConnPulse, selectModel, openModelDropdown, closeModelDropdown, initModelSelector } from './features/models/models.js';
-import { initElements as initSettingsElements, openSettings, closeSettingsModal, applySettings as settingsApplySettings, loadSettings, syncSettingsUI, initSettings, renderProviderStatusList as settingsRenderProviderStatusList } from './features/settings/settings.js';
+import { openSettings } from './features/settings/open.js';
+import { applyAppearance, initAppearance } from './features/settings/appearance.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
 import { renderSkillsTab } from './features/skills/skills.js';
 import { renderTeamsTab } from './features/teams/teams.js';
@@ -47,8 +48,6 @@ function initDOM() {
     mobileNewChat: $('#mobileNewChat'),
     searchChats: $('#searchChats'),
     chatHistory: $('#chatHistory'),
-    settingsOverlay: $('#settingsOverlay'),
-    closeSettings: $('#closeSettings'),
     themeOptions: $('#themeOptions'),
     fontSizeSegmented: $('#fontSizeSegmented'),
     chatWidthSegmented: $('#chatWidthSegmented'),
@@ -152,7 +151,6 @@ function initDOM() {
   // Initialize modules with their element references
   initChatElements();
   initModelsElements();
-  initSettingsElements();
   initAuthElements();
   initSidebarElements();
 }
@@ -217,7 +215,6 @@ function initGlobalListeners() {
     // Escape - Close modals, dropdowns
     if (e.key === 'Escape') {
       closeModelDropdown();
-      closeSettingsModal();
       elements.tempPopover?.classList.add('hidden');
     }
     // Ctrl+Shift+C - Copy last assistant message
@@ -261,12 +258,7 @@ function initGlobalListeners() {
     // Ctrl+Shift+T - Toggle theme
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 't') {
       e.preventDefault();
-      const cur = document.documentElement.getAttribute('data-theme');
-      const newTheme = cur === 'dark' ? 'light' : 'dark';
-      import('./core/state.js').then((m) => {
-        m.setSettings({ ...m.getSettings(), theme: newTheme });
-        settingsApplySettings();
-      });
+      import('./features/settings/appearance.js').then((m) => m.toggleTheme());
     }
     // Ctrl+Shift+W - Toggle web search
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'w') {
@@ -439,9 +431,7 @@ function setupGlobalNamespace() {
     closeModelDropdown,
     // Settings
     openSettings,
-    closeSettingsModal,
-    applySettings: settingsApplySettings,
-    syncSettingsUI,
+    applySettings: applyAppearance,
     // Sidebar
     openMobileSidebar,
     closeMobileSidebar,
@@ -490,9 +480,8 @@ function syncDropdownsFromState() {
  * Main bootstrap function - called after auth succeeds.
  */
 export async function startApplication() {
-  // Apply saved settings
-  loadSettings();
-  settingsApplySettings();
+  // Apply saved appearance settings (theme/font/density from settings store)
+  applyAppearance();
 
   // i18n: apply the language setting
   try { setLang(getSetting('language') || 'en'); } catch {}
@@ -568,7 +557,7 @@ async function init() {
 
   // Initialize modules
   initAuth();
-  initSettings();
+  initAppearance();
   initModelSelector();
   initChatEvents();
   initSidebar();

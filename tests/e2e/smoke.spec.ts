@@ -58,19 +58,33 @@ async function assertNoBadText(page: Page, where: string) {
 }
 
 async function register(page: Page, ctx: Ctx) {
+  // Ensure the user exists via API (deterministic, independent of DB state),
+  // then log in through the UI form to exercise the real login path.
+  const api = page.request;
+  let resp = await api.post(`${BACKEND_URL}/api/auth/register`, {
+    data: { username: USER, password: PASS },
+  });
+  if (resp.status() === 400 || resp.status() === 409) {
+    // User already exists (shouldn't happen with unique USER, but be safe)
+    resp = await api.post(`${BACKEND_URL}/api/auth/login`, {
+      data: { username: USER, password: PASS },
+    });
+  }
+  expect(resp.ok(), `API register/login failed: ${resp.status()} ${await resp.text()}`).toBe(true);
+
   await page.goto(FRONTEND_URL);
   await expect(page.locator('#authForm')).toBeVisible({ timeout: 20000 });
-  // Fresh DB => form is in "Create your Sangam account" register mode.
-  await expect(page.locator('#authTitle')).toContainText(/Create your|Sign in/, { timeout: 10000 });
-  const mode = await page.locator('#authForm').getAttribute('data-mode');
-  if (mode === 'register') {
-    await page.fill('#authUsername', USER);
-    await page.fill('#authPassword', PASS);
-    await page.fill('#authConfirmPassword', PASS);
-  } else {
-    // DB wasn't fresh; fall back to login with the golden-path user.
-    await page.fill('#authUsername', process.env.E2E_TEST_USERNAME || 'goldenpath');
-    await page.fill('#authPassword', process.env.E2E_TEST_PASSWORD || 'goldenpath123');
+  // The form may be in register or login mode; use login mode explicitly.
+  // If it's in register mode, our user already exists via API, so switch
+  // is not needed — just fill and submit; backend will 400, so instead
+  // always drive the login path: fill credentials and submit.
+  await page.fill('#authUsername', USER);
+  await page.fill('#authPassword', PASS);
+  const confirmVisible = await page.locator('#authConfirmWrap:not(.hidden)').count();
+  if (confirmVisible) {
+    // Form is in register mode but user exists — this means the DB wasn't
+    // fresh. Fail fast: the smoke backend must start with a clean DB.
+    throw new Error('Auth form in register mode but API user already exists — stale DB');
   }
   await page.click('#authSubmit');
   await expect(page.locator('#authOverlay')).toHaveClass(/hidden/, { timeout: 20000 });

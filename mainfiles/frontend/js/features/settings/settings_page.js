@@ -6,7 +6,11 @@
  * per-setting Reset, and a "Changed" dot when the value differs from default.
  *
  * Controls write through settings_store (setSetting); persistence is handled
- * server-side by the store. Does NOT touch the legacy settings modal.
+ * server-side by the store.
+ *
+ * Phase 8 B2: categories can also render custom sections (provider keys,
+ * OmniRoute, feature toggles, memory browser, voice settings) migrated from
+ * the deleted legacy modal. See ./sections.js.
  */
 import { SETTING_CATEGORIES, SETTINGS_SCHEMA, searchSettings } from '../../shared/settings_schema.js';
 import {
@@ -14,6 +18,10 @@ import {
 } from '../../shared/settings_store.js';
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
+import {
+  renderProviderKeysSection, renderOmnirouteSection, renderFeatureTogglesSection,
+  renderMemorySection, renderVoiceSection,
+} from './sections.js';
 
 console.log('[Module] settings_page.js loaded');
 
@@ -260,14 +268,31 @@ export function renderSettingsPage(bodyEl) {
       defs = SETTINGS_SCHEMA.filter((s) => s.category === activeCategory);
       titleEl.textContent = catLabel(activeCategory);
     }
-    if (!defs.length) {
-      listEl.innerHTML = `<div class="no-results">${query
-        ? `No settings match “${escapeHtml(query)}”.`
-        : 'No settings in this category yet.'}</div>`;
+    if (!defs.length && query) {
+      listEl.innerHTML = `<div class="no-results">No settings match “${escapeHtml(query)}”.</div>`;
       return;
     }
     for (const def of defs) {
       listEl.appendChild(settingRow(def, { showCategory: !!query }));
+    }
+    // Phase 8 B2: custom sections migrated from the legacy modal.
+    if (!query) renderCustomSections(listEl, activeCategory);
+  }
+
+  /**
+   * Custom (non-schema) sections per category, migrated from the old modal.
+   * Rendered after the schema rows.
+   */
+  function renderCustomSections(list, category) {
+    if (category === 'models') {
+      renderProviderKeysSection(list);
+      renderOmnirouteSection(list);
+    } else if (category === 'knowledge') {
+      renderMemorySection(list);
+    } else if (category === 'voice') {
+      renderVoiceSection(list);
+    } else if (category === 'workspace') {
+      renderFeatureTogglesSection(list);
     }
   }
 

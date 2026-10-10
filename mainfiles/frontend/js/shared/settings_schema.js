@@ -5,7 +5,7 @@
  * Types: 'boolean' | 'string' | 'number' | 'select' | 'multiselect'
  *
  * The Settings page renders from this schema: searchable, resettable,
- * persisted server-side via /api/user/preferences (localStorage as cache).
+ * persisted server-side via /user/settings (localStorage as cache).
  */
 export const SETTING_CATEGORIES = [
   { id: 'general',     label: 'General',            icon: 'fa-gear' },
@@ -112,6 +112,12 @@ export const SETTINGS_SCHEMA = [
     default: false, category: 'output' },
   { key: 'adhdFriendly', label: 'ADHD-friendly formatting', description: 'Answer-first, numbered steps, capped lists.', type: 'boolean',
     default: false, category: 'output' },
+  { key: 'formality', label: 'Formality', description: 'How formal replies should read.', type: 'select',
+    options: [{ v: 'casual', l: 'Casual' }, { v: 'neutral', l: 'Neutral' }, { v: 'formal', l: 'Formal' }],
+    default: 'neutral', category: 'output' },
+  { key: 'expertise', label: 'Technical depth', description: 'Match answers to your expertise.', type: 'select',
+    options: [{ v: 'beginner', l: 'Beginner' }, { v: 'general', l: 'General' }, { v: 'expert', l: 'Expert' }],
+    default: 'general', category: 'output' },
 
   // ---- Privacy ----
   { key: 'analyticsOptIn', label: 'Usage analytics', description: 'Local-only, opt-in.', type: 'boolean',
