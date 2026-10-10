@@ -392,7 +392,8 @@ export async function startApplication() {
     import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
     // Command palette (Ctrl+P).
     import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
-    showToast({ type: 'success', title: 'Connected', message: `Live backend at ${getApiBaseUrl()}` });
+    // Note: no "Connected" toast on every load — the topbar connection pulse
+    // already shows backend status, and a toast here blocks mobile nav.
   } catch (err) {
     chatStartNewChat();
     elements.messages.innerHTML = '';

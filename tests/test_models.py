@@ -42,6 +42,12 @@ import httpx
 # --- tests ---
 
 class ModelSelectionTests(unittest.TestCase):
+    def setUp(self):
+        # The Ollama failure cooldown is module-global; reset it so each
+        # test gets the real retry behavior, not a previous test's cooldown.
+        from backend.providers.model_discovery import reset_ollama_cooldown
+        reset_ollama_cooldown()
+
     def test_live_fetch_returns_exactly_what_provider_api_exposes(self):
         """The picker must mirror the provider's API, not a static catalogue."""
         import httpx
@@ -790,6 +796,10 @@ class ModelDiscoveryLoggingTests(unittest.TestCase):
     The graceful-degradation return contracts ([] / partial results) are
     preserved — the audit finding (C-006) is about *visibility*, not raising.
     """
+
+    def setUp(self):
+        from backend.providers.model_discovery import reset_ollama_cooldown
+        reset_ollama_cooldown()
 
     def test_fetch_models_logs_connection_error(self):
         """A connection error is logged with provider context and returns []."""

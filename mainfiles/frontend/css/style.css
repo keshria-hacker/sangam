@@ -2091,8 +2091,8 @@ a.sidebar-footer-btn{text-decoration:none; cursor:pointer;}
 .onboarding-card .btn-secondary:focus-visible{outline:3px solid var(--focus-ring); outline-offset:2px;}
 
 /* ---------- Toasts ---------- */
-.toast-container{position:fixed; top:18px; right:18px; z-index:600; display:flex; flex-direction:column; gap:10px; width:320px;}
-.toast{
+.toast-container{position:fixed; top:18px; right:18px; z-index:600; display:flex; flex-direction:column; gap:10px; width:320px; pointer-events:none;}
+.toast{pointer-events:auto;
   display:flex; align-items:flex-start; gap:10px; background:var(--bg-elevated); border:1px solid var(--border);
   border-left-width:3px; border-radius:var(--radius-md); padding:12px 14px; box-shadow:var(--shadow-3);
   animation:toastIn var(--dur-med) var(--ease); position:relative; overflow:hidden;
@@ -2536,12 +2536,6 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   .skills-categories::before,.skills-invocations::before{display:none;}
   .skills-list{width:100%; flex:0 0 auto; border-right:none; border-bottom:1px solid var(--border-soft); max-height:200px;}
   .skills-detail{flex:1; min-height:300px;}
-
-  /* Side panels stack full-width on mobile instead of crushing content */
-  .inspector-panel{width:100%; min-width:0; border-left:none; border-top:1px solid var(--border);}
-  .kn-detail{width:100%; min-width:0;}
-  .analytics-cols{grid-template-columns:1fr;}
-  .composer-popover{position:fixed; left:12px; right:12px; bottom:90px; min-width:0; max-width:none;}
 }
 
 @media (min-width:901px){
@@ -3024,3 +3018,15 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .spec-form label{display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:var(--text-secondary);}
 .spec-form .provider-key-input{font-weight:400;}
 .spec-output pre{max-height:400px; overflow:auto;}
+
+/* ---------- Mobile late overrides ---------- */
+/* These live at the end of the file so they win over base rules declared
+   after the main responsive block (source order decides ties). */
+@media (max-width:900px){
+  /* Side panels stack full-width on mobile instead of crushing content */
+  .inspector-panel{width:100%; min-width:0; border-left:none; border-top:1px solid var(--border);}
+  .kn-detail{width:100%; min-width:0;}
+  .analytics-cols{grid-template-columns:1fr;}
+  /* Composer popovers become bottom sheets that can't overflow the viewport */
+  .composer-popover{position:fixed; left:12px; right:12px; bottom:90px; min-width:0; max-width:none;}
+}

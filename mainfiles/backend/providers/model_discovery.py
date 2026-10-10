@@ -4,6 +4,7 @@ Live model discovery - fetches available models from provider APIs.
 import asyncio
 import json
 import logging
+import time
 
 import httpx
 
@@ -224,6 +225,10 @@ async def _ollama_reachable(base_url: str = "http://localhost:11434") -> bool:
 
 async def fetch_ollama_models(base_url: str = "http://localhost:11434") -> list[ModelInfo]:
     """Fetch models from local Ollama server."""
+    # Fast path: a recent failure means Ollama is down — don't burn 11s of
+    # auto-start retries on every call.
+    if _ollama_in_cooldown():
+        return []
     endpoint = f"{base_url.rstrip('/')}/api/tags"
     models: list[ModelInfo] = []
 
@@ -249,7 +254,9 @@ async def fetch_ollama_models(base_url: str = "http://localhost:11434") -> list[
 
     # Try direct connection first
     try:
-        return await _fetch_and_process()
+        result = await _fetch_and_process()
+        _note_ollama_success()
+        return result
     except httpx.HTTPError as exc:
         logger.debug("Ollama not reachable at %s (%s); attempting auto-start", endpoint, exc)
 
@@ -261,12 +268,15 @@ async def fetch_ollama_models(base_url: str = "http://localhost:11434") -> list[
     for delay in backoff_delays:
         await asyncio.sleep(delay)
         try:
-            return await _fetch_and_process()
+            result = await _fetch_and_process()
+            _note_ollama_success()
+            return result
         except httpx.HTTPError as exc:
             logger.debug("Ollama retry failed (delay=%ss): %s", delay, exc)
             continue
 
     if not models:
+        _note_ollama_failure()
         logger.warning(
             "Ollama unreachable at %s after %d retries; returning empty model list",
             endpoint,
@@ -274,6 +284,37 @@ async def fetch_ollama_models(base_url: str = "http://localhost:11434") -> list[
         )
 
     return models
+
+
+# Cooldown so a dead Ollama doesn't stall every /api/models call (and every
+# caller of fetch_ollama_models) with the full auto-start backoff. After a
+# failed probe, skip straight to the empty list for a while; the next call
+# after the cooldown retries for real.
+_OLLAMA_FAIL_COOLDOWN_S = 120.0
+_ollama_last_failure_ts: float = 0.0
+
+
+def _note_ollama_success() -> None:
+    global _ollama_last_failure_ts
+    _ollama_last_failure_ts = 0.0
+
+
+def _note_ollama_failure() -> None:
+    global _ollama_last_failure_ts
+    _ollama_last_failure_ts = time.monotonic()
+
+
+def _ollama_in_cooldown() -> bool:
+    return (
+        _ollama_last_failure_ts > 0
+        and (time.monotonic() - _ollama_last_failure_ts) < _OLLAMA_FAIL_COOLDOWN_S
+    )
+
+
+def reset_ollama_cooldown() -> None:
+    """Clear the failure cooldown (used by tests to get deterministic retries)."""
+    global _ollama_last_failure_ts
+    _ollama_last_failure_ts = 0.0
 
 
 # Re-export Ollama process management from ollama.py (single source of truth).

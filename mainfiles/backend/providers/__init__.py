@@ -544,11 +544,25 @@ async def stream_response_events(
             raise ValueError(f"Unknown provider: {provider_id}")
         provider = provider_class(config, api_key)
     model_info = None
-    models = await list_models(db)
-    for m in models:
-        if m.id == model_id:
-            model_info = m
-            break
+    # Fast path: ask only THIS provider for its models. The old code called
+    # the full list_models(db) here, which refreshes every provider including
+    # Ollama (auto-start retries ≈ 11s when Ollama is down) — stalling the
+    # first token of every chat stream on an unrelated provider.
+    try:
+        own_models = await provider.list_models(api_key)
+        for m in own_models or []:
+            if m.id == model_id:
+                model_info = m
+                break
+    except Exception:
+        pass
+    if model_info is None:
+        # Fallback: full cross-provider listing (slow, but complete).
+        models = await list_models(db)
+        for m in models:
+            if m.id == model_id:
+                model_info = m
+                break
     builder = ResponseEventBuilder(
         provider=provider_id,
         model=model_id,

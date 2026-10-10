@@ -103,3 +103,9 @@ class MockProvider(BaseProvider):
         # Yield in small chunks to exercise the streaming path.
         for i in range(0, len(reply), 24):
             yield ProviderStreamChunk(text=reply[i : i + 24])
+        # Terminal chunk: without a finish_reason the response-event adapter
+        # treats the stream as broken ("Stream terminated without
+        # finish_reason") and the UI shows an error instead of the reply.
+        from backend.response_events import FinishReason
+
+        yield ProviderStreamChunk(text="", finish_reason=FinishReason.STOP)

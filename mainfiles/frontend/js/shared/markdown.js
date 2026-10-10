@@ -164,6 +164,12 @@ function preprocessMermaid(markdown) {
  * Used for final render pass after streaming completes.
  */
 export function parseMarkdown(markdown) {
+  // Graceful degradation: the markdown libs come from a CDN. If it failed
+  // (offline/blocked), render escaped plaintext instead of throwing — a
+  // missing CDN must never break the chat itself.
+  if (!areMarkdownLibsLoaded()) {
+    return `<p>${escapeHtml(markdown)}</p>`;
+  }
   // Preprocess for KaTeX and Mermaid
   let processed = preprocessKaTeX(markdown);
   processed = preprocessMermaid(processed);
@@ -183,6 +189,9 @@ export function parseMarkdown(markdown) {
  * Used during SSE streaming for visually stable updates.
  */
 export function renderMarkdownStream(markdown) {
+  if (!areMarkdownLibsLoaded()) {
+    return `<p>${escapeHtml(markdown)}</p>`;
+  }
   // Preprocess for KaTeX and Mermaid
   let processed = preprocessKaTeX(markdown);
   processed = preprocessMermaid(processed);
