@@ -73,8 +73,21 @@ async function assertNoBadText(page: Page, where: string) {
 }
 
 async function register(page: Page, ctx: Ctx) {
-  // Serial execution + single-user app: first test registers via UI (fresh
-  // DB => register mode), later tests log in via UI (login mode).
+  // Single-user app, parallel workers: ensure the account exists via API.
+  // First worker registers (201), others get 403 then log in (200).
+  // The page itself is not authenticated by this (separate request context),
+  // so we always drive the UI login form below.
+  const api = page.request;
+  let resp = await api.post(`${BACKEND_URL}/api/auth/register`, {
+    data: { username: USER, password: PASS },
+  });
+  if (resp.status() === 403) {
+    resp = await api.post(`${BACKEND_URL}/api/auth/login`, {
+      data: { username: USER, password: PASS },
+    });
+  }
+  expect(resp.ok(), `API register/login failed: ${resp.status()}`).toBe(true);
+
   await page.goto(FRONTEND_URL);
   await page.waitForFunction(
     () => {
@@ -86,23 +99,20 @@ async function register(page: Page, ctx: Ctx) {
     { timeout: 20000 }
   );
   if (await page.locator('#authOverlay.hidden').count()) {
-    ctx.loggedIn = true; // already authenticated
+    ctx.loggedIn = true;
     await page.waitForTimeout(1500);
     return;
   }
-  const mode = await page.locator('#authForm').getAttribute('data-mode');
+  // Form is visible: must be in login mode (user exists via API above).
   await page.fill('#authUsername', USER);
   await page.fill('#authPassword', PASS);
-  if (mode === 'register') {
-    await page.fill('#authConfirmPassword', PASS);
-  }
   await page.click('#authSubmit');
   await expect(page.locator('#authOverlay')).toHaveClass(/hidden/, { timeout: 20000 });
   ctx.loggedIn = true;
   await page.waitForTimeout(1500); // let /features + initial fetches settle
 }
 
-test.describe.serial('Smoke (required gate)', () => {
+test.describe('Smoke (required gate)', () => {
   test('CSS variables: every var() used is defined', async ({ page }) => {
     const css = await (await fetch(`${FRONTEND_URL}/css/style.css`)).text();
     // Vars used WITHOUT a fallback: var(--x) — these break if undefined.
