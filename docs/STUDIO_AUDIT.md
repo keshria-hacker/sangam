@@ -231,3 +231,84 @@ Code Agent — all fixable without layout changes (Phase 1 scope).
 9. Settings relocation hooks (no logic loss).
 
 *Gate: tests green; manual checklist for voice stop + Agent mode; no dead button.*
+
+---
+
+# Phase 8 Audit — "STOP ADDING, START FIXING" (2026-10-10)
+
+**Mandate:** No new features. Fix, delete, and wire up only. "Done" means clickable in a real browser.
+
+## Smoke Test Gate (Required)
+
+**File:** `tests/e2e/smoke.spec.ts` + `tests/e2e/run_smoke.sh`
+
+**Result:** 3/3 PASS (2026-10-10)
+
+| Test | Status |
+|------|--------|
+| CSS variables: every var() used is defined | ✅ Pass |
+| Full pass: register, rail, popovers, settings, chat, knowledge | ✅ Pass |
+| Mobile 390px: rail reachable via menu button | ✅ Pass |
+
+The gate verifies: registration, every rail item clickable, composer popovers (Mode/Tools/Tune), Settings, chat send via mock provider, Knowledge graph load. Fails on HTTP≥400, console.error, NaN/undefined/[object] text, undefined CSS vars.
+
+## Section A: Bug Fixes (A1-A9) — All Done
+
+| ID | Fix | Verification |
+|----|-----|--------------|
+| A1 | Knowledge graph 500 (`Chat.user_id`) | Real-DB regression test, fails on old code |
+| A2 | NaN token label | Single `renderTokenLabel()` owner |
+| A3 | Undefined CSS vars, transparent overlays | 32× `var(--surface)` → `var(--surface-raised)` |
+| A4 | OmniRoute sync signature mismatch | Fake-server regression test |
+| A5 | Rail "Turn on" → Settings | Now enables feature then opens destination |
+| A6 | Activity Tray overlap | Moved inside main panel |
+| A7 | Repeated inner titles | Replaced with breadcrumbs |
+| A8 | Mobile rail | Verified wired, 390px test passes |
+| A9 | Late feature state | Rail renders post-auth only |
+
+## Section B: Deletions (B1-B8) — All Done (8 commits)
+
+- B1: Deleted footer Settings button (rail is single entry)
+- B2: Deleted legacy settings modal (946 lines); migrated provider keys, OmniRoute, memory, voice into schema-driven page
+- B3: Single source `/user/settings`; deleted `/user/preferences` API + legacy localStorage blob
+- B4: Deleted Temp/Tokens/Reasoning pills; Tune is single owner
+- B5: Deleted tab "+" picker and terminal button
+- B6: Rail replaces main view; tabs only for explicit split-view (max 2)
+- B7: Rail 7+1 (Home Chat Agents Knowledge Create Code Library + Settings); merged Agents/Teams/Compare/Runs, Code/SpecWizard, Create sub-views
+- B8: Wired `presets.js` into Settings (was dead code)
+
+**Deletions:** ~1,800 lines removed.
+
+## Section C: Dead Settings — Resolved
+
+**Deleted (7):** `startupView`, `thinkingDisplay`, `sendKey`, `queueWhileStreaming`, `agentMaxCost`, `memoryScope`, `preCompactionSave`
+
+**Wired (9):**
+- `reduceMotion` → disables animations (respects OS setting)
+- `defaultTemperature`/`defaultMaxTokens` → composer signal defaults
+- `requireApproval` → passed to `/code-agent/run`
+- `memoryAutoExtract` → gates memory extraction in chat route
+- `voiceSpeed` → `SpeechSynthesisUtterance.rate`
+- `noSlop`/`adhdFriendly` → user settings override env in postprocessor
+- `analyticsOptIn` → gates `record_event` (privacy-conservative)
+
+**Categories:** 14 → 7 (general, appearance, chat, models, agents, knowledge, voice_output)
+
+## Section D: Unreachable Backend — Resolved
+
+- D1: Spec wizard (`/spec/build`, `/spec/to-task`) → Code page sub-view
+- D2: Run history (`GET /runs`) → Agents page Runs sub-view
+- D3: Quality preview (`POST /quality/preview`) → Settings Output section
+- D4: Memory move (`PUT /memory/{id}/move`) → Knowledge memory browser
+- D5: Artifact version list → already wired
+- D6: Fallback chain → now wraps `stream_response_events` (chat path)
+
+## Known Issue
+
+**Chat streaming DOM detachment:** The assistant message node can be detached from the DOM during streaming (likely a view remount). The backend streams correctly (verified via curl), and the message is sent successfully (POST 200, no errors). The streaming text update is fragile. Workaround in place (re-attach logic); full fix requires refactoring the streaming to use state instead of temporary DOM nodes.
+
+## Test Totals
+
+- **Pytest:** 1103 passed, 3 failed (analyticsOptIn — tests updated), 100 skipped
+- **Playwright smoke:** 3/3 passed
+- **Frontend modules:** All parse + link

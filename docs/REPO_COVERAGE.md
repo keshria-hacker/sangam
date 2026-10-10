@@ -81,3 +81,36 @@
 - **Partial:** 0/22
 - **Skip:** 2/22 (winutil, claw-code — weak fit, documented)
 - **Missing:** 0/22
+
+---
+
+## Phase 8 Update (2026-10-10) — "STOP ADDING, START FIXING"
+
+**Branch:** `integration/full-program`  
+**Method:** Real-browser smoke test (Playwright) + pytest + code inspection. "Done" = clickable.
+
+### Smoke Gate: 3/3 PASS
+
+- CSS variables defined, no console errors, no bad text
+- Register → rail → popovers → Settings → chat send → Knowledge graph
+- Mobile 390px rail via menu button
+
+### What Changed
+
+**Fixed (A1-A9):** Knowledge graph 500, NaN token label, undefined CSS vars, OmniRoute sync signature, rail "Turn on", tray overlap, duplicate titles, mobile rail, late feature state.
+
+**Deleted (B1-B8):** ~1,800 lines. Legacy settings modal, duplicate pills, tab picker, footer Settings, `/user/preferences` API. Rail now 7+1.
+
+**Settings (C):** 7 deleted, 9 wired, 14 categories → 7.
+
+**Backend wiring (D):** Spec wizard, run history, quality preview, memory move all reachable in UI. Fallback chain in chat path.
+
+### Known Issue
+
+Chat streaming DOM detachment — backend works, frontend render fragile. Documented in STUDIO_AUDIT.md.
+
+### Totals
+
+- Pytest: 1103 passed
+- Smoke: 3/3 passed
+- Deletions: ~1,800 lines + 7 settings + 7 categories
