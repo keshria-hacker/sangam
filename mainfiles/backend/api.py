@@ -72,10 +72,8 @@ from .api_routes.chats_routes import (  # noqa: F401
     delete_chat,
     get_chat,
     get_chat_summary,
-    get_preferences,
     list_chats,
     submit_feedback,
-    update_preferences,
 )
 
 # Importing the route modules registers all endpoints on the shared routers.

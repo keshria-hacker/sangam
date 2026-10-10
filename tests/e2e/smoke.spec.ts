@@ -141,10 +141,11 @@ test.describe('Smoke (required gate)', () => {
       await page.screenshot({ path: `tests/e2e/screenshots/smoke-rail-${id}.png` });
     }
 
-    // 3. Composer popovers (back on chat view)
+    // 3. Composer popovers (back on chat view) — B4: Temp/Tokens pills deleted,
+    // Tune is the single owner. Popovers: Mode, Tools, Tune.
     await page.locator('.rail-item[data-nav="chat"]').first().click();
     await page.waitForTimeout(800);
-    for (const btn of ['#modeBtn', '#toolsBtn', '#tuneBtn', '#tokenBtn']) {
+    for (const btn of ['#modeBtn', '#toolsBtn', '#tuneBtn']) {
       const el = page.locator(btn);
       if ((await el.count()) === 0 || !(await el.first().isVisible())) continue;
       await el.first().click();
