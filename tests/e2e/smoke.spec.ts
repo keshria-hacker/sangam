@@ -121,6 +121,10 @@ test.describe.serial('Smoke (required gate)', () => {
     await assertNoBadText(page, 'post-register');
 
     // 2. Visit every rail item
+    await page.waitForFunction(
+      () => document.querySelectorAll('.rail-item[data-nav]').length > 3,
+      { timeout: 15000 }
+    );
     const railIds: string[] = await page.evaluate(() =>
       [...document.querySelectorAll('.rail-item[data-nav]')].map((el) =>
         (el as HTMLElement).dataset.nav as string
