@@ -23,6 +23,8 @@ export const SETTING_CATEGORIES = [
   { id: 'shortcuts',   label: 'Shortcuts',          icon: 'fa-keyboard' },
   { id: 'privacy',     label: 'Privacy & Data',     icon: 'fa-shield-halved' },
   { id: 'doctor',      label: 'Doctor & About',     icon: 'fa-stethoscope' },
+  { id: 'learn',       label: 'Learn',                icon: 'fa-graduation-cap' },
+  { id: 'insights',    label: 'Insights',             icon: 'fa-chart-simple' },
 ];
 
 export const SETTINGS_SCHEMA = [

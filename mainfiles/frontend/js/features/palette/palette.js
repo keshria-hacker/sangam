@@ -44,22 +44,25 @@ function buildActions() {
     { id: 'copy', label: 'Copy last response', hint: 'Ctrl+Shift+C', run: () => copyLast() },
     { id: 'regen', label: 'Regenerate last response', hint: 'Ctrl+Shift+R', run: () => a.regenerate?.() },
   ];
-  if (flags.multi_agent) {
-    actions.push({
-      id: 'teams', label: 'Open Agent teams',
-      run: () => import('../teams/teams.js').then((m) => m.openTeamsModal()),
-    });
-  }
+  // Phase 8 B7: merged pages — deep-link into sub-views.
+  actions.push({
+    id: 'teams', label: 'Open Agent teams',
+    run: () => import('../tabs/tabs.js').then((m) => m.showToolSub('agents', 'data-agentsub', 'teams')),
+  });
+  actions.push({
+    id: 'compare', label: 'Compare models',
+    run: () => import('../tabs/tabs.js').then((m) => m.showToolSub('agents', 'data-agentsub', 'compare')),
+  });
   if (flags.learning) {
     actions.push({
       id: 'learn', label: 'Open Learn mode',
-      run: () => import('../learn/learn.js').then((m) => m.openLearnModal()),
+      run: () => import('../tabs/tabs.js').then((m) => { m.showTool('settings'); }),
     });
   }
   if (flags.analytics) {
     actions.push({
       id: 'usage', label: 'Open Usage analytics',
-      run: () => import('../analytics/analytics.js').then((m) => m.openAnalyticsModal()),
+      run: () => import('../tabs/tabs.js').then((m) => { m.showTool('settings'); }),
     });
   }
   return actions;

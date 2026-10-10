@@ -16,7 +16,7 @@ const TABS = [
   { id: 'skills', label: 'Skills', icon: 'fa-wand-magic-sparkles' },
   { id: 'mcp', label: 'MCP Servers', icon: 'fa-plug' },
   { id: 'extensions', label: 'Extensions', icon: 'fa-puzzle-piece' },
-  { id: 'templates', label: 'Templates', icon: 'fa-file-lines' },
+  { id: 'templates', label: 'Prompts', icon: 'fa-file-lines' },
 ];
 
 let activeTab = 'skills';

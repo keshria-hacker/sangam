@@ -13,20 +13,17 @@ const TOOL_DEFS = {
   home:      { title: 'Home',          icon: 'fa-house',               feature: null },
   settings:  { title: 'Settings',      icon: 'fa-gear',                feature: null },
   knowledge: { title: 'Knowledge',     icon: 'fa-brain',               feature: null },
-  agents:    { title: 'Agent Hub',     icon: 'fa-robot',               feature: null },
+  agents:    { title: 'Agents',        icon: 'fa-robot',               feature: null },
   create:    { title: 'Create',        icon: 'fa-wand-magic-sparkles', feature: null },
   library:   { title: 'Library',       icon: 'fa-book',               feature: null },
-  routes:    { title: 'Routes',        icon: 'fa-route',              feature: null },
-  automations: { title: 'Automations', icon: 'fa-clock',              feature: null },
-  skills:    { title: 'Skills',        icon: 'fa-wand-magic-sparkles', feature: null },
-  teams:     { title: 'Agent teams',   icon: 'fa-users',               feature: 'multi_agent' },
-  learn:     { title: 'Learn',         icon: 'fa-graduation-cap',      feature: 'learning' },
-  analytics: { title: 'Analytics',     icon: 'fa-chart-simple',        feature: 'analytics' },
-  images:    { title: 'Image studio',  icon: 'fa-image',               feature: 'image_gen' },
-  voice:     { title: 'Voice studio',  icon: 'fa-microphone',           feature: 'voice' },
-  code:      { title: 'Code agent',    icon: 'fa-code',                feature: null },
-  design:    { title: 'Design studio', icon: 'fa-palette',             feature: null },
-  compare:   { title: 'Compare',       icon: 'fa-scale-balanced',      feature: null },
+  code:      { title: 'Code',          icon: 'fa-code',                feature: null },
+  // Phase 8 B7: merged pages. The old separate tabs are gone:
+  // - teams, compare -> Agents page sub-views
+  // - skills, automations -> Library / Agents sub-views
+  // - routes -> Settings > Models & Routing
+  // - learn, analytics -> Settings sub-pages
+  // - images, voice -> Create sub-views
+  // - design -> Create sub-view
 };
 
 const openTabs = []; // [{ id, tool, title, icon, mounted }]
@@ -174,6 +171,24 @@ export function showTool(tool) {
 
 /** Which tool (if any) is currently shown in the main view. */
 export function getActiveViewTool() { return activeViewTool; }
+
+/**
+ * Phase 8 B7: deep-link into a merged page's sub-view.
+ * Shows the tool, then clicks its sub-tab (polls briefly for async renders).
+ */
+export function showToolSub(tool, subAttr, subId) {
+  showTool(tool);
+  const tryClick = () => {
+    const btn = document.querySelector(`[${subAttr}="${subId}"]`);
+    if (btn) { btn.click(); return true; }
+    return false;
+  };
+  if (tryClick()) return;
+  let n = 0;
+  const t = setInterval(() => {
+    if (tryClick() || ++n > 25) clearInterval(t);
+  }, 120);
+}
 
 export function closeTab(tabId) {
   if (tabId === 'main') return;

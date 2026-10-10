@@ -10,7 +10,7 @@ import { apiFetch } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { getJobs } from '../../core/jobs.js';
-import { showTool } from '../tabs/tabs.js';
+import { showTool, showToolSub } from '../tabs/tabs.js';
 
 console.log('[Module] home.js loaded');
 
@@ -23,13 +23,13 @@ const SUGGESTED_STARTS = [
     desc: 'Ask anything — a fresh conversation.', feature: null },
   { id: 'code', tool: 'code', icon: 'fa-code', title: 'Code agent',
     desc: 'Build, fix, and refactor code with an agent.', feature: null },
-  { id: 'design', tool: 'design', icon: 'fa-palette', title: 'Design studio',
+  { id: 'design', tool: 'create', sub: ['data-createsub', 'design'], icon: 'fa-palette', title: 'Design studio',
     desc: 'Generate web prototypes with live preview.', feature: null },
-  { id: 'images', tool: 'images', icon: 'fa-image', title: 'Image studio',
+  { id: 'images', tool: 'create', sub: ['data-createsub', 'image'], icon: 'fa-image', title: 'Image studio',
     desc: 'Create images from text prompts.', feature: 'image_gen' },
-  { id: 'teams', tool: 'teams', icon: 'fa-users', title: 'Agent teams',
+  { id: 'teams', tool: 'agents', sub: ['data-agentsub', 'teams'], icon: 'fa-users', title: 'Agent teams',
     desc: 'Run parallel specialist agents on a task.', feature: 'multi_agent' },
-  { id: 'learn', tool: 'learn', icon: 'fa-graduation-cap', title: 'Learn',
+  { id: 'learn', tool: 'settings', icon: 'fa-graduation-cap', title: 'Learn',
     desc: 'Interactive lessons with an AI tutor.', feature: 'learning' },
 ];
 
@@ -82,7 +82,10 @@ export async function renderHome(bodyEl) {
     btn.addEventListener('click', () => {
       const def = SUGGESTED_STARTS.find((s) => s.id === btn.dataset.start);
       if (!def) return;
-      if (def.tool) showTool(def.tool);
+      if (def.tool) {
+        if (def.sub) showToolSub(def.tool, def.sub[0], def.sub[1]);
+        else showTool(def.tool);
+      }
       else import('../chat/chat.js').then((m) => m.startNewChat()).catch(() => {});
     });
   });

@@ -20,7 +20,8 @@ import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import {
   renderProviderKeysSection, renderOmnirouteSection, renderFeatureTogglesSection,
-  renderMemorySection, renderVoiceSection,
+  renderMemorySection, renderVoiceSection, renderRoutesSection, renderDoctorSection,
+  renderLearnSection, renderInsightsSection, renderQualityPreview,
 } from './sections.js';
 
 console.log('[Module] settings_page.js loaded');
@@ -287,12 +288,20 @@ export function renderSettingsPage(bodyEl) {
     if (category === 'models') {
       renderProviderKeysSection(list);
       renderOmnirouteSection(list);
+      renderRoutesSection(list);
+      renderDoctorSection(list);
     } else if (category === 'knowledge') {
       renderMemorySection(list);
     } else if (category === 'voice') {
       renderVoiceSection(list);
     } else if (category === 'workspace') {
       renderFeatureTogglesSection(list);
+    } else if (category === 'learn') {
+      renderLearnSection(list);
+    } else if (category === 'insights') {
+      renderInsightsSection(list);
+    } else if (category === 'output') {
+      renderQualityPreview(list);
     }
   }
 

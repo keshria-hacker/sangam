@@ -90,7 +90,7 @@ function wireDocClickOnce() {
   document.addEventListener('click', () => closeAllMenus());
 }
 
-export async function renderCreateHub(bodyEl) {
+async function renderDocumentsView(bodyEl) {
   root = bodyEl;
   editing = null;
   viewVersion = null;
@@ -152,13 +152,13 @@ function renderTemplates() {
   wrap.querySelectorAll('[data-tpl]').forEach((b) => {
     b.addEventListener('click', () => {
       const t = TEMPLATES[Number(b.dataset.tpl)];
-      // Studio entries navigate to the respective tab
+      // Studio entries switch the Create page to that sub-view (Phase 8 B7)
       if (t.type === '_image_studio') {
-        document.querySelector('[data-nav="images"]')?.click();
+        document.querySelector('[data-createsub="image"]')?.click();
         return;
       }
       if (t.type === '_voice_studio') {
-        document.querySelector('[data-nav="voice"]')?.click();
+        document.querySelector('[data-createsub="voice"]')?.click();
         return;
       }
       createArtifact(t.type, t.title, t.content);
@@ -515,4 +515,66 @@ function renderDiagram(src) {
   svg += '</svg>';
   return `<div class="create-diagram-scroll">${svg}</div>
     <p class="settings-hint create-diagram-hint">Syntax: <code>A[Box]</code> <code>A{Choice}</code> <code>A(Round)</code> · <code>A --> B</code> · <code>A -- yes --> B</code></p>`;
+}
+
+// ---------------------------------------------------------------------------
+// Merged Create page (Phase 8 B7).
+//
+// Sub-views: Documents (artifacts hub) | Image | Voice | Design.
+// Image/Voice/Design were separate rail tabs; now they live here.
+// ---------------------------------------------------------------------------
+
+const CREATE_SUBVIEWS = [
+  { id: 'documents', label: 'Documents', icon: 'fa-file-lines' },
+  { id: 'image',     label: 'Image',     icon: 'fa-image' },
+  { id: 'voice',     label: 'Voice',     icon: 'fa-microphone' },
+  { id: 'design',    label: 'Design',    icon: 'fa-palette' },
+];
+
+/** Merged Create page — the rail 'Create' entry renders this. */
+export async function renderCreateHub(bodyEl) {
+  bodyEl.innerHTML = `
+    <div class="create-page">
+      <div class="library-tabs" role="tablist" aria-label="Create sections">
+        ${CREATE_SUBVIEWS.map((t, i) => `
+          <button class="library-tab${i === 0 ? ' active' : ''}" role="tab"
+            data-createsub="${t.id}" aria-selected="${i === 0}">
+            <i class="fa-solid ${t.icon}"></i> ${t.label}
+          </button>`).join('')}
+      </div>
+      <div class="create-subbody" id="createSubBody"></div>
+    </div>`;
+  const subBody = bodyEl.querySelector('#createSubBody');
+  const show = (id) => {
+    bodyEl.querySelectorAll('[data-createsub]').forEach((b) => {
+      const on = b.dataset.createsub === id;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    renderCreateSubview(subBody, id);
+  };
+  bodyEl.querySelectorAll('[data-createsub]').forEach((b) => {
+    b.addEventListener('click', () => show(b.dataset.createsub));
+  });
+  await renderCreateSubview(subBody, 'documents');
+}
+
+async function renderCreateSubview(container, id) {
+  container.innerHTML = '<p class="settings-hint">Loading…</p>';
+  try {
+    if (id === 'documents') {
+      await renderDocumentsView(container);
+    } else if (id === 'image') {
+      const { renderImageTab } = await import('../image/image.js');
+      await renderImageTab(container);
+    } else if (id === 'voice') {
+      const { renderVoiceStudio } = await import('../voice/studio.js');
+      await renderVoiceStudio(container);
+    } else if (id === 'design') {
+      const { renderDesignTab } = await import('../design/design-studio.js');
+      await renderDesignTab(container);
+    }
+  } catch (err) {
+    container.innerHTML = `<p class="team-error">Could not load: ${escapeHtml(err?.message || String(err))}</p>`;
+  }
 }

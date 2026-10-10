@@ -3161,3 +3161,18 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .auto-runs i{margin-right:4px;}
 #autoForm small.settings-hint{display:block; margin-top:4px;}
 #autoForm small.settings-hint code{background:var(--bg-elevated); padding:1px 5px; border-radius:4px;}
+
+/* Phase 8 B7: merged pages */
+.agents-page, .create-page, .code-page{padding:20px; max-width:1200px;}
+.agents-subbody, .create-subbody, .code-subbody{margin-top:16px;}
+.runs-list{display:flex; flex-direction:column; gap:8px;}
+.run-row{display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--surface); border:1px solid var(--border-soft); border-radius:var(--radius-sm);}
+.run-row i.fa-solid:first-child{color:var(--text-tertiary);}
+.run-main{flex:1; display:flex; flex-direction:column; gap:2px;}
+.run-main strong{font-size:13px;}
+.run-error{color:var(--danger);}
+.spec-wizard{max-width:800px;}
+.spec-form{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
+.spec-form label{display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:var(--text-secondary);}
+.spec-form .provider-key-input{font-weight:400;}
+.spec-output pre{max-height:400px; overflow:auto;}

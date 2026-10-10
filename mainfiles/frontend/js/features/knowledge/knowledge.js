@@ -454,8 +454,12 @@ async function loadMemories(bodyEl) {
         <span class="kn-mem-content">${escapeHtml((m.content || '').slice(0, 160))}</span>
         ${m.room && m.room !== 'default' ? `<span class="kn-mem-room" title="Room / drawer">${escapeHtml(m.room)}/${escapeHtml(m.drawer || 'general')}</span>` : ''}
         ${m.importance != null ? `<span class="kn-mem-imp" title="Importance">${Number(m.importance).toFixed(2)}</span>` : ''}
+        <button class="icon-btn kn-mem-move" title="Move to room/drawer" aria-label="Move memory"><i class="fa-solid fa-folder-open"></i></button>
         <button class="icon-btn kn-mem-del" title="Forget"><i class="fa-solid fa-trash"></i></button>
       </div>`).join('');
+    box.querySelectorAll('.kn-mem-move').forEach((btn) => {
+      btn.addEventListener('click', () => openMoveMemory(bodyEl, btn.closest('.kn-mem')));
+    });
     box.querySelectorAll('.kn-mem-del').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = btn.closest('.kn-mem').dataset.id;
@@ -472,6 +476,34 @@ async function loadMemories(bodyEl) {
     });
   } catch {
     box.innerHTML = '<p class="settings-hint">Could not load memories.</p>';
+  }
+}
+
+/** Phase 8 D4: move a memory to another room/drawer (PUT /memory/{id}/move). */
+async function openMoveMemory(bodyEl, rowEl) {
+  const id = rowEl?.dataset.id;
+  if (!id) return;
+  // Fetch existing rooms for suggestions
+  let rooms = [];
+  try {
+    const data = await (await apiFetch('/memory/rooms')).json();
+    rooms = (data.rooms || []).map((r) => r.name);
+  } catch { /* ignore */ }
+  const room = prompt(`Move memory to room (existing: ${rooms.join(', ') || 'none yet'}):`, 'default');
+  if (room == null) return;
+  const drawer = prompt('Drawer:', 'general');
+  if (drawer == null) return;
+  try {
+    const res = await apiFetch(`/memory/${encodeURIComponent(id)}/move`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room: room.trim() || 'default', drawer: drawer.trim() || 'general' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast({ type: 'success', title: 'Memory moved' });
+    loadMemories(bodyEl);
+  } catch (err) {
+    showToast({ type: 'error', title: 'Move failed', message: err?.message || String(err) });
   }
 }
 

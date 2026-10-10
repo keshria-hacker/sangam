@@ -18,11 +18,10 @@ export const NAV_ITEMS = [
   { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'tab:knowledge', feature: null },
   { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'tab:create', feature: null },
   { id: 'code',      label: 'Code',      icon: 'fa-code',             action: 'tab:code',   feature: null },
-  { id: 'learn',     label: 'Learn',     icon: 'fa-graduation-cap',   action: 'tab:learn',  feature: 'learning' },
   { id: 'library',   label: 'Library',   icon: 'fa-book',             action: 'tab:library', feature: null },
-  { id: 'insights',  label: 'Insights',  icon: 'fa-chart-simple',     action: 'tab:analytics', feature: 'analytics' },
-  { id: 'images',    label: 'Images',    icon: 'fa-image',            action: 'tab:images',  feature: 'image_gen' },
-  { id: 'voice',     label: 'Voice',     icon: 'fa-microphone',       action: 'tab:voice',   feature: 'voice' },
+  // Phase 8 B7: rail is 7 items. Merged away:
+  // - learn, insights -> Settings sub-pages
+  // - images, voice -> Create sub-views
 ];
 
 export const NAV_BOTTOM = [

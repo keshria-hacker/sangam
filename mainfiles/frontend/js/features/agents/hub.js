@@ -248,3 +248,125 @@ function openRunPanel(bodyEl, target) {
   wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   taskEl.focus();
 }
+
+// ---------------------------------------------------------------------------
+// Merged Agents page (Phase 8 B7 + D2).
+//
+// Sub-views: Agents (hub) | Teams | Compare | Runs | Approvals.
+// Teams and Compare were separate tabs; Runs (run history, D2) is new;
+// Approvals shows the approval policy (approvals happen inline in runs).
+// ---------------------------------------------------------------------------
+
+const AGENT_SUBVIEWS = [
+  { id: 'agents',    label: 'Agents',    icon: 'fa-robot' },
+  { id: 'teams',     label: 'Teams',     icon: 'fa-users' },
+  { id: 'compare',   label: 'Compare',   icon: 'fa-scale-balanced' },
+  { id: 'runs',      label: 'Runs',      icon: 'fa-clock-rotate-left' },
+  { id: 'automations', label: 'Automations', icon: 'fa-clock' },
+  { id: 'approvals', label: 'Approvals', icon: 'fa-shield-halved' },
+];
+
+/** Merged Agents page — the rail 'Agents' entry renders this. */
+export async function renderAgentsPage(bodyEl) {
+  bodyEl.innerHTML = `
+    <div class="agents-page">
+      <div class="library-tabs" role="tablist" aria-label="Agents sections">
+        ${AGENT_SUBVIEWS.map((t, i) => `
+          <button class="library-tab${i === 0 ? ' active' : ''}" role="tab"
+            data-agentsub="${t.id}" aria-selected="${i === 0}">
+            <i class="fa-solid ${t.icon}"></i> ${t.label}
+          </button>`).join('')}
+      </div>
+      <div class="agents-subbody" id="agentsSubBody"></div>
+    </div>`;
+  const subBody = bodyEl.querySelector('#agentsSubBody');
+  const show = (id) => {
+    bodyEl.querySelectorAll('[data-agentsub]').forEach((b) => {
+      const on = b.dataset.agentsub === id;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    renderAgentSubview(subBody, id);
+  };
+  bodyEl.querySelectorAll('[data-agentsub]').forEach((b) => {
+    b.addEventListener('click', () => show(b.dataset.agentsub));
+  });
+  await renderAgentSubview(subBody, 'agents');
+}
+
+async function renderAgentSubview(container, id) {
+  container.innerHTML = '<p class="settings-hint">Loading…</p>';
+  try {
+    if (id === 'agents') {
+      await renderAgentHub(container);
+    } else if (id === 'teams') {
+      const { renderTeamsTab } = await import('../teams/teams.js');
+      await renderTeamsTab(container);
+    } else if (id === 'compare') {
+      const { renderCompareTab } = await import('../compare/compare.js');
+      await renderCompareTab(container);
+    } else if (id === 'runs') {
+      await renderRunsHistory(container);
+    } else if (id === 'automations') {
+      const { renderAutomations } = await import('../automations/ui.js');
+      await renderAutomations(container);
+    } else if (id === 'approvals') {
+      renderApprovalsView(container);
+    }
+  } catch (err) {
+    container.innerHTML = `<p class="team-error">Could not load: ${escapeHtml(err?.message || String(err))}</p>`;
+  }
+}
+
+/** D2: run history from GET /runs. */
+async function renderRunsHistory(container) {
+  let runs = [];
+  try {
+    const data = await (await apiFetch('/runs?limit=50')).json();
+    runs = data.runs || [];
+  } catch (err) {
+    container.innerHTML = `<p class="settings-hint">Could not load runs: ${escapeHtml(err?.message || String(err))}</p>`;
+    return;
+  }
+  if (!runs.length) {
+    container.innerHTML = '<p class="settings-hint">No agent runs yet. Runs from the Agents, Teams, and Code pages are recorded here.</p>';
+    return;
+  }
+  const statusIcon = (s) => ({
+    done: 'fa-circle-check', running: 'fa-circle-play', failed: 'fa-circle-exclamation',
+  }[s] || 'fa-circle');
+  container.innerHTML = `
+    <div class="runs-list">
+      ${runs.map((r) => `
+        <div class="run-row">
+          <i class="fa-solid ${statusIcon(r.status)}"></i>
+          <div class="run-main">
+            <strong>${escapeHtml(r.title || r.kind || 'Run')}</strong>
+            <span class="settings-hint">${escapeHtml(r.kind || '')} · ${escapeHtml(r.model || '')} · ${r.tokens ? `${r.tokens} tok` : ''}${r.cost_usd ? ` · $${Number(r.cost_usd).toFixed(3)}` : ''}</span>
+          </div>
+          <span class="settings-hint">${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</span>
+          ${r.error ? `<span class="run-error" title="${escapeHtml(r.error)}"><i class="fa-solid fa-triangle-exclamation"></i></span>` : ''}
+        </div>`).join('')}
+    </div>`;
+}
+
+/** Approvals: policy overview (approvals happen inline during runs). */
+function renderApprovalsView(container) {
+  container.innerHTML = `
+    <div class="sp-custom-section">
+      <h3 class="sp-section-title"><i class="fa-solid fa-shield-halved"></i> Approval policy</h3>
+      <p class="settings-hint">When an agent wants to use a gated tool, it pauses and asks
+        you to approve inline in the run. Configure which tools need approval in
+        Settings → Agents &amp; Safety.</p>
+      <div class="sp-section-body" data-approval-policy><p class="settings-hint">Loading…</p></div>
+    </div>`;
+  const body = container.querySelector('[data-approval-policy]');
+  import('../../shared/settings_store.js').then(({ getSetting }) => {
+    const req = getSetting('requireApproval') || [];
+    body.innerHTML = req.length
+      ? `<ul class="lib-risks">${req.map((t) => `<li><i class="fa-solid fa-check"></i> ${escapeHtml(t)}</li>`).join('')}</ul>`
+      : '<p class="settings-hint">No tools require approval right now.</p>';
+  }).catch(() => {
+    body.innerHTML = '<p class="settings-hint">Could not load policy.</p>';
+  });
+}

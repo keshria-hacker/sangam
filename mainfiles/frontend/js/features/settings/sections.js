@@ -325,3 +325,118 @@ export function renderVoiceSection(container) {
       '<p class="settings-hint">Voice settings unavailable.</p>';
   });
 }
+
+// ---------------------------------------------------------------------------
+// Phase 8 B7: merged-away tabs as Settings sub-pages.
+// ---------------------------------------------------------------------------
+
+/** Routes UI inside Settings → Models & Routing. */
+export function renderRoutesSection(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `<h3 class="sp-section-title"><i class="fa-solid fa-route"></i> Routing rules</h3>
+    <div class="sp-section-body" data-routes-body><p class="settings-hint">Loading…</p></div>`;
+  container.appendChild(wrap);
+  import('../routing/routes.js').then((m) => {
+    const body = wrap.querySelector('[data-routes-body]');
+    body.innerHTML = '';
+    if (m.renderRoutesTab) m.renderRoutesTab(body);
+    else body.innerHTML = '<p class="settings-hint">Routes UI unavailable.</p>';
+  }).catch(() => {
+    wrap.querySelector('[data-routes-body]').innerHTML =
+      '<p class="settings-hint">Routes UI unavailable.</p>';
+  });
+}
+
+/** Doctor inside Settings → Models & Routing. */
+export function renderDoctorSection(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `<h3 class="sp-section-title"><i class="fa-solid fa-stethoscope"></i> Doctor</h3>
+    <div class="sp-section-body" data-doctor-body><p class="settings-hint">Loading…</p></div>`;
+  container.appendChild(wrap);
+  import('../home/home.js').then((m) => {
+    const body = wrap.querySelector('[data-doctor-body]');
+    body.innerHTML = '';
+    if (m.renderDoctor) m.renderDoctor(body);
+    else body.innerHTML = '<p class="settings-hint">Doctor unavailable.</p>';
+  }).catch(() => {
+    wrap.querySelector('[data-doctor-body]').innerHTML =
+      '<p class="settings-hint">Doctor unavailable.</p>';
+  });
+}
+
+/** Learn mode as a Settings sub-page. */
+export function renderLearnSection(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `<div class="sp-section-body" data-learn-body><p class="settings-hint">Loading…</p></div>`;
+  container.appendChild(wrap);
+  import('../learn/learn.js').then((m) => {
+    const body = wrap.querySelector('[data-learn-body]');
+    body.innerHTML = '';
+    if (m.renderLearnTab) m.renderLearnTab(body);
+    else body.innerHTML = '<p class="settings-hint">Learn unavailable.</p>';
+  }).catch(() => {
+    wrap.querySelector('[data-learn-body]').innerHTML =
+      '<p class="settings-hint">Learn unavailable.</p>';
+  });
+}
+
+/** Analytics as a Settings sub-page. */
+export function renderInsightsSection(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `<div class="sp-section-body" data-insights-body><p class="settings-hint">Loading…</p></div>`;
+  container.appendChild(wrap);
+  import('../analytics/analytics.js').then((m) => {
+    const body = wrap.querySelector('[data-insights-body]');
+    body.innerHTML = '';
+    if (m.renderAnalyticsTab) m.renderAnalyticsTab(body);
+    else body.innerHTML = '<p class="settings-hint">Analytics unavailable.</p>';
+  }).catch(() => {
+    wrap.querySelector('[data-insights-body]').innerHTML =
+      '<p class="settings-hint">Analytics unavailable.</p>';
+  });
+}
+
+/**
+ * D3: quality / de-slop preview (POST /quality/preview had no frontend).
+ * Lives in Settings → Output style & Quality.
+ */
+export function renderQualityPreview(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `
+    <h3 class="sp-section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> De-slop preview</h3>
+    <p class="settings-hint">Paste text to see what the no-slop cleanup would change — before it ever touches your chats.</p>
+    <div class="sp-section-body">
+      <textarea class="provider-key-input" data-qp-input rows="5" style="width:100%;box-sizing:border-box"
+        placeholder="Paste AI-generated text here…" aria-label="Text to preview"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-primary btn-sm" type="button" data-qp-run>Preview cleanup</button>
+      </div>
+      <div data-qp-out style="margin-top:8px"></div>
+    </div>`;
+  container.appendChild(wrap);
+  const input = wrap.querySelector('[data-qp-input]');
+  const out = wrap.querySelector('[data-qp-out]');
+  wrap.querySelector('[data-qp-run]').addEventListener('click', async () => {
+    const text = input.value.trim();
+    if (!text) { showToast({ type: 'info', title: 'Paste some text first' }); return; }
+    out.innerHTML = '<p class="settings-hint">Cleaning…</p>';
+    try {
+      const data = await (await apiFetch('/quality/preview', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })).json();
+      const cleaned = data.cleaned ?? data.preview ?? '';
+      const changed = data.changed ?? (cleaned !== text);
+      out.innerHTML = changed
+        ? `<h4>Cleaned</h4><pre class="lib-skill-md">${escapeHtml(cleaned)}</pre>`
+        : '<p class="settings-hint">No slop detected — text is already clean.</p>';
+    } catch (err) {
+      out.innerHTML = `<p class="team-error">Preview failed: ${escapeHtml(err?.message || String(err))}</p>`;
+    }
+  });
+}

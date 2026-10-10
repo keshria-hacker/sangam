@@ -9,14 +9,7 @@ import { initElements as initModelsElements, loadProvidersAndModels, renderModel
 import { openSettings } from './features/settings/open.js';
 import { applyAppearance, initAppearance } from './features/settings/appearance.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
-import { renderSkillsTab } from './features/skills/skills.js';
-import { renderTeamsTab } from './features/teams/teams.js';
-import { renderLearnTab } from './features/learn/learn.js';
-import { renderAnalyticsTab } from './features/analytics/analytics.js';
-import { renderImageTab } from './features/image/image.js';
-import { renderCodeAgentTab } from './features/code-agent/code-agent.js';
-import { renderDesignTab } from './features/design/design-studio.js';
-import { initTabs, openToolTab, showTool, registerTabRenderer } from './features/tabs/tabs.js';
+import { initTabs, openToolTab, showTool, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
 import { trapFocus } from './shared/focus_trap.js';
 import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';
@@ -334,7 +327,7 @@ function setupGlobalNamespace() {
     closeMobileSidebar,
     toggleSidebarCollapse,
     // Skills
-    openSkillsTab: () => showTool('skills'),
+    openSkillsTab: () => showToolSub('library', 'data-libtab', 'skills'),
     // Auth
     initializeAuth,
     // Utils
@@ -435,13 +428,9 @@ async function init() {
   initPopovers();
   initTray();
   initInspector();
-  registerTabRenderer('skills', renderSkillsTab);
-  registerTabRenderer('teams', renderTeamsTab);
-  registerTabRenderer('learn', renderLearnTab);
-  registerTabRenderer('analytics', renderAnalyticsTab);
-  registerTabRenderer('images', renderImageTab);
-  registerTabRenderer('code', renderCodeAgentTab);
-  registerTabRenderer('design', renderDesignTab);
+  // Phase 8 B7: only the 7 merged pages have renderers. Teams/Compare are
+  // Agents sub-views; Skills is a Library sub-view; Images/Voice/Design are
+  // Create sub-views; Routes/Learn/Analytics live in Settings.
   registerTabRenderer('home', async (bodyEl) => {
     const { renderHome } = await import('./features/home/home.js');
     renderHome(bodyEl);
@@ -455,8 +444,8 @@ async function init() {
     renderKnowledgeTab(bodyEl);
   });
   registerTabRenderer('agents', async (bodyEl) => {
-    const { renderAgentHub } = await import('./features/agents/hub.js');
-    renderAgentHub(bodyEl);
+    const { renderAgentsPage } = await import('./features/agents/hub.js');
+    renderAgentsPage(bodyEl);
   });
   registerTabRenderer('create', async (bodyEl) => {
     const { renderCreateHub } = await import('./features/create/hub.js');
@@ -466,22 +455,11 @@ async function init() {
     const { renderLibrary } = await import('./features/library/library.js');
     renderLibrary(bodyEl);
   });
-  registerTabRenderer('routes', async (bodyEl) => {
-    const { renderRoutesTab } = await import('./features/routing/routes.js');
-    renderRoutesTab(bodyEl);
+  registerTabRenderer('code', async (bodyEl) => {
+    const { renderCodePage } = await import('./features/code-agent/code-agent.js');
+    renderCodePage(bodyEl);
   });
-  registerTabRenderer('automations', async (bodyEl) => {
-    const { renderAutomations } = await import('./features/automations/ui.js');
-    renderAutomations(bodyEl);
-  });
-  registerTabRenderer('compare', async (bodyEl) => {
-    const { renderCompareTab } = await import('./features/compare/compare.js');
-    renderCompareTab(bodyEl);
-  });
-  registerTabRenderer('voice', async (bodyEl) => {
-    const { renderVoiceStudio } = await import('./features/voice/studio.js');
-    renderVoiceStudio(bodyEl);
-  });
+
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);
