@@ -187,6 +187,9 @@ test.describe.serial('Smoke (required gate)', () => {
     await page.waitForTimeout(8000);
     const dbgHtml = await page.locator('#messages').innerHTML();
     console.log('MESSAGES LEN:', dbgHtml.length, 'HAS REPLY:', dbgHtml.includes('Smoke test reply'));
+    // Find assistant messages
+    const assistantHtml = await page.locator('.msg.assistant').innerHTML().catch(() => 'none');
+    console.log('ASSISTANT HTML:', assistantHtml.slice(0, 300));
     try {
       await expect(page.locator('#messages')).toContainText('Smoke test reply', { timeout: 30000 });
     } catch (e) {
