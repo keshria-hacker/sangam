@@ -26,6 +26,13 @@
 
 <!-- App styles (cache-busting v3 for Paper/Ink design system) -->
 <link rel="stylesheet" href="css/style.css?v=7">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#121315">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body data-code-theme="github-dark">
 <a href="#messages" class="skip-link">Skip to conversation</a>
@@ -98,15 +105,19 @@ if (location.protocol === 'file:') {
         <input type="text" id="searchChats" placeholder="Search chats…" autocomplete="off">
       </div>
 
+      <nav class="rail-nav" id="railNav" aria-label="Studio navigation">
+        <!-- Populated by core/nav.js -->
+      </nav>
+
       <nav class="chat-history" id="chatHistory" aria-label="Chat history">
         <!-- Populated by JS -->
       </nav>
 
       <div class="sidebar-footer">
-        <button class="sidebar-footer-btn" id="settingsBtn" title="Open settings — providers, appearance, account">
-          <i class="fa-solid fa-sliders"></i>
-          <span>Settings</span>
-        </button>
+        <a class="sidebar-footer-btn star-btn" href="https://github.com/keshria-hacker/sangam" target="_blank" rel="noopener" title="Star Sangam on GitHub">
+          <i class="fa-brands fa-github"></i>
+          <span>Star</span>
+        </a>
         <div class="profile-section" id="profileSection" role="button" tabindex="0" aria-label="Open profile menu" title="Open profile menu">
           <div class="profile-avatar" id="profileAvatar">N</div>
           <div class="profile-meta">
@@ -148,6 +159,17 @@ if (location.protocol === 'file:') {
   <!-- ============ MAIN ============ -->
   <main class="main-panel">
 
+    <!-- ============ TAB STRIP (browser-like) ============ -->
+    <div class="tab-strip" id="tabStrip" role="tablist" aria-label="Open tabs">
+      <div class="tab tab-pinned tab-active" id="mainTab" role="tab" aria-selected="true" data-tab-id="main">
+        <i class="fa-solid fa-message"></i><span>Chat</span>
+      </div>
+      <div class="tab-list" id="toolTabList"></div>
+    </div>
+
+    <!-- Chat view (main tab) -->
+    <div class="chat-view" id="chatView">
+
     <!-- Top bar -->
     <header class="topbar">
       <button class="icon-btn expand-btn hidden" id="expandSidebar" title="Expand sidebar" aria-label="Expand sidebar">
@@ -160,7 +182,6 @@ if (location.protocol === 'file:') {
           <span class="model-name">Loading models…</span>
           <span class="model-provider">Checking providers</span>
           <span class="status-dot offline" title="Not linked"></span>
-          <span class="reasoning-effort hidden" id="reasoningEffortIndicator" aria-label="Reasoning effort"></span>
           <i class="fa-solid fa-chevron-down"></i>
         </button>
 
@@ -179,7 +200,6 @@ if (location.protocol === 'file:') {
         <span class="conn-pulse" id="connPulse" title="All linked providers reachable">
           <span class="pulse-dot"></span> Checking providers
         </span>
-        <button class="icon-btn" id="skillsBtn" title="Skills & tools" aria-label="Skills and tools"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
         <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
           <i class="fa-solid fa-moon"></i>
         </button>
@@ -229,7 +249,7 @@ if (location.protocol === 'file:') {
               <span>Explain temperature vs. token limit</span>
             </button>
           </div>
-          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> New chat · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Ctrl+Shift+W</kbd> Toggle web search · <kbd>Ctrl+Enter</kbd> Send</p>
+          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> New chat · <kbd>Ctrl+P</kbd> Commands · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Ctrl+Shift+W</kbd> Toggle web search · <kbd>Ctrl+Enter</kbd> Send</p>
         </div>
 
         <!-- Messages render here -->
@@ -285,6 +305,16 @@ if (location.protocol === 'file:') {
           <button class="icon-btn composer-attach" id="attachBtn" title="Attach files" aria-label="Attach files">
             <i class="fa-solid fa-paperclip"></i>
           </button>
+          <button class="icon-btn hidden" id="micBtn" title="Dictate (speech to text)" aria-label="Dictate message">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+          <span class="dict-timer hidden" id="dictTimer" aria-label="Recording time">0s</span>
+          <button class="icon-btn hidden dict-cancel" id="dictCancelBtn" title="Cancel dictation (discard)" aria-label="Cancel dictation">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+          <button class="icon-btn hidden" id="imageBtn" title="Generate image" aria-label="Generate image">
+            <i class="fa-solid fa-image"></i>
+          </button>
           <input type="file" id="fileInput" multiple hidden
             accept=".pdf,.docx,.txt,.csv,.xlsx,.pptx,.json,.html,.xml,.py,.java,.js,.c,.cpp,.cs,.go,.rs,.php,.sql,.r">
 
@@ -303,256 +333,46 @@ if (location.protocol === 'file:') {
         </div>
 
         <div class="composer-controls">
-          <button class="pill-control" id="tempControl">
-            <i class="fa-solid fa-temperature-half"></i>
-            <span>Temp <b id="tempValue">0.7</b></span>
-          </button>
-          <div class="temp-popover hidden" id="tempPopover">
-            <label for="tempSlider">Temperature <span id="tempPopoverValue">0.7</span></label>
-            <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7">
-            <div class="temp-scale"><span>Precise</span><span>Balanced</span><span>Creative</span></div>
-          </div>
-
-          <div class="composer-select" id="tokenSelect">
-            <i class="fa-solid fa-hashtag"></i>
-            <button class="select-btn" id="tokenBtn" aria-label="Max output tokens">
-              <span id="tokenLabel">1,024</span>
-              <i class="fa-solid fa-chevron-down"></i>
+          <div class="composer-popover-wrap">
+            <button class="pill-control" id="modeBtn" title="Composer mode" aria-haspopup="true">
+              <i class="fa-solid fa-comment"></i><span>Chat</span><i class="fa-solid fa-chevron-down"></i>
             </button>
-            <div class="select-dropdown hidden" id="tokenDropdown">
-              <button type="button" data-value="512">512</button>
-              <button type="button" data-value="1024" class="selected">1,024</button>
-              <button type="button" data-value="2048">2,048</button>
-              <button type="button" data-value="4096">4,096</button>
-              <button type="button" data-value="8192">8,192</button>
-            </div>
+            <div class="composer-popover hidden" id="modePopover" role="menu"></div>
           </div>
-
-          <!-- Agentic Reasoning Panel -->
-          <div class="agentic-reasoning-panel hidden" id="agenticReasoningPanel">
-            <div class="panel-header">
-              <i class="fa-solid fa-brain"></i>
-              <span>Agentic Reasoning</span>
-            </div>
-            <div class="panel-content">
-              <p class="panel-description">
-                When enabled, your message will be processed with reasoning and tool use
-                before being sent to the AI model. This allows for web search, file operations,
-                and code execution to enhance your request.
-              </p>
-              <div class="panel-settings">
-                <div class="setting-row">
-                  <label class="setting-label">Max Iterations:</label>
-                  <select id="agenticReasoningIterations">
-                    <option value="1">1</option>
-                    <option value="2" selected>2</option>
-                    <option value="3">3</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
-                <div class="setting-row">
-                  <label class="setting-label">Tools:</label>
-                  <div class="tool-checkboxes">
-                    <label><input type="checkbox" checked> Web Search</label>
-                    <label><input type="checkbox" checked> File Operations</label>
-                    <label><input type="checkbox"> Code Execution</label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="composer-select" id="reasoningSelect" title="Reasoning effort (supported by OpenAI o-series and other reasoning models)">
-            <i class="fa-solid fa-brain"></i>
-            <button class="select-btn" id="reasoningBtn" aria-label="Reasoning effort">
-              <span id="reasoningLabel">Medium</span>
-              <i class="fa-solid fa-chevron-down"></i>
+          <div class="composer-popover-wrap">
+            <button class="pill-control" id="toolsBtn" title="Tools for this message" aria-haspopup="true">
+              <i class="fa-solid fa-wrench"></i><span>Tools</span><i class="fa-solid fa-chevron-down"></i>
             </button>
-            <div class="select-dropdown hidden" id="reasoningDropdown">
-              <button type="button" data-value="none">Auto</button>
-              <button type="button" data-value="low">Low</button>
-              <button type="button" data-value="medium" class="selected">Medium</button>
-              <button type="button" data-value="high">High</button>
-              <button type="button" data-value="extra_high">Extra High</button>
-            </div>
+            <div class="composer-popover hidden" id="toolsPopover" role="menu"></div>
           </div>
-
-          <button class="pill-control toggle-pill" id="webSearchToggle" title="Enable web search for this message" aria-pressed="false">
-            <i class="fa-solid fa-globe"></i>
-            <span>Web</span>
-          </button>
-
-          <button class="pill-control toggle-pill" id="agenticReasoningToggle" title="Enable agentic reasoning for this message" aria-pressed="false">
-            <i class="fa-solid fa-brain"></i>
-            <span>Reason</span>
-          </button>
+          <div class="composer-popover-wrap">
+            <button class="pill-control" id="tuneBtn" title="Tune generation" aria-haspopup="true">
+              <i class="fa-solid fa-sliders"></i><span>Tune</span><i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div class="composer-popover hidden" id="tunePopover" role="menu"></div>
+          </div>
 
           <span class="composer-hint" id="composerHint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to send</span>
           <span class="token-counter" id="tokenCounter" title="Estimated token count"></span>
         </div>
       </div>
     </div>
+    </div><!-- /chat-view -->
+
+    <!-- Tool tab view -->
+    <div class="tool-view hidden" id="toolView">
+      <div class="tool-view-header" id="toolViewHeader">
+        <h2 id="toolViewTitle">Tool</h2>
+        <button class="icon-btn ghost" id="toolViewClose" title="Close tab" aria-label="Close tab">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="tool-view-body" id="toolViewBody"></div>
+    </div>
 
   </main>
 </div>
 
-<!-- ============ SETTINGS MODAL ============ -->
-<div class="modal-overlay hidden" id="settingsOverlay">
-  <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <div class="modal-header">
-      <h2 id="settingsTitle"><i class="fa-solid fa-sliders"></i> Settings</h2>
-      <button class="icon-btn ghost" id="closeSettings" aria-label="Close settings"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-
-    <div class="settings-tabs" role="tablist" aria-label="Settings categories">
-      <button class="settings-tab active" role="tab" aria-selected="true" data-tab="general"><i class="fa-solid fa-sliders"></i> General</button>
-      <button class="settings-tab" role="tab" aria-selected="false" data-tab="providers"><i class="fa-solid fa-cloud"></i> Providers</button>
-    </div>
-
-    <div class="settings-body">
-
-      <!-- General tabpanel (Backend + Appearance) -->
-      <div class="settings-tabpanel" role="tabpanel" data-tabpanel="general">
-        <!-- Connection section -->
-        <section class="settings-section">
-          <h3>Connection</h3>
-          <div class="setting-row">
-            <div class="setting-label">
-              <span>Backend URL</span>
-              <small>Where the FastAPI server is running</small>
-            </div>
-            <div class="setting-control">
-              <input type="text" id="backendUrlInput" class="input-mono" placeholder="http://127.0.0.1:8001/api">
-              <button class="btn-secondary" id="testBackendBtn" type="button"><i class="fa-solid fa-plug"></i> Test</button>
-              <span id="backendTestResult" class="backend-test-result"></span>
-            </div>
-          </div>
-        </section>
-
-          <section class="settings-section">
-            <h3>Appearance</h3>
-
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Theme</span>
-                <small>Choose how Sangam looks on this device</small>
-              </div>
-              <div class="theme-options" id="themeOptions">
-                <button class="theme-option active" data-theme="dark"><i class="fa-solid fa-moon"></i> Dark</button>
-                <button class="theme-option" data-theme="light"><i class="fa-solid fa-sun"></i> Light</button>
-                <button class="theme-option" data-theme="system"><i class="fa-solid fa-display"></i> System</button>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Font size</span>
-                <small>Adjust the size of message text</small>
-              </div>
-              <div class="segmented" id="fontSizeSegmented">
-                <button data-size="sm">Small</button>
-                <button data-size="md" class="active">Medium</button>
-                <button data-size="lg">Large</button>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Chat width</span>
-                <small>How wide the conversation column is</small>
-              </div>
-              <div class="segmented" id="chatWidthSegmented">
-                <button data-width="narrow">Narrow</button>
-                <button data-width="default" class="active">Default</button>
-                <button data-width="wide">Wide</button>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Code block theme</span>
-                <small>Syntax highlighting style</small>
-              </div>
-              <div class="pill-control select-wrap">
-                <i class="fa-solid fa-code"></i>
-                <select id="codeThemeSelect">
-                  <option value="github-dark">GitHub Dark</option>
-                  <option value="atom-one-dark">Atom One Dark</option>
-                  <option value="nord">Nord</option>
-                  <option value="dracula">Dracula</option>
-                  <option value="github">GitHub Light</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Interface animations</span>
-                <small>Message transitions, typing indicator, hover effects</small>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="animationToggle" checked>
-                <span class="switch-track"><span class="switch-thumb"></span></span>
-              </label>
-            </div>
-          </section>
-
-          <!-- Response style (Phase 4 — persisted server-side per user) -->
-          <section class="settings-section">
-            <h3>Response style</h3>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Answer length</span>
-                <small>Saved to your account — applies to every chat</small>
-              </div>
-              <div class="segmented" id="responseStyleSegmented">
-                <button data-style="concise">Concise</button>
-                <button data-style="balanced" class="active">Balanced</button>
-                <button data-style="detailed">Detailed</button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Tone</span>
-                <small>How formal replies should read</small>
-              </div>
-              <div class="segmented" id="formalitySegmented">
-                <button data-tone="casual">Casual</button>
-                <button data-tone="neutral" class="active">Neutral</button>
-                <button data-tone="formal">Formal</button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Technical depth</span>
-                <small>Match answers to your expertise</small>
-              </div>
-              <div class="segmented" id="expertiseSegmented">
-                <button data-expertise="beginner">Beginner</button>
-                <button data-expertise="general" class="active">General</button>
-                <button data-expertise="expert">Expert</button>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <!-- Providers tabpanel (Status + API Keys) -->
-        <div class="settings-tabpanel" role="tabpanel" data-tabpanel="providers" hidden>
-          <section class="settings-section">
-            <h3>Providers</h3>
-            <div class="provider-status-list" id="providerStatusList"><!-- Populated by JS --></div>
-          </section>
-
-          <!-- Provider API Keys -->
-          <section class="settings-section">
-            <h3>API Keys</h3>
-            <div id="providerKeyManager"><!-- Populated by JS --></div>
-          </section>
-        </div>
-
-      </div>
-    </div>
-  </div>
 
 <!-- ============ CONFIRM DIALOG ============ -->
 <div class="confirm-overlay hidden" id="confirmOverlay">
@@ -652,43 +472,6 @@ if (location.protocol === 'file:') {
   </div>
 </div>
 
-<!-- ============ SKILLS MODAL ============ -->
-<div class="modal-overlay hidden" id="skillsOverlay">
-  <div class="modal skills-modal" role="dialog" aria-modal="true" aria-labelledby="skillsModalTitle">
-    <div class="modal-header">
-      <h2 id="skillsModalTitle"><i class="fa-solid fa-wand-magic-sparkles"></i> Skills</h2>
-      <button class="icon-btn ghost close-skills-btn" id="closeSkills" aria-label="Close skills"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="skills-layout">
-      <div class="skills-sidebar">
-        <div class="skills-search-wrap">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="skillsSearch" placeholder="Search skills…" autocomplete="off">
-        </div>
-        <div class="skills-categories" id="skillsCategories">
-          <button type="button" data-category="all" class="active">All</button>
-          <button type="button" data-category="engineering">Engineering</button>
-          <button type="button" data-category="knowledge">Knowledge</button>
-          <button type="button" data-category="productivity">Productivity</button>
-          <button type="button" data-category="design">Design</button>
-          <button type="button" data-category="system">System</button>
-          <button type="button" data-category="behavioral">Behavioral</button>
-        </div>
-        <div class="skills-invocations" id="skillsInvocations">
-          <button type="button" data-invocation="all" class="active">All triggers</button>
-          <button type="button" data-invocation="user">Manual</button>
-          <button type="button" data-invocation="auto">Auto</button>
-        </div>
-      </div>
-      <div class="skills-list" id="skillsList">
-        <div class="no-results">Loading skills…</div>
-      </div>
-      <div class="skills-detail" id="skillsDetail">
-        <div class="no-results">Select a skill from the list to see its details.</div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- ============ SHORTCUTS MODAL ============ -->
 <div class="modal-overlay hidden" id="shortcutsOverlay">
@@ -724,5 +507,5 @@ if (location.protocol === 'file:') {
 </script>
 
 <!-- App (ES modules) — ?v=YYYYMMDD cache-bust prevents stale module graph -->
-<script type="module" src="js/app.js?v=20260816"></script>
+<script type="module" src="js/app.js?v=20261010"></script>
 </html>

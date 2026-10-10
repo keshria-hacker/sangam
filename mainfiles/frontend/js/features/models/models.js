@@ -7,7 +7,7 @@ import { showToast } from '../../shared/toast.js';
 import { escapeHtml, bucketFor } from '../../shared/utils.js';
 import {
   getProviders, setProviders, getModels, setModels, getSelectedModel, setSelectedModel,
-  getActiveProviderFilter, setActiveProviderFilter, getReasoningEffort
+  getActiveProviderFilter, setActiveProviderFilter
 } from '../../core/state.js';
 import { PROVIDER_COLORS } from '../../shared/constants.js';
 
@@ -156,7 +156,7 @@ export function renderModelList(filter = '') {
     list.innerHTML = `<div class="no-results">No selectable models yet.<br><button class="btn-secondary" type="button" id="openProviderSettingsBtn">Link a provider key or start Ollama</button></div>`;
     $('#openProviderSettingsBtn')?.addEventListener('click', () => {
       closeModelDropdown();
-      import('../features/settings/settings.js').then((m) => m.openSettings());
+      import('../features/settings/open.js').then((m) => m.openSettings());
     });
     return;
   }
@@ -236,6 +236,8 @@ export function renderProviderFilters() {
 export function selectModel(model, opts = {}) {
   if (!model) return;
   setSelectedModel(model);
+  // Notify listeners (e.g. Think mode gating on reasoning capability)
+  window.dispatchEvent(new CustomEvent('sangam:model-changed', { detail: { model } }));
   const info = getProviderInfo(model.provider);
   elements.modelSelectorBtn.querySelector('.provider-dot').style.setProperty('--dot-color', info.color);
   elements.modelSelectorBtn.querySelector('.model-name').textContent = model.name;
@@ -251,20 +253,8 @@ export function selectModel(model, opts = {}) {
   statusEl.className = `status-dot ${info.state}`;
   statusEl.title = info.state === 'online' ? 'Connected' : info.state === 'local' ? 'Local runtime' : 'Not linked';
 
-  // Update reasoning effort indicator
-  const reasoningEl = elements.modelSelectorBtn.querySelector('.reasoning-effort');
-  const effort = getReasoningEffort();
-  const hasReasoning = effort !== 'none';
-
-  if (reasoningEl) {
-    if (hasReasoning) {
-      const labels = { low: 'Low', medium: 'Medium', high: 'High', extra_high: 'Extra High' };
-      reasoningEl.innerHTML = `<i class="fa-solid fa-brain"></i> ${labels[effort] || effort}`;
-      reasoningEl.classList.remove('hidden');
-    } else {
-      reasoningEl.classList.add('hidden');
-    }
-  }
+  // Phase 8 B4: model-selector reasoning badge removed — reasoning effort
+  // lives in Tune only.
 
   const sendBtn = document.getElementById('sendBtn');
   if (sendBtn) sendBtn.disabled = false;
@@ -317,7 +307,7 @@ export function renderConnPulse() {
 /**
  * Render provider status list in sidebar.
  */
-export function renderProviderStatusList() {
+export async function renderProviderStatusList() {
   const list = elements.providerStatusList;
   if (!list) return;
 
@@ -327,12 +317,34 @@ export function renderProviderStatusList() {
     return;
   }
 
-  list.innerHTML = providers.map((p) => `
+  // Phase 7: fetch circuit breaker + quota states
+  let chainStates = {};
+  try {
+    const data = await (await apiFetch('/providers/status')).json();
+    chainStates = data.providers || {};
+  } catch { /* ignore */ }
+
+  list.innerHTML = providers.map((p) => {
+    const cs = chainStates[p.id];
+    let healthBadge = '';
+    if (cs) {
+      if (cs.circuit === 'open') {
+        healthBadge = `<span class="provider-health provider-health-open" title="Circuit open — cooling down">cooldown</span>`;
+      } else if (cs.circuit === 'half_open') {
+        healthBadge = `<span class="provider-health provider-health-half" title="Testing recovery">recovering</span>`;
+      }
+      if (cs.quota && cs.quota.remaining === 0) {
+        healthBadge += ` <span class="provider-health provider-health-quota" title="Hourly quota exhausted">quota</span>`;
+      }
+    }
+    return `
     <div class="provider-status-row">
       <span class="provider-dot" style="--dot-color:${PROVIDER_COLORS[p.id] || '#9AA1AC'}"></span>
       <span class="provider-label">${escapeHtml(p.label)}</span>
       <span class="provider-state ${p.state}">${p.state === 'online' ? 'Connected' : p.state === 'local' ? 'Local runtime' : ''}</span>
-    </div>`).join('');
+      ${healthBadge}
+    </div>`;
+  }).join('');
 }
 
 /**
@@ -340,6 +352,9 @@ export function renderProviderStatusList() {
  */
 export function initModelSelector() {
   initElements();
+
+  // Refresh model list when OmniRoute (or another source) syncs new models
+  window.addEventListener('sangam:models-changed', () => { loadProvidersAndModels(); });
 
   elements.modelSelectorBtn?.addEventListener('click', (e) => {
     e.stopPropagation();

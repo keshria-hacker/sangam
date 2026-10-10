@@ -13,7 +13,8 @@ import {
   getLastUserText, setLastUserText, getIsGenerating, setIsGenerating,
   getAbortController, setAbortController, getWebSearchEnabled, setWebSearchEnabled,
   getMaxTokens, getReasoningEffort, getTemperature,
-  getAgenticReasoningEnabled, setAgenticReasoningEnabled,
+  getAgentModeEnabled, setAgentModeEnabled,
+  getThinkingDisplay,
   getChats, setChats,
   resetChatState
 } from '../../core/state.js';
@@ -26,6 +27,7 @@ import {
   showToolCallInNode,
   showCitationInNode,
   showArtifactInNode,
+  showMediaInNode,
   bindChatActions,
 } from './message_view.js';
 import {
@@ -73,22 +75,7 @@ export function initElements() {
     messageInput: $('#messageInput'),
     sendBtn: $('#sendBtn'),
     stopBtn: $('#stopBtn'),
-    webSearchToggle: $('#webSearchToggle'),
-    agenticReasoningToggle: $('#agenticReasoningToggle'),
-    agenticReasoningPanel: $('#agenticReasoningPanel'),
-    tempControl: $('#tempControl'),
-    tempPopover: $('#tempPopover'),
-    tempSlider: $('#tempSlider'),
-    tempValue: $('#tempValue'),
-    tempPopoverValue: $('#tempPopoverValue'),
-    tokenBtn: $('#tokenBtn'),
-    tokenLabel: $('#tokenLabel'),
-    tokenDropdown: $('#tokenDropdown'),
-    tokenSelect: $('#tokenSelect'),
-    reasoningBtn: $('#reasoningBtn'),
-    reasoningLabel: $('#reasoningLabel'),
-    reasoningDropdown: $('#reasoningDropdown'),
-    reasoningSelect: $('#reasoningSelect'),
+    // Phase 8 B4: temp/token/reasoning pills removed — Tune popover owns them.
   };
 }
 
@@ -148,8 +135,11 @@ export function renderFileChips() {
     const info = FILE_ICON_MAP[f.ext] || { icon: 'fa-file', color: '#9AA1AC' };
     const chip = document.createElement('div');
     chip.className = 'file-chip';
+    const thumb = f.imageUrl
+      ? `<img class="file-chip-thumb" src="${escapeHtml(f.imageUrl)}" alt="">`
+      : `<span class="file-chip-icon" style="background:${info.color}"><i class="fa-solid ${f.uploading ? 'fa-spinner fa-spin' : info.icon}"></i></span>`;
     chip.innerHTML = `
-      <span class="file-chip-icon" style="background:${info.color}"><i class="fa-solid ${f.uploading ? 'fa-spinner fa-spin' : info.icon}"></i></span>
+      ${thumb}
       <span class="file-chip-info">
         <span class="file-chip-name">${escapeHtml(f.name)}</span>
         <span class="file-chip-size">${f.uploading ? 'Uploading…' : formatBytes(f.size)}</span>
@@ -228,57 +218,28 @@ export async function handleSend() {
     return;
   }
 
+  // New send stops any voice I/O (speech or dictation)
+  document.dispatchEvent(new CustomEvent('sangam:before-send'));
+
   elements.welcomeScreen?.classList.add('hidden');
 
-  // Process user message with agentic reasoning if enabled
-  let processedContent = text;
-  let toolResults = [];
-  if (getAgenticReasoningEnabled()) {
-    try {
-      // Show thinking indicator
-      showToast({ type: 'info', title: 'Agentic Reasoning', message: 'Enhancing your request with reasoning and tool use...' });
-
-      // Call the backend agentic reasoning endpoint — pass the panel's
-      // iteration limit and the checked tool groups so the backend honours them.
-      const panel = elements.agenticReasoningPanel;
-      const maxIterations = Number(panel?.querySelector('#agenticReasoningIterations')?.value) || 2;
-      const tools = panel
-        ? [...panel.querySelectorAll('.tool-checkboxes input:checked')]
-            .map((el) => {
-              const label = el.parentElement?.textContent?.trim().toLowerCase() || '';
-              if (label.includes('web')) return 'web_search';
-              if (label.includes('file')) return 'file_operations';
-              if (label.includes('code')) return 'code_execution';
-              return '';
-            })
-            .filter(Boolean)
-        : [];
-
-      const response = await apiPost('/agentic-reasoning', {
-        message: text,
-        model: getSelectedModel()?.id || '',
-        chat_id: getActiveChatId(),
-        max_iterations: maxIterations,
-        tools,
-      });
-
-      if (response.reasoning_used) {
-        processedContent = response.enhanced_message || text;
-        toolResults = response.tool_results || [];
-        console.log('[Agentic Reasoning] Enhanced response:', processedContent);
-        console.log('[Agentic Reasoning] Tool results:', toolResults);
-        showToast({ type: 'success', title: 'Agentic Reasoning', message: `Enhanced with ${toolResults.length} tool(s)` });
-      } else {
-        showToast({ type: 'info', title: 'Agentic Reasoning', message: 'No enhancement needed' });
+  // Routing: check if a rule matches this message (backend evaluation)
+  try {
+    const { evaluateRoutes } = await import('../routing/routes.js');
+    const routedModel = await evaluateRoutes(text);
+    if (routedModel) {
+      const { getModels } = await import('../models/models.js');
+      const match = getModels().find((m) => m.id === routedModel);
+      if (match) {
+        const { selectModel } = await import('../models/models.js');
+        selectModel(match);
+        showToast({ type: 'info', title: 'Routed', message: `Using ${match.name} (routing rule)` });
       }
-    } catch (error) {
-      console.error('[Agentic Reasoning] Error:', error);
-      showToast({ type: 'warning', title: 'Agentic Reasoning', message: 'Reasoning enhancement failed, proceeding with original request.' });
-      processedContent = text;
     }
-  }
+  } catch {}
 
-  const userMsg = { role: 'user', content: processedContent || '(Sent with attached files)', created_at: new Date().toISOString() };
+  const agentMode = getAgentModeEnabled();
+  const userMsg = { role: 'user', content: text || '(Sent with attached files)', created_at: new Date().toISOString() };
   setMessages([...getMessages(), userMsg]);
   elements.messages?.appendChild(buildMessageNode(userMsg));
   setLastUserText(userMsg.content);
@@ -292,6 +253,46 @@ export async function handleSend() {
   setFollowingStream(true); // a new send re-engages auto-following
   updateJumpBtn();
   scrollToBottom(true);
+
+  if (agentMode) {
+    setIsGenerating(true);
+    setSendButtonState(true);
+    const { runAgentGeneration } = await import('./agent_mode.js');
+    await runAgentGeneration({
+      content: userMsg.content,
+      messagesEl: elements.messages,
+      scrollToBottom,
+      onDone: async (answer, stopped) => {
+        setIsGenerating(false);
+        setSendButtonState(false);
+        if (answer && !stopped) {
+          const asstMsg = { role: 'assistant', content: answer, created_at: new Date().toISOString() };
+          setMessages([...getMessages(), asstMsg]);
+          // Persist both messages via the append endpoint (create chat first if new)
+          try {
+            let chatId = getActiveChatId();
+            if (!chatId) {
+              const created = await (await apiPost('/chats', {
+                title: userMsg.content.slice(0, 60) || 'New chat',
+                model: getSelectedModel()?.id || '',
+              })).json();
+              chatId = created.id;
+              setActiveChatId(chatId);
+              const sidebarModule = await import('../sidebar/sidebar.js');
+              sidebarModule.loadChatList?.();
+            }
+            await apiPost(`/chats/${chatId}/messages`, {
+              messages: [
+                { role: 'user', content: userMsg.content },
+                { role: 'assistant', content: answer },
+              ],
+            });
+          } catch (e) { console.warn('[Agent] persist failed', e); }
+        }
+      },
+    });
+    return;
+  }
 
   runGeneration({ content: userMsg.content, fileIds, regenerate: false });
 }
@@ -354,7 +355,11 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       <div class="msg-meta"><span class="msg-author">${escapeHtml(model.name)}</span><span class="msg-provider-tag" style="color:${info.color}">${escapeHtml(info.label)}</span></div>
       <article class="assistant-response" aria-live="polite" aria-busy="true"><div class="typing-indicator" aria-label="Generating response">thinking<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></div></article>
     </div>`;
-  elements.messages?.appendChild(typingNode);
+  // Phase 8: use live DOM lookup — elements.messages may be stale after view re-mounts.
+  const messagesEl = document.getElementById('messages') || elements.messages;
+  console.log('[DEBUG] appending typingNode, messagesEl exists:', !!messagesEl);
+  messagesEl?.appendChild(typingNode);
+  console.log('[DEBUG] typingNode in DOM after append:', document.contains(typingNode));
   scrollToBottom(true);
 
   var _thinkStartTime = Date.now();
@@ -384,8 +389,9 @@ export async function runGeneration({ content, fileIds, regenerate }) {
     model: model.id,
     messages: getMessages().map(({ role, content }) => ({ role, content })),
     file_ids: fileIds,
+    media_ids: getAttachedFiles().map((f) => f.mediaId).filter(Boolean),
     temperature: getTemperature(),
-    max_tokens: parseInt(getMaxTokens(), 10),
+    max_tokens: getMaxTokens() === 'auto' ? null : parseInt(getMaxTokens(), 10),
     reasoning_effort: getReasoningEffort() === 'none' ? null : getReasoningEffort(),
     regenerate,
     web_search: getWebSearchEnabled(),
@@ -405,6 +411,9 @@ export async function runGeneration({ content, fileIds, regenerate }) {
   let toolCalls = [];
   let citations = [];
   let artifacts = [];
+  // Foundation: streamed media (image/audio) tracked the same way.
+  let media = [];
+  let currentMedia = null;
  
  try {
     const stream = await streamChatCompletion(body, controller.signal);
@@ -440,6 +449,11 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         }
 
         collected += text;
+        // Phase 8: re-attach if detached (view re-mounts during streaming).
+        if (!document.contains(typingNode)) {
+          const liveMessages = document.getElementById('messages');
+          liveMessages?.appendChild(typingNode);
+        }
         const responseEl = typingNode.querySelector('.assistant-response');
         if (responseEl) {
           // Use streaming markdown renderer for visually stable incremental updates
@@ -449,7 +463,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       },
       reasoningDelta: (text) => {
         reasoningContent += text;
-        showReasoningInNode(typingNode, reasoningContent);
+        showReasoningInNode(typingNode, reasoningContent, { thinkingState: { getThinkingDisplay } });
       },
       toolStart: (event) => {
         const toolId = event.metadata?.tool_id;
@@ -504,6 +518,27 @@ export async function runGeneration({ content, fileIds, regenerate }) {
      },
      artifactEnd: (event) => {
        // Finalize artifact if needed
+     },
+
+     // Foundation: streamed media attachments (image/audio) for voice + image-gen.
+     mediaStart: ({ kind, metadata }) => {
+       currentMedia = { id: 'stream-' + Date.now(), kind, filename: metadata?.filename || '', url: null, chunks: '' };
+       showMediaInNode(typingNode, currentMedia);
+       media.push(currentMedia);
+     },
+     mediaDelta: ({ content }) => {
+       if (currentMedia) {
+         currentMedia.chunks += content;
+         showMediaInNode(typingNode, { ...currentMedia, delta: content });
+       }
+     },
+     mediaEnd: ({ url, metadata }) => {
+       if (currentMedia) {
+         if (url) currentMedia.url = url;
+         showMediaInNode(typingNode, { ...currentMedia, url: currentMedia.url, finalize: true });
+         currentMedia = null;
+       }
+       void metadata;
      },
 
      artifactDelta: (event) => {
@@ -572,6 +607,20 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       warning: (message) => {
         if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') console.warn(message);
       },
+      messageEnd: (event) => {
+        // Phase 8: ensure the final text is in the DOM, even if the
+        // streaming node was detached during the stream.
+        try {
+          const liveMessages = document.getElementById('messages');
+          if (liveMessages && !document.contains(typingNode)) {
+            liveMessages.appendChild(typingNode);
+          }
+          const responseEl = typingNode.querySelector('.assistant-response');
+          if (responseEl && collected) {
+            responseEl.innerHTML = renderMarkdownStream(collected);
+          }
+        } catch { /* ignore */ }
+      },
     });
 
     for await (const { event, data } of parseSSE(stream)) {
@@ -581,6 +630,15 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       }
       if (event === 'chat_id') {
         newChatId = data;
+        continue;
+      }
+      if (event === 'provenance') {
+        // Phase 7: "Used in this answer" — feed the Inspector panel.
+        try {
+          const prov = JSON.parse(data);
+          const { setProvenance } = await import('../inspector/inspector.js');
+          setProvenance(prov);
+        } catch { /* ignore malformed provenance */ }
         continue;
       }
       responseController.handleSSE({ event, data });
@@ -636,7 +694,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         link.className = 'btn-secondary error-settings-link';
         link.textContent = 'Open Settings';
         link.addEventListener('click', () => {
-          import('../../features/settings/settings.js').then(m => m.openSettings());
+          import('../../features/settings/open.js').then(m => m.openSettings());
         });
         btnWrapper.appendChild(link);
       }
@@ -657,7 +715,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
         sidebarModule.loadChatList();
         const elapsedMs = Date.now() - genStartedAt;
         const elapsedSec = (elapsedMs / 1000).toFixed(1);
-        const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts };
+        const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts, media: media.map(m => ({ id: m.id, kind: m.kind, filename: m.filename, url: m.url })) };
         setMessages([...getMessages(), finalMsg]);
         // PHASE: Done — show completion time briefly, then replace with final message
         setThinkingPhase(typingNode, 'done', elapsedSec);
@@ -683,7 +741,7 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       sidebarModule.loadChatList();
       const elapsedMs = Date.now() - genStartedAt;
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
-      const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts };
+      const finalMsg = { id: responseMessageId, role: 'assistant', content: collected, model: model.id, created_at: new Date().toISOString(), response_time: parseFloat(elapsedSec), tool_calls: toolCalls, citations: citations, artifacts: artifacts, media: media.map(m => ({ id: m.id, kind: m.kind, filename: m.filename, url: m.url })) };
       setMessages([...getMessages(), finalMsg]);
       // PHASE: Done — show completion time briefly, then replace with final message
       setThinkingPhase(typingNode, 'done', elapsedSec);
@@ -693,6 +751,8 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       typingNode.replaceWith(finalNode);
       // Final render pass: ensure complete markdown with syntax highlighting
       await finalizeMarkdownRender(finalNode, collected);
+      // Voice: auto-speak the response when the user enabled it.
+      import('../voice/voice.js').then((m) => m.maybeAutoSpeak(collected)).catch(() => {});
     } else if (!sawFirstToken) {
       // Aborted before any token
       typingNode.remove();
@@ -812,34 +872,23 @@ export function initChatEvents() {
     else if (e.key === 'Enter' && e.shiftKey && window.innerWidth <= 900) { e.preventDefault(); handleSend(); }
   });
 
-  // Web search toggle
-  elements.webSearchToggle?.addEventListener('click', () => {
-    const enabled = !getWebSearchEnabled();
-    setWebSearchEnabled(enabled);
-    elements.webSearchToggle.classList.toggle('active', enabled);
-    elements.webSearchToggle.setAttribute('aria-pressed', String(enabled));
-  });
-
-  // Agentic reasoning toggle
-  elements.agenticReasoningToggle?.addEventListener('click', () => {
-    const enabled = !getAgenticReasoningEnabled();
-    setAgenticReasoningEnabled(enabled);
-    elements.agenticReasoningToggle.classList.toggle('active', enabled);
-    elements.agenticReasoningToggle.setAttribute('aria-pressed', String(enabled));
-
-    // Show/hide the agentic reasoning panel
-    if (elements.agenticReasoningPanel) {
-      elements.agenticReasoningPanel.classList.toggle('hidden', !enabled);
+  // Mode/Tools popovers (Phase 2) drive these states now
+  document.addEventListener('sangam:mode-changed', (e) => {
+    const mode = e.detail?.mode;
+    if (mode === 'research' && !getWebSearchEnabled()) setWebSearchEnabled(true);
+    if (mode === 'agent' || mode === 'code') {
+      showToast({ type: 'info', title: 'Agent mode', message: 'Agent can now use tools (web, files, code).' });
     }
   });
+  document.addEventListener('sangam:tools-changed', (e) => {
+    const tools = e.detail?.tools || [];
+    setWebSearchEnabled(tools.includes('web_search'));
+  });
 
-  // Initialize agentic reasoning toggle state
-  const agenticReasoningEnabled = getAgenticReasoningEnabled();
-  elements.agenticReasoningToggle?.classList.toggle('active', agenticReasoningEnabled);
-  elements.agenticReasoningToggle?.setAttribute('aria-pressed', String(agenticReasoningEnabled));
-  if (elements.agenticReasoningPanel) {
-    elements.agenticReasoningPanel.classList.toggle('hidden', !agenticReasoningEnabled);
-  }
+  // Initialize agent mode toggle state
+  const agentModeOn = getAgentModeEnabled();
+  elements.agentModeToggle?.classList.toggle('active', agentModeOn);
+  elements.agentModeToggle?.setAttribute('aria-pressed', String(agentModeOn));
 
   // Composer drag-drop
   const composerEl = document.getElementById('composer');

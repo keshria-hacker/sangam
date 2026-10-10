@@ -278,7 +278,9 @@ export function highlightElement(element) {
   // Only highlight if the language is supported by highlight.js
   if (SUPPORTED_LANGUAGES.has(normalizedLanguage)) {
     // Use highlight.js to highlight the code block
-    highlight.highlightElement(element);
+    if (typeof window !== 'undefined' && window.hljs) {
+      window.hljs.highlightElement(element);
+    }
   }
 }
 

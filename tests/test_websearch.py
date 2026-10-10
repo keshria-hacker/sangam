@@ -82,6 +82,12 @@ class WebSearchTests(unittest.TestCase):
 
     def test_live_web_search_returns_real_results(self):
         # Hits DuckDuckGo Lite for real; proves web search actually works.
+        # Skips cleanly when network is unavailable.
+        import socket
+        try:
+            socket.create_connection(("lite.duckduckgo.com", 443), timeout=5).close()
+        except OSError:
+            self.skipTest("Network unavailable — skipping live web search test")
         results = asyncio.run(
             backend.websearch.web_search("openai api pricing", max_results=3)
         )

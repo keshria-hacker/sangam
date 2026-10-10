@@ -6,9 +6,11 @@ endpoints consumed by the frontend Skills browser.
 """
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..database import get_db
 from .registry import InvocationType, SkillCategory, get_registry
 from .router import get_router
 
@@ -126,6 +128,43 @@ async def suggest_skills(ctx: dict):
     }
 
 
+@router.get("/packs")
+async def list_skill_packs():
+    """List all bundled skill packs with their enabled state."""
+    from .packs import list_packs
+
+    return [p.to_dict() for p in list_packs()]
+
+
+@router.post("/packs/{name}/enable")
+async def enable_skill_pack(
+    name: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Enable a skill pack (its skills become visible to the registry)."""
+    from ..analytics import events as _ae, optional_user_id, record_event as _record
+    from .packs import enable_pack
+
+    pack = enable_pack(name)
+    if pack is None:
+        raise HTTPException(404, f"Skill pack not found: {name}")
+    await _record(db, await optional_user_id(request, db), _ae.PACK_ENABLED,
+                  {"pack": name})
+    return pack.to_dict()
+
+
+@router.post("/packs/{name}/disable")
+async def disable_skill_pack(name: str):
+    """Disable a skill pack."""
+    from .packs import disable_pack
+
+    pack = disable_pack(name)
+    if pack is None:
+        raise HTTPException(404, f"Skill pack not found: {name}")
+    return pack.to_dict()
+
+
 @router.get("/{sid}")
 async def get_skill(sid: str):
     """Return full detail for a single skill, excluding the full prompt template."""
@@ -155,4 +194,23 @@ async def get_skill(sid: str):
         "tags": sk.tags,
         "src": sk.source_repo,
         "prompt": (prompt[:500] + "...") if len(prompt) > 500 else prompt,
+        "skill_md": sk.prompt_template,  # Phase 7: full SKILL.md for preview
+        "version": getattr(sk, "version", None),
+        "pinned_version": getattr(sk, "pinned_version", None),
     }
+
+
+class SkillPinIn(BaseModel):
+    version: str | None = None
+
+
+@router.post("/{sid}/pin")
+async def pin_skill_version(sid: str, payload: SkillPinIn):
+    """Pin a skill to a specific version (or unpin with null)."""
+    rg = get_registry()
+    sk = rg.get(sid)
+    if not sk:
+        raise HTTPException(404, f"Skill not found: {sid}")
+    # Store pin on the skill object (in-memory; persists for session)
+    sk.pinned_version = payload.version
+    return {"id": sid, "pinned_version": payload.version}

@@ -1,9 +1,8 @@
 """
-api_routes/chat_stream_routes.py — the chat streaming pipeline (SSE) and the
-agentic-reasoning enhancement endpoint.
+api_routes/chat_stream_routes.py — the chat streaming pipeline (SSE).
 """
 import asyncio
-import sys
+import json
 import time
 import uuid
 from datetime import UTC, datetime
@@ -21,7 +20,8 @@ from ..capability_orchestration import derive_interpretations, should_clarify
 from ..context_manager import create_context_manager
 from ..database import AsyncSessionLocal, get_db
 from ..domain import ChatMessage
-from ..memory import retrieve_memories
+from ..graph_provenance import clear_current_provenance, get_current_provenance
+from ..memory import extract_from_turn_background, recall
 from ..models import Chat, Message, UploadedFile, UserPreference
 from ..rag import TOP_K as RAG_TOP_K
 from ..rag import retrieve_relevant_chunks
@@ -42,6 +42,7 @@ from .common import (
     sse_event,
     sse_response_event,
 )
+from .media_routes import media_content_parts, resolve_media_json
 
 # SSE heartbeat interval (seconds) — keeps proxies/load-balancers from timing out
 # long-lived streaming connections during slow model generations.
@@ -54,11 +55,30 @@ async def chat_stream(  # noqa: PLR0912
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    # Phase 7: clear provenance tracker for this request.
+    clear_current_provenance()
     # Validate the model exists before allocating any resources — a fast 400
     # is much better than failing mid-stream after the chat has been created.
     model_info = llm._resolve_model(payload.model)
     if model_info is None:
         raise HTTPException(status_code=400, detail=f"Unknown model: {payload.model}")
+
+    # Prompt injection detection (warn-only mode — logs but never blocks).
+    # See backend/prompt_injection.py for the heuristic detector.
+    try:
+        from ..prompt_injection import detect_injection
+        import logging
+        _pi_logger = logging.getLogger("sangam.prompt_injection")
+        for m in payload.messages:
+            if m.role == "user" and m.content:
+                flagged, score, reasons = detect_injection(m.content)
+                if flagged:
+                    _pi_logger.warning(
+                        "Prompt injection detected (score=%.2f): %s",
+                        score, "; ".join(reasons[:3]),
+                    )
+    except Exception:
+        pass  # Detector must never break the chat flow
 
     # Optional web-search augmentation: when the client requests it, fetch live
     # results for the latest user turn and inject them as context so the model
@@ -101,16 +121,50 @@ async def chat_stream(  # noqa: PLR0912
                 file_context = "\n\n".join(
                     f"--- From {c['filename']} ---\n{c['text']}" for c in rag_chunks
                 )
+                # Phase 7: track provenance — which documents were used
+                prov = get_current_provenance()
+                for c in rag_chunks:
+                    prov.mark_used(
+                        f"doc:{c.get('file_id', c['filename'])}",
+                        "document",
+                        c['filename'],
+                        reason="RAG chunk used in context",
+                    )
             else:
                 # Fallback: use full extracted text
                 file_context = "\n\n".join(
                     f"--- {f.filename} ---\n{f.extracted_text}" for f in files if f.extracted_text
                 )
+                prov = get_current_provenance()
+                for f in files:
+                    if f.extracted_text:
+                        prov.mark_used(f"doc:{f.id}", "document", f.filename,
+                                       reason="Full document text used in context")
             if file_context:
                 messages[-1]["content"] = f"{messages[-1]['content']}\n\n[Attached files]\n{file_context}"
     if web_context and messages:
         # Inject as a system message so the model sees the sources.
         messages.insert(0, {"role": "system", "content": web_context})
+
+    # 2b. Media attachments (image/audio). Persisted on the user message as
+    #     media_json; vision-capable models additionally receive OpenAI-style
+    #     content_parts, other models get a textual note so nothing breaks.
+    user_media_json = resolve_media_json(getattr(payload, "media_ids", None))
+    if user_media_json and messages:
+        last_user_idx = next(
+            (i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"),
+            None,
+        )
+        if last_user_idx is not None:
+            parts = media_content_parts(user_media_json, messages[last_user_idx]["content"])
+            vision = bool(getattr(getattr(model_info, "capabilities", None), "vision", False))
+            if parts and vision:
+                messages[last_user_idx]["content_parts"] = parts
+            else:
+                names = ", ".join(
+                    a.get("filename", "?") for a in json.loads(user_media_json)
+                )
+                messages[last_user_idx]["content"] += f"\n\n[Attached media: {names}]"
 
     # --- Phase 6: Response Intelligence ---
     # Analyze request and inject guidance as system prompt additions.
@@ -187,6 +241,7 @@ async def chat_stream(  # noqa: PLR0912
                             role="user",
                             content=payload.messages[-1].content,
                             file_ids=",".join(payload.file_ids) or None,
+                            media_json=user_media_json,
                         ))
                         await clarify_db.commit()
                     # Lifecycle: message_start must precede any content event
@@ -217,25 +272,35 @@ async def chat_stream(  # noqa: PLR0912
         return StreamingResponse(clarification_generator(), media_type="text/event-stream")
 
     # --- Phase 5: Cross-session memory ---
-    # Retrieve relevant past-conversation summaries and inject as provider
-    # context. Placed AFTER response-intelligence analysis and the
-    # clarification gate: injecting earlier would pollute the conversation
-    # history that the ambiguity heuristic reads (a system message at index 0
-    # makes history non-empty, disabling the no-context branch) and the
-    # clarification path never calls the provider so it needs no memory.
-    # Degrades to no-op on any ChromaDB error (retrieve_memories never raises).
+    # Retrieve relevant long-term memories and inject as provider context.
+    # Placed AFTER response-intelligence analysis and the clarification gate:
+    # injecting earlier would pollute the conversation history that the
+    # ambiguity heuristic reads (a system message at index 0 makes history
+    # non-empty, disabling the no-context branch) and the clarification path
+    # never calls the provider so it needs no memory.
+    # Ranked recall (similarity × recency × importance × access); the current
+    # chat's own memories are excluded. Degrades to no-op on any ChromaDB
+    # error (recall never raises).
     if not payload.regenerate:
         try:
             last_user_content = payload.messages[-1].content
-            memories = await retrieve_memories(last_user_content, top_k=2)
-            memories = [m for m in memories if (chat.summary or "") not in (m, )] if chat.summary else memories
-            if memories:
-                memory_context = "\n".join(f"- {m}" for m in memories)
+            records = await recall(last_user_content, top_k=3, exclude_chat_id=chat.id)
+            if records:
+                memory_context = "\n".join(f"- {r.content}" for r in records)
                 messages.insert(0, {
                     "role": "system",
                     "content": f"[Long-term memory — relevant past conversations]\n{memory_context}",
                 })
-                logger.debug("Injected %d long-term memories", len(memories))
+                logger.debug("Injected %d long-term memories", len(records))
+                # Phase 7: track provenance — which memories were used
+                prov = get_current_provenance()
+                for r in records:
+                    prov.mark_used(
+                        f"memory:{r.id}",
+                        "memory",
+                        (r.content or "")[:80],
+                        reason=f"Memory ({r.kind}) recalled into context",
+                    )
         except Exception as exc:  # noqa: BLE001 — memory must never break chat
             logger.warning("Memory retrieval failed: %s", exc)
 
@@ -321,14 +386,30 @@ async def chat_stream(  # noqa: PLR0912
                 # (and what reloads from history) carries the hedge.
                 if guidance is not None and ri_config.UNCERTAINTY_HEDGING_ENABLED:
                     try:
-                        collected = post_process_response(collected, guidance)
+                        # Phase 8 C: user noSlop/adhdFriendly settings override env.
+                        _no_slop = None
+                        _adhd = None
+                        try:
+                            from ..models import UserPreference
+                            import json as _json2
+                            _pref = await stream_db.get(UserPreference, user.id)
+                            if _pref and _pref.settings_json:
+                                _s = _json2.loads(_pref.settings_json)
+                                if 'noSlop' in _s:
+                                    _no_slop = bool(_s['noSlop'])
+                                if 'adhdFriendly' in _s:
+                                    _adhd = bool(_s['adhdFriendly'])
+                        except Exception:
+                            pass
+                        collected = post_process_response(collected, guidance, no_slop=_no_slop, adhd_friendly=_adhd)
                     except Exception as exc:  # noqa: BLE001 — never break persistence
                         logger.warning("Uncertainty post-processing failed: %s", exc)
 
                 if not payload.regenerate:
                     stream_db.add(Message(chat_id=chat.id, role="user",
                                    content=payload.messages[-1].content,
-                                   file_ids=",".join(payload.file_ids) or None))
+                                   file_ids=",".join(payload.file_ids) or None,
+                                   media_json=user_media_json))
                 stream_db.add(Message(id=response_message_id, chat_id=chat.id, role="assistant", content=collected,
                                model=payload.model, response_time=response_time))
                 # Merge the chat into the new session so the model/updated_at
@@ -337,6 +418,39 @@ async def chat_stream(  # noqa: PLR0912
                 chat.updated_at = datetime.now(UTC)
                 await stream_db.merge(chat)
                 await stream_db.commit()
+                # Analytics (opt-in): message sent with model. Never breaks chat.
+                try:
+                    from ..analytics import events as _ae, record_event as _record
+
+                    await _record(
+                        stream_db, current_user.id, _ae.MESSAGE_SENT,
+                        {"model": payload.model},
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
+                # Memory++: fire-and-forget extraction of durable facts from
+                # this turn (preferences, corrections, "remember this").
+                # Offline heuristics; never blocks the response.
+                # Phase 8 C: gated by the memoryAutoExtract setting.
+                if not payload.regenerate:
+                    try:
+                        from ..models import UserPreference
+                        import json as _json
+                        pref = await stream_db.get(UserPreference, user.id)
+                        auto_extract = True
+                        if pref and pref.settings_json:
+                            s = _json.loads(pref.settings_json)
+                            auto_extract = s.get('memoryAutoExtract', True)
+                        if auto_extract:
+                            extract_from_turn_background(
+                                payload.messages[-1].content, chat_id=chat.id
+                            )
+                    except Exception:
+                        # On any error, fall back to extracting (conservative).
+                        extract_from_turn_background(
+                            payload.messages[-1].content, chat_id=chat.id
+                        )
 
                 # Phase 5: fire-and-forget rolling summarization. Checked every
                 # threshold crossing; failures are logged inside summarize_chat.
@@ -349,6 +463,15 @@ async def chat_stream(  # noqa: PLR0912
                         summary_task.add_done_callback(_background_tasks.discard)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Summarize trigger failed: %s", exc)
+
+                # Phase 7: emit provenance — which nodes were used in this answer.
+                try:
+                    prov = get_current_provenance()
+                    if prov.used_nodes:
+                        import json as _json
+                        yield sse_event(_json.dumps(prov.to_dict()), event="provenance")
+                except Exception:  # noqa: BLE001 — provenance must never break chat
+                    pass
 
                 yield sse_event("[DONE]")
             except (GeneratorExit, asyncio.CancelledError):
@@ -381,110 +504,3 @@ async def chat_stream(  # noqa: PLR0912
                 return
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-# ---------------------------------------------------------------------------
-# Agentic Reasoning Endpoint
-# ---------------------------------------------------------------------------
-
-
-@router.post("/agentic-reasoning")
-async def agentic_reasoning_endpoint(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    """Enhance the user's message with reasoning + tool use.
-
-    Returns the enriched message (and the tool calls that produced it) so the
-    client can send it through the normal ``/chat/stream`` pipeline.
-    """
-    body = await request.json()
-    message = body.get("message", "")
-    if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
-
-    model_id = body.get("model") or ""
-    chat_id = body.get("chat_id")
-
-    # --- Reasoning panel settings -------------------------------------
-    try:
-        max_iterations = max(1, min(int(body.get("max_iterations", 3)), 5))
-    except (TypeError, ValueError):
-        max_iterations = 3
-
-    # The panel groups tools; expand the groups into concrete tool names.
-    _TOOL_GROUPS = {
-        "web_search": ["web_search"],
-        "file_operations": ["read_file", "list_files"],
-        "code_execution": ["execute_code"],
-    }
-    allowed_tools: list[str] = []
-    for entry in body.get("tools") or []:
-        allowed_tools.extend(_TOOL_GROUPS.get(entry, [entry]))
-
-    try:
-        # Chat history gives the reasoning loop the conversation context.
-        chat_history = []
-        if chat_id:
-            chat_result = await db.execute(
-                select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.messages))
-            )
-            chat = chat_result.scalar_one_or_none()
-            if chat:
-                chat_history = [
-                    ChatMessage(role=msg.role, content=msg.content)
-                    for msg in chat.messages
-                ]
-
-        # The agent package lives in `<project root>/.agents` (file is
-        # mainfiles/backend/api_routes/x.py — parents[3] is the repo root).
-        agents_dir = str(Path(__file__).resolve().parents[3] / ".agents")
-        if agents_dir not in sys.path:
-            sys.path.append(agents_dir)
-
-        from agentic_reasoning import (
-            AgenticReasoningConfig,
-            enhance_chat_response_with_reasoning,
-        )
-
-        config = AgenticReasoningConfig(
-            max_iterations=max_iterations,
-            enable_tools=bool(allowed_tools),
-            allowed_tools=allowed_tools,
-        )
-
-        enhanced_message, tool_results = await enhance_chat_response_with_reasoning(
-            user_message=message,
-            model_id=model_id,
-            db=db,
-            chat_history=chat_history or None,
-            config=config,
-        )
-
-        tool_results_data = [
-            {
-                "tool_call_id": r.tool_call_id,
-                "name": r.name,
-                "content": str(r.content) if r.content else "",
-                "error": r.error,
-                "is_error": r.is_error,
-            }
-            for r in tool_results
-            if not r.is_error  # failed tools are logged, never shown as context
-        ]
-
-        return {
-            "enhanced_message": enhanced_message or message,
-            "reasoning_used": bool(tool_results_data),
-            "tool_results": tool_results_data,
-        }
-
-    except Exception as exc:  # noqa: BLE001 — enhancement must never block chat
-        logger.error("Agentic reasoning failed: %s", exc)
-        return {
-            "enhanced_message": message,
-            "reasoning_used": False,
-            "tool_results": [],
-            "error": str(exc),
-        }

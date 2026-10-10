@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -8,6 +9,11 @@ from typing import Any
 import yaml
 
 SKILLS_ROOT = Path(__file__).resolve().parents[2] / "config" / "skills"
+
+
+def _slugify(value: str) -> str:
+    """Lowercase slug: runs of non-alphanumeric characters become '-'."""
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "skill"
 
 
 class SkillCategory(str, Enum):
@@ -52,8 +58,13 @@ class SkillDefinition:
 
 
 class SkillRegistry:
-    def __init__(self, skills_root: Path = SKILLS_ROOT):
+    def __init__(
+        self,
+        skills_root: Path = SKILLS_ROOT,
+        extra_roots: list[Path] | None = None,
+    ):
         self.root = skills_root
+        self.extra_roots = extra_roots or []
         self.skills: dict[str, SkillDefinition] = {}
         self._load_all()
 
@@ -64,6 +75,27 @@ class SkillRegistry:
             skill = self._parse(skill_file)
             if skill:
                 self.skills[skill.id] = skill
+        # Skill packs: enabled packs contribute their skill directories.
+        for extra in self.extra_roots:
+            if not extra.exists():
+                continue
+            for skill_file in extra.rglob("SKILL.md"):
+                skill = self._parse(skill_file)
+                if skill:
+                    # Pack skills don't clobber user skills with the same id.
+                    self.skills.setdefault(skill.id, skill)
+
+    def reload(self) -> None:
+        """Clear and re-load all skills from disk (picks up new SKILL.md files)."""
+        self.skills.clear()
+        # Re-resolve enabled packs so enable/disable takes effect.
+        try:
+            from .packs import enabled_pack_skill_roots
+
+            self.extra_roots = enabled_pack_skill_roots()
+        except Exception:  # noqa: BLE001 — packs are optional
+            pass
+        self._load_all()
 
     def _parse(self, skill_file: Path) -> SkillDefinition | None:
         try:
@@ -72,8 +104,15 @@ class SkillRegistry:
                 return None
             _, front_matter, body = content.split("---", 2)
             metadata = yaml.safe_load(front_matter) or {}
+            # Claude-style frontmatter tolerance: `id` may be absent while
+            # `name` is present (e.g. "name: my-skill"); fall back to a
+            # slugified name so such files still load. Unknown keys are
+            # ignored gracefully via .get() defaults below.
+            raw_id = metadata.get("id") or _slugify(
+                str(metadata.get("name") or skill_file.parent.name)
+            )
             return SkillDefinition(
-                id=metadata.get("id", skill_file.parent.name),
+                id=raw_id,
                 name=metadata.get("name", skill_file.parent.name),
                 category=SkillCategory(metadata.get("category", "misc")),
                 invocation=InvocationType(metadata.get("invocation", "both")),
@@ -136,5 +175,17 @@ _registry: SkillRegistry | None = None
 def get_registry() -> SkillRegistry:
     global _registry
     if _registry is None:
-        _registry = SkillRegistry()
+        # Enabled skill packs contribute their skill directories.
+        try:
+            from .packs import enabled_pack_skill_roots
+
+            extra_roots = enabled_pack_skill_roots()
+        except Exception:  # noqa: BLE001 — packs are optional
+            extra_roots = []
+        _registry = SkillRegistry(extra_roots=extra_roots)
     return _registry
+
+
+def reload_registry() -> SkillRegistry:
+    """Force a fresh reload of all skills from disk and return the registry."""
+    return get_registry().reload() or get_registry()

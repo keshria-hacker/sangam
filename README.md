@@ -90,6 +90,78 @@ A **Paper / Ink** design system — warm paper whites (PAPER) or deep charcoal (
 
 Local authentication, encrypted provider keys, secure password hashing, and local conversation storage.
 
+### 🧠 Memory++
+
+Typed long-term memory (episodic, semantic, procedural) with importance-ranked recall, automatic extraction from conversations, and consolidation — managed from Settings.
+
+### 🎙️ Voice
+
+Local-first text-to-speech and speech-to-text with pluggable engines (Kokoro, faster-whisper, OpenAI-compatible APIs). Mic dictation in the composer, per-message Speak, auto-speak setting.
+
+### 🎨 Image Generation
+
+Fooocus-inspired style presets with pluggable engines (OpenAI-compatible image APIs, experimental local Fooocus). Generate images from the composer and attach them to chats.
+
+### 📦 Skill Packs
+
+Curated skill bundles — spec-driven development workflows, Mermaid architecture diagramming, science research essentials, and agent-loop discipline. Enable/disable packs from the Skills browser.
+
+### 👥 Multi-Agent Teams
+
+Research, Code, and Writing teams: specialist agents work in parallel while a coordinator synthesizes the final answer. Watch each specialist's output unfold.
+
+### 🎓 Learning Mode
+
+Interactive classroom: a teacher agent delivers structured, research-first lessons and a tutor gives Socratic feedback on your answers.
+
+### ✨ Response Quality
+
+Optional AI-slop cleanup and ADHD-friendly formatting (answer-first, scannable) applied safely at persistence time.
+
+### 📊 Usage Analytics
+
+Opt-in, local-first analytics dashboard — your usage stays on your server, never shared.
+
+### ⌨️ Command Palette
+
+Press Ctrl+P for a quick launcher: new chat, skills, teams, export, theme, and more. Export any chat as Markdown.
+
+### 🏢 AI Studio Shell
+
+Intent-grouped navigation (Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings). Browser-style tabs for side-by-side work — main chat stays pinned. Right Inspector panel (Ctrl+Shift+I), Activity Tray for background jobs, typed settings with search.
+
+### 🧠 Knowledge Graph
+
+Unified graph of memories, documents, code symbols, and chats. SVG visualization with zoom, click-to-inspect, provenance labels (EXTRACTED/INFERRED/AMBIGUOUS), memory wings by type, and "used in this answer" tracking.
+
+### 🤖 Agent Hub
+
+Build custom agents with system prompts, tools, and approval policies. Built-in Researcher, Coder, Writer, Analyst. Run with streaming, approve/deny tool calls, set cost budgets.
+
+### 🎨 Create Hub
+
+Typed artifacts: markdown docs, diagrams (custom SVG renderer), code files, HTML previews. Version history with restore, eight starter templates, image/voice studio shortcuts.
+
+### ⏰ Automations
+
+Schedule agent tasks or chat messages: hourly, daily, weekly, or cron. Enable/disable, run now, humanized next-run times.
+
+### 🔀 Routes & Combos
+
+Keyword-based model routing (e.g. "python" → code model). Chain models into combos (fast draft → smart refine). Per-provider quota display.
+
+### ⚖️ Model Compare & Arena
+
+Run the same prompt against 2-4 models in parallel. Vote for the winner; leaderboard tracks win rates by model.
+
+### 💻 Code Agent
+
+OpenHands-style agentic coding: write_file, edit_file, run_bash tools, SSE streaming, TDD mode, learned instincts, code map (AST graph of your codebase).
+
+### 🎨 Design Studio
+
+Generate UI prototypes from prompts. Sandboxed iframe preview, refine iteratively, download as HTML.
+
 ---
 
 ## 🤖 Supported AI Providers
@@ -323,9 +395,24 @@ Run the test suite from the project root:
 venv\Scripts\python.exe -m pytest tests -v
 ```
 
-The test suite lives in a single unified tree at `tests/` (unit, `integration/`, `e2e/`, `manual/`), consolidated by the module-split refactor.
+The test suite lives in a single unified tree at `tests/` (60 files: unit, `integration/`, `e2e/`, `manual/`). As of 2026-10-09: **1148 passed, 1 flaky, 100 skipped**.
 
-Tests cover core functionality including authentication, document processing, model discovery, streaming, response intelligence, Skills, and web search.
+Tests cover authentication, document processing + RAG, model discovery, streaming, response intelligence, skills + packs, web search, voice, image generation, multi-agent teams, learning mode, response quality, analytics, knowledge graph, agents, artifacts, automations, and the Phase 6 additions (teams SSE streaming, graph provenance, model compare/Arena, fallback chain).
+
+Playwright end-to-end tests (`tests/e2e/golden_paths.spec.ts`) cover 6 golden paths: first run, ask/refine, knowledge, create, agents, settings.
+
+Frontend modules are validated with:
+
+```bash
+node --experimental-vm-modules scripts/check_frontend_modules.mjs
+```
+(all 47 ES modules parse + link)
+
+---
+
+## ⭐ Star Sangam
+
+If Sangam is useful to you, [star it on GitHub](https://github.com/keshria-hacker/sangam) — it helps others discover the project.
 
 ---
 

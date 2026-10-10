@@ -93,9 +93,21 @@ class OpenAICompatibleProvider(BaseProvider):
         # Use validated API key from base class
         effective_key = api_key or self.api_key
 
+        # Multimodal foundation: route-level `content_parts` (OpenAI-style
+        # text/image parts) become the wire `content`; the extra key is
+        # stripped so non-multimodal code paths never see it.
+        wire_messages = []
+        for m in messages:
+            if isinstance(m, dict) and m.get("content_parts"):
+                cleaned = {k: v for k, v in m.items() if k != "content_parts"}
+                cleaned["content"] = m["content_parts"]
+                wire_messages.append(cleaned)
+            else:
+                wire_messages.append(m)
+
         completion_kwargs = {
             "model": litellm_id,
-            "messages": messages,
+            "messages": wire_messages,
             "temperature": temperature,
             "stream": True,
             "timeout": 60,

@@ -4,8 +4,9 @@
  * subscriber callbacks for reactivity.
  */
 
-import { DEFAULT_SETTINGS, CHAT_BUCKETS, PROVIDER_COLORS } from '../shared/constants.js';
+import { CHAT_BUCKETS, PROVIDER_COLORS } from '../shared/constants.js';
 import { bucketFor } from '../shared/utils.js';
+import { getAllSettings } from '../shared/settings_store.js';
 
 /**
  * Create a reactive signal.
@@ -115,37 +116,24 @@ export const [getIsGenerating, setIsGenerating] = createSignal(false);
 export const [getAbortController, setAbortController] = createSignal(null);
 export const [getLastUserText, setLastUserText] = createSignal('');
 export const [getWebSearchEnabled, setWebSearchEnabled] = createSignal(false);
-export const [getAgenticReasoningEnabled, setAgenticReasoningEnabled] = createSignal(false);
+export const [getAgentModeEnabled, setAgentModeEnabled] = createSignal(false);
+// Think mode: how to display the Thinking block — 'expand' | 'collapse' | 'hide'
+const _thinkPref = localStorage.getItem('sangam:thinking-display') || 'collapse';
+export const [getThinkingDisplay, setThinkingDisplay] = createSignal(_thinkPref);
+export function setThinkingDisplayPref(v) {
+  setThinkingDisplay(v);
+  try { localStorage.setItem('sangam:thinking-display', v); } catch {}
+}
 export const [getSidebarCollapsed, setSidebarCollapsed] = createSignal(false);
 export const [getBackendReachable, setBackendReachable] = createSignal(null);
-export const [getMaxTokens, setMaxTokens] = createSignal('1024');
+export const [getMaxTokens, setMaxTokens] = createSignal('auto');
 export const [getReasoningEffort, setReasoningEffort] = createSignal('medium');
 export const [getTemperature, setTemperature] = createSignal(0.7);
 
-// Settings state (persisted to localStorage)
-let _savedSettings = null;
-try {
-  const saved = localStorage.getItem('sangam-settings');
-  _savedSettings = saved ? JSON.parse(saved) : null;
-} catch {
-  _savedSettings = null;
-}
-
-const [getSettings, setSettings, subscribeSettings] = createSignal({
-  ...DEFAULT_SETTINGS,
-  ..._savedSettings,
-});
-
-// Persist settings changes
-subscribeSettings((newSettings) => {
-  try {
-    localStorage.setItem('sangam-settings', JSON.stringify(newSettings));
-  } catch (e) {
-    console.warn('Failed to persist settings:', e);
-  }
-});
-
-export { getSettings, setSettings };
+// Phase 8 B3: the legacy settings blob (localStorage 'sangam-settings') is
+// gone. All settings live in the typed store (shared/settings_store.js),
+// persisted via /user/settings. One-time migration runs in
+// settings_store.initSettingsStore().
 
 // Provider metadata cache
 export const [getProviderMeta, setProviderMeta] = createSignal({});
@@ -247,7 +235,7 @@ export function groupModelsByProvider(models) {
 export function selectModel(model, { silent = false } = {}) {
   if (!model) return;
   setSelectedModel(model);
-  setMaxTokens(model.max_tokens || '1024');
+  setMaxTokens(model.max_tokens ? String(model.max_tokens) : 'auto');
 }
 
 /**
@@ -276,7 +264,7 @@ export function resetAllState() {
   setBackendReachable(null);
   setWebSearchEnabled(false);
   setTemperature(0.7);
-  setMaxTokens('1024');
+  setMaxTokens('auto');
   setReasoningEffort('medium');
   // Don't reset settings - those are user preferences
 }
@@ -285,8 +273,8 @@ export function resetAllState() {
  * Initialize app state on boot.
  */
 export function initAppState() {
-  // Load persisted settings
-  const settings = getSettings();
+  // Load persisted settings (Phase 8 B3: typed store, not the legacy blob).
+  const settings = getAllSettings();
   const root = document.documentElement;
   const effectiveTheme = settings.theme === 'system'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -295,5 +283,7 @@ export function initAppState() {
   root.setAttribute('data-theme', effectiveTheme);
   document.body.setAttribute('data-font-size', settings.fontSize);
   document.body.setAttribute('data-chat-width', settings.chatWidth);
-  document.body.setAttribute('data-animations', settings.animations ? 'on' : 'off');
+  // Phase 8 C: reduceMotion wired — disables animations.
+  const reduceMotion = settings.reduceMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.body.setAttribute('data-animations', reduceMotion ? 'off' : 'on');
 }

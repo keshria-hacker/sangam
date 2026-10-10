@@ -1,0 +1,138 @@
+<style>
+.sgm { box-sizing: border-box; max-width: 100%; font-family: -apple-system, "Segoe UI", Inter, Roboto, sans-serif; color: var(--hatch-widget-text); padding: 4px; }
+.sgm * { box-sizing: border-box; }
+.sgm h2 { font-size: 17px; margin: 0 0 2px; letter-spacing: .2px; }
+.sgm .sub { color: var(--hatch-widget-muted); font-size: 12.5px; margin: 0 0 14px; }
+.sgm .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.sgm .stat { background: var(--hatch-widget-surface); border: 1px solid var(--hatch-widget-border); border-radius: 10px; padding: 10px 8px; text-align: center; }
+.sgm .stat b { display: block; font-size: 19px; color: var(--hatch-widget-accent); }
+.sgm .stat span { font-size: 11px; color: var(--hatch-widget-muted); }
+.sgm .sec { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--hatch-widget-muted); margin: 18px 0 8px; }
+.sgm .layer { border: 1px solid var(--hatch-widget-border); border-radius: 12px; margin-bottom: 6px; overflow: hidden; }
+.sgm .layer-h { padding: 8px 12px; font-size: 12.5px; font-weight: 700; background: var(--hatch-widget-surface); border-bottom: 1px solid var(--hatch-widget-border); display: flex; justify-content: space-between; align-items: center; }
+.sgm .layer-h .tag { font-weight: 400; font-size: 11px; color: var(--hatch-widget-muted); }
+.sgm .layer-b { padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.sgm .chip { font-size: 11.5px; padding: 5px 10px; border-radius: 20px; background: var(--hatch-widget-surface-muted); border: 1px solid var(--hatch-widget-border); }
+.sgm .chip.hot { border-color: var(--hatch-widget-accent); color: var(--hatch-widget-accent); font-weight: 600; }
+.sgm .arrow { text-align: center; color: var(--hatch-widget-muted); font-size: 14px; line-height: 1; margin: 2px 0; }
+.sgm .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sgm .node { font-size: 11.5px; padding: 7px 11px; border-radius: 8px; background: var(--hatch-widget-surface); border: 1px solid var(--hatch-widget-border); white-space: nowrap; }
+.sgm .node.opt { border-style: dashed; color: var(--hatch-widget-muted); }
+.sgm .farr { color: var(--hatch-widget-accent); font-weight: 700; }
+.sgm .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 560px) { .sgm .grid2 { grid-template-columns: 1fr; } }
+.sgm .card { background: var(--hatch-widget-surface); border: 1px solid var(--hatch-widget-border); border-radius: 10px; padding: 10px 12px; }
+.sgm .card h3 { margin: 0 0 6px; font-size: 13px; }
+.sgm .card ul { margin: 0; padding-left: 16px; font-size: 12px; color: var(--hatch-widget-muted); }
+.sgm .card li { margin: 3px 0; }
+.sgm .card li b { color: var(--hatch-widget-text); font-weight: 600; }
+.sgm .legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--hatch-widget-muted); margin-top: 10px; flex-wrap: wrap; }
+.sgm .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: baseline; }
+</style>
+<div class="sgm">
+  <h2>Sangam — Project Map</h2>
+  <p class="sub">Privacy-first, multi-provider AI chat platform &middot; v1.1 &middot; "One interface. Every model."</p>
+
+  <div class="stats">
+    <div class="stat"><b>120</b><span>Python files</span></div>
+    <div class="stat"><b>~11k</b><span>lines of code</span></div>
+    <div class="stat"><b>11</b><span>AI providers</span></div>
+    <div class="stat"><b>1,093</b><span>tests</span></div>
+    <div class="stat"><b>2</b><span>services (5500/8001)</span></div>
+    <div class="stat"><b>MIT</b><span>license</span></div>
+  </div>
+
+  <div class="sec">System architecture</div>
+
+  <div class="layer">
+    <div class="layer-h">Frontend — Vanilla JS SPA <span class="tag">http://127.0.0.1:5500 &middot; ~5.9k LOC</span></div>
+    <div class="layer-b">
+      <span class="chip hot">chat.js — streaming + SSE</span>
+      <span class="chip">message_view.js</span>
+      <span class="chip">response_controller.js</span>
+      <span class="chip">core/state.js — signal store</span>
+      <span class="chip">sidebar.js</span>
+      <span class="chip">models.js</span>
+      <span class="chip">settings.js</span>
+      <span class="chip">skills.js</span>
+      <span class="chip">auth.js</span>
+    </div>
+  </div>
+  <div class="arrow">&#8595; REST + SSE (response_event protocol)</div>
+  <div class="layer">
+    <div class="layer-h">API layer — FastAPI <span class="tag">http://127.0.0.1:8001 &middot; auth, CSRF, rate-limit</span></div>
+    <div class="layer-b">
+      <span class="chip hot">chat_stream_routes.py — pipeline</span>
+      <span class="chip">chats_routes.py</span>
+      <span class="chip">models_routes.py</span>
+      <span class="chip">providers_routes.py</span>
+      <span class="chip">files_routes.py</span>
+      <span class="chip">auth.py — scrypt, lockout</span>
+    </div>
+  </div>
+  <div class="arrow">&#8595;</div>
+  <div class="layer">
+    <div class="layer-h">Intelligence pipeline <span class="tag">the "brain" — per-message processing</span></div>
+    <div class="layer-b">
+      <span class="chip">prompt_injection.py — guard</span>
+      <span class="chip">response_intelligence — intent/style</span>
+      <span class="chip hot">capability_orchestration.py — clarify?</span>
+      <span class="chip">websearch.py</span>
+      <span class="chip">rag.py — ChromaDB retrieval</span>
+      <span class="chip">memory.py — cross-session</span>
+      <span class="chip">context_manager.py — token budget</span>
+      <span class="chip">tools/ — agentic tool-calling</span>
+      <span class="chip">response_postprocessor.py</span>
+    </div>
+  </div>
+  <div class="arrow">&#8595;</div>
+  <div class="layer">
+    <div class="layer-h">Provider layer <span class="tag">11 providers, live model discovery</span></div>
+    <div class="layer-b">
+      <span class="chip">OpenAI</span><span class="chip">Anthropic</span><span class="chip">Gemini</span>
+      <span class="chip">Groq</span><span class="chip">Mistral</span><span class="chip">DeepSeek</span>
+      <span class="chip">NVIDIA NIM</span><span class="chip">Together</span><span class="chip">OpenRouter</span>
+      <span class="chip hot">Ollama — local</span><span class="chip hot">OmniRoute — local</span>
+      <span class="chip">enhanced/ — cost/latency routing</span>
+    </div>
+  </div>
+  <div class="arrow">&#8595;</div>
+  <div class="layer">
+    <div class="layer-h">Storage <span class="tag">all local — privacy-first</span></div>
+    <div class="layer-b">
+      <span class="chip">SQLite + SQLAlchemy — chats, users, prefs</span>
+      <span class="chip">ChromaDB — vectors, memory</span>
+      <span class="chip">Fernet (MASTER_KEY) — encrypted API keys</span>
+    </div>
+  </div>
+
+  <div class="sec">One chat message — lifecycle</div>
+  <div class="flow">
+    <span class="node">type message</span><span class="farr">&#8594;</span>
+    <span class="node">POST /api/chat/stream</span><span class="farr">&#8594;</span>
+    <span class="node">auth + schema check</span><span class="farr">&#8594;</span>
+    <span class="node opt">web search</span><span class="farr">&#8594;</span>
+    <span class="node opt">RAG context</span><span class="farr">&#8594;</span>
+    <span class="node opt">clarification gate</span><span class="farr">&#8594;</span>
+    <span class="node hot">provider stream</span><span class="farr">&#8594;</span>
+    <span class="node">SSE response_event frames</span><span class="farr">&#8594;</span>
+    <span class="node">persist atomically</span>
+  </div>
+
+  <div class="sec">Key subsystems</div>
+  <div class="grid2">
+    <div class="card"><h3>Response Intelligence</h3>
+      <ul><li><b>classification</b> — intent &amp; style per message</li><li><b>clarification gate</b> — asks before answering ambiguous asks</li><li><b>uncertainty hedging</b> — calibrated confidence</li></ul></div>
+    <div class="card"><h3>Agentic Tooling</h3>
+      <ul><li><b>tools/registry + executor</b> — tool-calling loop</li><li><b>skills/</b> — reusable workflows: debugging, API design, code review, web research</li></ul></div>
+    <div class="card"><h3>Documents + RAG</h3>
+      <ul><li><b>document.py</b> — PDF, DOCX, XLSX, PPTX, CSV, code</li><li><b>rag.py</b> — chunk &rarr; embed &rarr; retrieve top-k</li></ul></div>
+    <div class="card"><h3>Security</h3>
+      <ul><li><b>scrypt</b> passwords, login lockout, CSRF</li><li><b>Fernet</b> key encryption at rest</li><li><b>prompt-injection</b> detection on the way in</li></ul></div>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--hatch-widget-accent)"></span>core / hot path</span>
+    <span><span class="dot" style="border:1.5px dashed var(--hatch-widget-muted);background:transparent"></span>optional per-message stage</span>
+  </div>
+</div>

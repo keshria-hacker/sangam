@@ -8,7 +8,7 @@ The actual route handlers live in ``backend/api_routes/``, split by resource:
 - ``api_routes/files_routes.py``       document upload
 - ``api_routes/chats_routes.py``       chat CRUD, preferences, summary, feedback
 - ``api_routes/models_routes.py``      model catalogue
-- ``api_routes/chat_stream_routes.py`` chat streaming pipeline + agentic reasoning
+- ``api_routes/chat_stream_routes.py`` chat streaming pipeline
 
 This facade keeps the historical import surface stable: ``backend.main`` mounts
 ``router``/``public_router`` from here, and tests import or patch
@@ -25,18 +25,55 @@ from . import (
 )
 from .api_routes.chat_stream_routes import (  # noqa: F401
     SSE_HEARTBEAT_INTERVAL,
-    agentic_reasoning_endpoint,
     chat_stream,
 )
+from .api_routes.settings_routes import (  # noqa: F401
+    get_user_settings,
+    put_user_settings,
+)
+from .api_routes.knowledge_routes import (  # noqa: F401
+    get_knowledge_graph,
+    search_knowledge,
+)
+from .api_routes.runs_routes import (  # noqa: F401
+    get_run,
+    list_runs,
+    record_run,
+)
+from .api_routes.artifacts_routes import (  # noqa: F401
+    create_artifact,
+    delete_artifact,
+    get_artifact,
+    list_artifacts,
+    list_versions,
+    update_artifact,
+)
+from .api_routes.spec_routes import (  # noqa: F401
+    build_spec_doc,
+    spec_to_task,
+)
+from .api_routes.quality_routes import preview_quality  # noqa: F401
+from .api_routes.automations_routes import (  # noqa: F401
+    create_automation,
+    delete_automation,
+    get_automation,
+    list_automations,
+    run_automation_now,
+    update_automation,
+)
+from .api_routes.compare_routes import (  # noqa: F401
+    arena_leaderboard,
+    arena_vote,
+    compare_models,
+)
 from .api_routes.chats_routes import (  # noqa: F401
+    append_messages,
     create_chat,
     delete_chat,
     get_chat,
     get_chat_summary,
-    get_preferences,
     list_chats,
     submit_feedback,
-    update_preferences,
 )
 
 # Importing the route modules registers all endpoints on the shared routers.
@@ -52,6 +89,45 @@ from .api_routes.common import (  # noqa: F401
     sse_response_event,
 )
 from .api_routes.files_routes import upload_file  # noqa: F401
+from .api_routes.features_routes import get_features  # noqa: F401
+from .api_routes.extensions_routes import (  # noqa: F401
+    disable_extension,
+    enable_extension,
+    list_extensions,
+)
+from .api_routes.media_routes import (  # noqa: F401
+    get_media,
+    load_media_attachment,
+    upload_media,
+)
+from .api_routes.memory_routes import (  # noqa: F401
+    create_memory,
+    get_memory_stats,
+    remove_memory,
+    run_consolidation,
+    search_memories,
+)
+from .api_routes.voice_routes import (  # noqa: F401
+    get_voice_status,
+    get_voices,
+    speech_to_text,
+    text_to_speech,
+)
+from .api_routes.image_routes import (  # noqa: F401
+    generate_image_endpoint,
+    get_image_status,
+)
+from .api_routes.teams_routes import (  # noqa: F401
+    get_teams,
+    run_team_endpoint,
+)
+from .api_routes.learn_routes import (  # noqa: F401
+    answer_feedback,
+    create_lesson,
+)
+from .api_routes.analytics_routes import (  # noqa: F401
+    analytics_stats,
+)
 from .api_routes.models_routes import (  # noqa: F401
     _to_model_info,
     get_models,
@@ -67,6 +143,24 @@ from .api_routes.providers_routes import (  # noqa: F401
     refresh_provider_models,
     set_provider_key,
 )
+from .api_routes.omniroute_routes import (  # noqa: F401
+    omniroute_config,
+    omniroute_status,
+    omniroute_sync,
+)
+from .api_routes.agents_routes import (  # noqa: F401
+    create_agent,
+    delete_agent,
+    get_agent,
+    list_agents,
+    run_custom_agent,
+    update_agent,
+)
+from .api_routes.code_agent_routes import (  # noqa: F401
+    chat_agent_run,
+    code_agent_run,
+)
+from .api_routes.routing_routes import evaluate_routing  # noqa: F401
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401
 from .document import extract_text, truncate_preview  # noqa: F401

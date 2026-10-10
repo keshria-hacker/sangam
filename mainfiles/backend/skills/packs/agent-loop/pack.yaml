@@ -1,0 +1,6 @@
+name: agent-loop
+version: 1.0.0
+description: Agent loop discipline — when to act vs ask, tool-use hygiene, and verify-don't-trust loops for reliable autonomous work.
+source: earendil-works/pi
+skills:
+  - tool-discipline

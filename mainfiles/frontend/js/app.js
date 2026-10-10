@@ -3,12 +3,20 @@
  * Main entry point - bootstraps all feature modules.
  */
 
-import { initAppState, getMessages, getIsGenerating, getLastUserText, getTemperature, setTemperature, getMaxTokens, setMaxTokens, getReasoningEffort, setReasoningEffort } from './core/state.js';
+import { initAppState, getMessages, getIsGenerating, getLastUserText } from './core/state.js';
 import { initElements as initChatElements, initChatEvents, handleSend, regenerate, runGeneration, stopGeneration, autoResizeTextarea, scrollToBottom, buildMessageNode, renderMessages, startNewChat as chatStartNewChat } from './features/chat/chat.js';
 import { initElements as initModelsElements, loadProvidersAndModels, renderModelList, renderProviderFilters, renderProviderStatusList, renderConnPulse, selectModel, openModelDropdown, closeModelDropdown, initModelSelector } from './features/models/models.js';
-import { initElements as initSettingsElements, openSettings, closeSettingsModal, applySettings as settingsApplySettings, loadSettings, syncSettingsUI, initSettings, renderProviderStatusList as settingsRenderProviderStatusList } from './features/settings/settings.js';
+import { openSettings } from './features/settings/open.js';
+import { applyAppearance, initAppearance } from './features/settings/appearance.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
-import { init as initSkills, openSkillsModal, closeSkillsModal } from './features/skills/skills.js';
+import { initTabs, openToolTab, showTool, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
+import { trapFocus } from './shared/focus_trap.js';
+import { setLang } from './shared/i18n.js';
+import { getSetting } from './shared/settings_store.js';
+import { renderRail, registerNavHandler } from './core/nav.js';
+import { initPopovers } from './features/composer/popovers.js';
+import { initTray } from './features/tray/tray.js';
+import { initInspector } from './features/inspector/inspector.js';
 import { initElements as initSidebarElements, initSidebar, openMobileSidebar, closeMobileSidebar, toggleSidebarCollapse, loadChatList as sidebarLoadChatList, renderChatHistory as sidebarRenderChatHistory, openChat as sidebarOpenChat, deleteChat as sidebarDeleteChat } from './features/sidebar/sidebar.js';
 import { showToast, initToasts } from './shared/toast.js';
 import { getApiBaseUrl } from './shared/http.js';
@@ -33,9 +41,6 @@ function initDOM() {
     mobileNewChat: $('#mobileNewChat'),
     searchChats: $('#searchChats'),
     chatHistory: $('#chatHistory'),
-    settingsBtn: $('#settingsBtn'),
-    settingsOverlay: $('#settingsOverlay'),
-    closeSettings: $('#closeSettings'),
     themeOptions: $('#themeOptions'),
     fontSizeSegmented: $('#fontSizeSegmented'),
     chatWidthSegmented: $('#chatWidthSegmented'),
@@ -76,19 +81,7 @@ function initDOM() {
     messageInput: $('#messageInput'),
     sendBtn: $('#sendBtn'),
     webSearchToggle: $('#webSearchToggle'),
-    tempControl: $('#tempControl'),
-    tempPopover: $('#tempPopover'),
-    tempSlider: $('#tempSlider'),
-    tempValue: $('#tempValue'),
-    tempPopoverValue: $('#tempPopoverValue'),
-    tokenBtn: $('#tokenBtn'),
-    tokenLabel: $('#tokenLabel'),
-    tokenDropdown: $('#tokenDropdown'),
-    tokenSelect: $('#tokenSelect'),
-    reasoningBtn: $('#reasoningBtn'),
-    reasoningLabel: $('#reasoningLabel'),
-    reasoningDropdown: $('#reasoningDropdown'),
-    reasoningSelect: $('#reasoningSelect'),
+    // Phase 8 B4: temp/token/reasoning pills removed — Tune popover owns them.
     authOverlay: $('#authOverlay'),
     authLoading: $('#authLoading'),
     authLoadingText: $('#authLoadingText'),
@@ -125,9 +118,9 @@ function initDOM() {
     authResetSubmit: $('#authResetSubmit'),
     authForgotBack: $('#authForgotBack'),
     authResetBack: $('#authResetBack'),
-    skillsOverlay: $('#skillsOverlay'),
     skillsBtn: $('#skillsBtn'),
-    closeSkills: $('#closeSkills'),
+    codeBtn: $('#codeBtn'),
+    designBtn: $('#designBtn'),
     shortcutsOverlay: $('#shortcutsOverlay'),
     closeShortcuts: $('#closeShortcuts'),
     backendUrlInput: $('#backendUrlInput'),
@@ -139,7 +132,6 @@ function initDOM() {
   // Initialize modules with their element references
   initChatElements();
   initModelsElements();
-  initSettingsElements();
   initAuthElements();
   initSidebarElements();
 }
@@ -147,6 +139,50 @@ function initDOM() {
 /**
  * Set up global event listeners that cross modules.
  */
+/**
+ * Initialize the studio rail (intent-grouped navigation).
+ * A9: only registers handlers here. The rail itself renders in
+ * loadRailFeatures(), called post-auth when /features returns real state.
+ */
+async function initRail() {
+  const container = document.getElementById('railNav');
+  if (!container) return;
+  // Register nav handlers
+  registerNavHandler('home', () => {
+    showTool('home');
+  });
+  registerNavHandler('chat', () => {
+    const { switchTab } = window.__sangamTabs || {};
+    // Fallback: main tab is the chat
+    document.getElementById('mainTab')?.click();
+  });
+  registerNavHandler('settings', () => {
+    showTool('settings');
+  });
+  // Load features and render
+  // (moved to loadRailFeatures — called post-auth from startApplication)
+  // Re-render rail when features change
+  document.addEventListener('sangam:features-changed', async (e) => {
+    renderRail(container, e.detail?.features || {});
+  });
+}
+
+/**
+ * A9: Fetch /features and render the rail. Called once post-auth from
+ * startApplication, so the rail never shows stale "Turn on" badges.
+ */
+async function loadRailFeatures() {
+  const container = document.getElementById('railNav');
+  if (!container) return;
+  try {
+    const { apiFetch } = await import('./shared/http.js');
+    const data = await (await apiFetch('/features')).json();
+    renderRail(container, data.features || {});
+  } catch {
+    renderRail(container, {});
+  }
+}
+
 function initGlobalListeners() {
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -158,9 +194,7 @@ function initGlobalListeners() {
     // Escape - Close modals, dropdowns
     if (e.key === 'Escape') {
       closeModelDropdown();
-      closeSettingsModal();
       elements.tempPopover?.classList.add('hidden');
-      if (!elements.skillsOverlay?.classList?.contains('hidden')) closeSkillsModal();
     }
     // Ctrl+Shift+C - Copy last assistant message
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
@@ -203,12 +237,7 @@ function initGlobalListeners() {
     // Ctrl+Shift+T - Toggle theme
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 't') {
       e.preventDefault();
-      const cur = document.documentElement.getAttribute('data-theme');
-      const newTheme = cur === 'dark' ? 'light' : 'dark';
-      import('./core/state.js').then((m) => {
-        m.setSettings({ ...m.getSettings(), theme: newTheme });
-        settingsApplySettings();
-      });
+      import('./features/settings/appearance.js').then((m) => m.toggleTheme());
     }
     // Ctrl+Shift+W - Toggle web search
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'w') {
@@ -218,20 +247,36 @@ function initGlobalListeners() {
     // Ctrl+/ - Shortcuts help
     if ((e.ctrlKey || e.metaKey) && e.key === '/') {
       e.preventDefault();
-      elements.shortcutsOverlay?.classList.remove('hidden');
+      openShortcutsModal();
     }
   });
 
-  // Close shortcuts modal
-  elements.shortcutsOverlay?.addEventListener('click', (e) => {
-    if (e.target === elements.shortcutsOverlay) elements.shortcutsOverlay.classList.add('hidden');
+  // Shortcuts modal with focus trap
+  let releaseShortcutsTrap = null;
+  function openShortcutsModal() {
+    elements.shortcutsOverlay?.classList.remove('hidden');
+    releaseShortcutsTrap = trapFocus(elements.shortcutsOverlay);
+  }
+  function closeShortcutsModal() {
+    elements.shortcutsOverlay?.classList.add('hidden');
+    releaseShortcutsTrap?.();
+    releaseShortcutsTrap = null;
+  }
+  // Escape closes it (handled globally too, but be explicit)
+  elements.shortcutsOverlay?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeShortcutsModal();
   });
-  elements.closeShortcuts?.addEventListener('click', () => elements.shortcutsOverlay.classList.add('hidden'));
+  elements.shortcutsOverlay?.addEventListener('click', (e) => {
+    if (e.target === elements.shortcutsOverlay) closeShortcutsModal();
+  });
+  elements.closeShortcuts?.addEventListener('click', closeShortcutsModal);
 
-  // Skills button
-  elements.skillsBtn?.addEventListener('click', () => openSkillsModal(document.getElementById('skillsOverlay')));
-  elements.closeSkills?.addEventListener('click', () => closeSkillsModal());
-  elements.skillsOverlay?.addEventListener('click', (e) => { if (e.target === elements.skillsOverlay) closeSkillsModal(); });
+  // Skills button -> opens Skills tab
+  elements.skillsBtn?.addEventListener('click', () => showTool('skills'));
+  // Code agent button -> opens Code agent tab
+  elements.codeBtn?.addEventListener('click', () => showTool('code'));
+  // Design studio button -> opens Design studio tab
+  elements.designBtn?.addEventListener('click', () => showTool('design'));
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 
@@ -245,68 +290,8 @@ function initGlobalListeners() {
       : `<i class="fa-solid fa-chevron-down"></i> Show details`;
   });
 
-  // Settings button
-  elements.settingsBtn?.addEventListener('click', openSettings);
+  // (Footer Settings button removed in Phase 8 B1 — rail Settings is the single entry.)
 
-  // ── Temperature popover ──
-  elements.tempControl?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.tempPopover?.classList.toggle('hidden');
-  });
-  document.addEventListener('click', (e) => {
-    if (!elements.tempControl?.contains(e.target) && !elements.tempPopover?.contains(e.target)) {
-      elements.tempPopover?.classList.add('hidden');
-    }
-  });
-  elements.tempSlider?.addEventListener('input', () => {
-    const val = elements.tempSlider.value;
-    elements.tempValue.textContent = val;
-    elements.tempPopoverValue.textContent = val;
-    setTemperature(parseFloat(val));
-  });
-
-  // ── Token dropdown ──
-  elements.tokenBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.tokenDropdown?.classList.toggle('hidden');
-  });
-  elements.tokenDropdown?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-value]');
-    if (!btn) return;
-    const val = btn.dataset.value;
-    elements.tokenLabel.textContent = parseInt(val).toLocaleString();
-    setMaxTokens(val);
-    elements.tokenDropdown.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    elements.tokenDropdown.classList.add('hidden');
-  });
-
-  // ── Reasoning dropdown ──
-  elements.reasoningBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.reasoningDropdown?.classList.toggle('hidden');
-  });
-  elements.reasoningDropdown?.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-value]');
-    if (!btn) return;
-    const val = btn.dataset.value;
-    const labels = { none: 'Auto', low: 'Low', medium: 'Medium', high: 'High', extra_high: 'Extra High' };
-    elements.reasoningLabel.textContent = labels[val] || val;
-    setReasoningEffort(val);
-    elements.reasoningDropdown.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    elements.reasoningDropdown.classList.add('hidden');
-  });
-
-  // Close select dropdowns when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!elements.tokenSelect?.contains(e.target)) {
-      elements.tokenDropdown?.classList.add('hidden');
-    }
-    if (!elements.reasoningSelect?.contains(e.target)) {
-      elements.reasoningDropdown?.classList.add('hidden');
-    }
-  });
 }
 
 /**
@@ -336,16 +321,13 @@ function setupGlobalNamespace() {
     closeModelDropdown,
     // Settings
     openSettings,
-    closeSettingsModal,
-    applySettings: settingsApplySettings,
-    syncSettingsUI,
+    applySettings: applyAppearance,
     // Sidebar
     openMobileSidebar,
     closeMobileSidebar,
     toggleSidebarCollapse,
     // Skills
-    openSkillsModal: () => openSkillsModal(document.getElementById('skillsOverlay')),
-    closeSkillsModal,
+    openSkillsTab: () => showToolSub('library', 'data-libtab', 'skills'),
     // Auth
     initializeAuth,
     // Utils
@@ -354,32 +336,30 @@ function setupGlobalNamespace() {
 }
 
 /**
- * Sync token and reasoning dropdowns with current state.
- */
-function syncDropdownsFromState() {
-  // Token dropdown
-  const maxTokens = getMaxTokens();
-  elements.tokenLabel.textContent = parseInt(maxTokens).toLocaleString();
-  elements.tokenDropdown?.querySelectorAll('button').forEach((b) => {
-    b.classList.toggle('selected', b.dataset.value === maxTokens);
-  });
-
-  // Reasoning dropdown
-  const reasoningEffort = getReasoningEffort();
-  const labels = { none: 'Auto', low: 'Low', medium: 'Medium', high: 'High', extra_high: 'Extra High' };
-  elements.reasoningLabel.textContent = labels[reasoningEffort] || reasoningEffort;
-  elements.reasoningDropdown?.querySelectorAll('button').forEach((b) => {
-    b.classList.toggle('selected', b.dataset.value === reasoningEffort);
-  });
-}
-
-/**
  * Main bootstrap function - called after auth succeeds.
  */
 export async function startApplication() {
-  // Apply saved settings
-  loadSettings();
-  settingsApplySettings();
+  // Load settings from the server (source of truth); one-time legacy migration
+  try {
+    const { loadSettings, getSetting } = await import('./shared/settings_store.js');
+    await loadSettings();
+    // Phase 8 C: apply defaultTemperature/defaultMaxTokens to composer signals.
+    const { setTemperature, setMaxTokens } = await import('./core/state.js');
+    const defTemp = getSetting('defaultTemperature');
+    if (typeof defTemp === 'number') setTemperature(defTemp);
+    const defTokens = getSetting('defaultMaxTokens');
+    if (defTokens) setMaxTokens(defTokens);
+  } catch (e) { console.warn('[settings] startup load failed', e); }
+  // Apply saved appearance settings (theme/font/density from settings store)
+  applyAppearance();
+
+  // i18n: apply the language setting
+  try { setLang(getSetting('language') || 'en'); } catch {}
+
+  // PWA: register the service worker (safe no-op if unsupported)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 
   // Initialize toast system
   initToasts();
@@ -387,15 +367,26 @@ export async function startApplication() {
   // Set up global namespace for inline handlers
   setupGlobalNamespace();
 
-  // Sync dropdowns with current state
-  syncDropdownsFromState();
-
   // Load providers and models from backend
   try {
     await loadProvidersAndModels();
     await sidebarLoadChatList();
+    // A9: render the rail now that /features returns authenticated state.
+    await loadRailFeatures();
     elements.backendDownState?.classList.add('hidden');
     chatStartNewChat();
+    // Voice: show mic/speak UI only when the backend flag is on.
+    import('./features/voice/voice.js').then((m) => m.initVoice()).catch(() => {});
+    // Image generation: show the composer button only when the flag is on.
+    import('./features/image/image.js').then((m) => m.initImage()).catch(() => {});
+    // Agent teams: show the teams button only when the flag is on.
+    import('./features/teams/teams.js').then((m) => m.initTeams()).catch(() => {});
+    // Learning mode: show the learn button only when the flag is on.
+    import('./features/learn/learn.js').then((m) => m.initLearn()).catch(() => {});
+    // Analytics: show the usage button only when the flag is on.
+    import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
+    // Command palette (Ctrl+P).
+    import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
     showToast({ type: 'success', title: 'Connected', message: `Live backend at ${getApiBaseUrl()}` });
   } catch (err) {
     chatStartNewChat();
@@ -433,12 +424,48 @@ async function init() {
 
   // Initialize modules
   initAuth();
-  initSettings();
+  initAppearance();
   initModelSelector();
   initChatEvents();
   initSidebar();
   initGlobalListeners();
-  initSkills(document.getElementById('skillsOverlay'));
+  initTabs();
+  initRail();
+  initPopovers();
+  initTray();
+  initInspector();
+  // Phase 8 B7: only the 7 merged pages have renderers. Teams/Compare are
+  // Agents sub-views; Skills is a Library sub-view; Images/Voice/Design are
+  // Create sub-views; Routes/Learn/Analytics live in Settings.
+  registerTabRenderer('home', async (bodyEl) => {
+    const { renderHome } = await import('./features/home/home.js');
+    renderHome(bodyEl);
+  });
+  registerTabRenderer('settings', async (bodyEl) => {
+    const { renderSettingsPage } = await import('./features/settings/settings_page.js');
+    renderSettingsPage(bodyEl);
+  });
+  registerTabRenderer('knowledge', async (bodyEl) => {
+    const { renderKnowledgeTab } = await import('./features/knowledge/knowledge.js');
+    renderKnowledgeTab(bodyEl);
+  });
+  registerTabRenderer('agents', async (bodyEl) => {
+    const { renderAgentsPage } = await import('./features/agents/hub.js');
+    renderAgentsPage(bodyEl);
+  });
+  registerTabRenderer('create', async (bodyEl) => {
+    const { renderCreateHub } = await import('./features/create/hub.js');
+    renderCreateHub(bodyEl);
+  });
+  registerTabRenderer('library', async (bodyEl) => {
+    const { renderLibrary } = await import('./features/library/library.js');
+    renderLibrary(bodyEl);
+  });
+  registerTabRenderer('code', async (bodyEl) => {
+    const { renderCodePage } = await import('./features/code-agent/code-agent.js');
+    renderCodePage(bodyEl);
+  });
+
 
   // Initialize auth flow (this will call startApplication on success)
   setStartApplicationCallback(startApplication);

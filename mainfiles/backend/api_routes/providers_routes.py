@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import llm, websearch
+from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models import ProviderKey
@@ -170,3 +171,15 @@ async def health():
 async def get_providers(db: AsyncSession = Depends(get_db)):
     """Return providers that are currently reachable (key linked + endpoint up)."""
     return await llm.list_provider_status(db)
+
+
+# --- Phase 6.4d: fallback chain status ---
+@router.get("/providers/status")
+async def get_provider_status(
+    db=Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Get circuit breaker + quota status for all providers."""
+    from ..providers.fallback_chain import get_fallback_chain
+    chain = get_fallback_chain()
+    return {"providers": chain.get_states()}

@@ -84,10 +84,10 @@ async def auth_headers(client: AsyncClient) -> dict[str, str]:
         "username": f"testuser_{id({})}",
         "password": "TestPass123!",
     }
-    resp = await client.post("/api/register", json=register_payload)
-    if resp.status_code != 200:
+    resp = await client.post("/api/auth/register", json=register_payload)
+    if resp.status_code not in (200, 201):
         # User may already exist from another fixture — try login
-        resp = await client.post("/api/login", json=register_payload)
+        resp = await client.post("/api/auth/login", json=register_payload)
 
     assert resp.status_code == 200, f"Auth setup failed: {resp.text}"
     data = resp.json()

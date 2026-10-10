@@ -4,8 +4,12 @@ Universal AI Provider System - Public Facade
 This module provides the main public API for the provider system.
 All external code should import from here, not from individual modules.
 """
-from collections.abc import AsyncGenerator
+import asyncio
+import random
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
+
+from backend.config import settings
 
 from ..response_events import (
     FinishReason,
@@ -43,6 +47,14 @@ from .model_discovery import (
     fetch_ollama_models,
 )
 from .registry import init_provider_registry, registry
+from .resilience import (
+    CircuitBreaker,
+    CircuitBreakerRegistry,
+    CircuitOpenError,
+    CircuitState,
+    breakers,
+    retry_async,
+)
 
 # Initialize registry on import
 _init_done = False
@@ -228,8 +240,8 @@ def _ensure_initialized() -> None:
                 label="OmniRoute",
                 local=True,
                 env_key_name="OMNIROUTE_API_KEY",
-                api_base="http://localhost:20128/v1",
-                model_endpoint="http://localhost:20128/v1/models",
+                api_base=settings.OMNIROUTE_BASE_URL,
+                model_endpoint=settings.OMNIROUTE_BASE_URL.rstrip("/") + "/models",
                 auth_type="bearer",
                 json_path="data",
                 id_field="id",
@@ -237,6 +249,26 @@ def _ensure_initialized() -> None:
             ),
             OmniRouteProvider
         )
+        # Mock provider for smoke testing — test infrastructure only.
+        # Enabled via SANGAM_MOCK_PROVIDER=1; never shown to real users.
+        from .mock_provider import MockProvider, mock_enabled
+
+        if mock_enabled():
+            registry.register(
+                ProviderConfig(
+                    provider_id="mock",
+                    label="Mock",
+                    local=True,
+                    env_key_name="",
+                    api_base="",
+                    model_endpoint="",
+                    auth_type="bearer",
+                    json_path="data",
+                    id_field="id",
+                    litellm_prefix="mock/",
+                ),
+                MockProvider,
+            )
         _init_done = True
 
 
@@ -258,6 +290,11 @@ async def list_models(db: Any) -> list[ModelInfo]:
 
     # Cloud providers - fetch concurrently
     async def _fetch_one(pid: str) -> list[ModelInfo]:
+        # Mock provider (smoke test): static list, no HTTP, no key.
+        if pid == "mock":
+            from .mock_provider import mock_enabled, mock_model_info
+
+            return [mock_model_info()] if mock_enabled() else []
         api_key = await resolve_api_key(pid, db)
         if not api_key:
             return []
@@ -355,6 +392,45 @@ async def default_model_id(db: Any) -> str | None:
     return models[0].id if models else None
 
 
+async def _stream_with_resilience(
+    provider_id: str,
+    stream_factory: Callable[[], AsyncGenerator[Any]],
+    *,
+    attempts: int = 3,
+) -> AsyncGenerator[Any]:
+    """Yield provider stream chunks with circuit-breaker guard + retries.
+
+    ``stream_factory`` is a zero-arg callable returning a NEW async generator
+    on each call, so a failed attempt can restart the stream from scratch.
+    The breaker is guarded once up front (raises :class:`CircuitOpenError`
+    while the circuit is open). A failed attempt is retried only when the
+    error is retryable (per ``normalize_error``) and no chunk has been
+    yielded yet — retrying a partially consumed stream would duplicate
+    content for downstream consumers. ``asyncio.CancelledError`` is never
+    retried.
+    """
+    breaker = breakers.get(provider_id)
+    await breaker.guard()
+
+    yielded_any = False
+    for attempt in range(attempts):
+        try:
+            async for chunk in stream_factory():
+                yielded_any = True
+                yield chunk
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            await breaker.record_failure()
+            if yielded_any or attempt >= attempts - 1 or not normalize_error(exc).retryable:
+                raise
+            delay = min(8.0, 0.5 * 2**attempt)
+            await asyncio.sleep(delay + random.uniform(0, 0.25 * delay))
+        else:
+            await breaker.record_success()
+            return
+
+
 async def stream_completion(
     model_id: str,
     messages: list[dict],
@@ -389,14 +465,20 @@ async def stream_completion(
         # Pass API key to provider constructor for validation
         provider = provider_class(config, api_key)
 
-    # Stream
-    async for chunk in provider.stream_completion(
-        model_id=model_id,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        reasoning_effort=reasoning_effort,
-        api_key=api_key,
+    # Stream with circuit-breaker guard + retry on retryable errors.
+    # Default-arg binding captures the kwargs by value: the factory is
+    # invoked later (and possibly more than once) by _stream_with_resilience.
+    _kwargs = {
+        "model_id": model_id,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "reasoning_effort": reasoning_effort,
+        "api_key": api_key,
+    }
+    async for chunk in _stream_with_resilience(
+        provider_id,
+        lambda _kw=_kwargs: provider.stream_completion(**_kw),
     ):
         yield chunk
 
@@ -519,14 +601,20 @@ async def stream_response_events(
                     # No user message, fall back to all enabled tools
                     from backend.tools.schemas import tool_definition_to_openai_function
                     tools = [tool_definition_to_openai_function(t) for t in enabled_tools]
-        provider_stream = provider.stream_completion(
-            model_id=litellm_id,
-            messages=current_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            reasoning_effort=reasoning_effort,
-            api_key=api_key,
-            tools=tools,
+        # Each tool round gets a fresh stream, guarded by the circuit breaker
+        # and retried on retryable errors. Default-arg binding captures the
+        # round's messages/tools by value for the (possibly repeated) factory.
+        provider_stream = _stream_with_resilience(
+            provider_id,
+            lambda _msgs=current_messages, _tools=tools: provider.stream_completion(
+                model_id=litellm_id,
+                messages=_msgs,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                reasoning_effort=reasoning_effort,
+                api_key=api_key,
+                tools=_tools,
+            ),
         )
         accumulated_tool_calls = {}
         chunk = None
@@ -660,6 +748,13 @@ __all__ = [
     "ProviderConfig",
     # Provider registry
     "registry",
+    # Resilience (circuit breakers + retry)
+    "breakers",
+    "retry_async",
+    "CircuitBreaker",
+    "CircuitBreakerRegistry",
+    "CircuitOpenError",
+    "CircuitState",
     # Legacy (for compatibility)
     "CURATED_MODELS",
     "MODELS",

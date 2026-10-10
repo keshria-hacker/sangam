@@ -52,7 +52,7 @@ def _has_hedge_suffix(text: str) -> bool:
     )
 
 
-def post_process_response(text: str, guidance: Any) -> str:
+def post_process_response(text: str, guidance: Any, no_slop: bool | None = None, adhd_friendly: bool | None = None) -> str:
     """Prepend a calibrated hedge to low-confidence factual/analysis answers.
 
     Activation conditions (ALL must hold):
@@ -64,6 +64,24 @@ def post_process_response(text: str, guidance: Any) -> str:
     """
     if not text or not text.strip():
         return text
+
+    # Output quality (no-ai-slop / ADHD-friendly): runs on the collected
+    # text at persistence time, never the live stream. Independent of the
+    # hedge logic below.
+    try:
+        from .config import settings
+        from .response_quality import apply_quality
+
+        # Phase 8 C: user settings override env vars if provided.
+        use_no_slop = no_slop if no_slop is not None else settings.QUALITY_NO_SLOP
+        use_adhd = adhd_friendly if adhd_friendly is not None else settings.QUALITY_ADHD_FRIENDLY
+        text, _stats = apply_quality(
+            text,
+            no_slop=use_no_slop,
+            adhd_friendly=use_adhd,
+        )
+    except Exception:  # noqa: BLE001 — quality must never break the chat
+        pass
 
     if guidance is None:
         return text

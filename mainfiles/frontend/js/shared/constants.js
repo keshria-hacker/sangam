@@ -69,15 +69,8 @@ export const TOAST_ICONS = {
   info: 'fa-circle-info',
 };
 
-// Default settings
-export const DEFAULT_SETTINGS = {
-  theme: 'dark',
-  fontSize: 'md',
-  chatWidth: 'default',
-  codeThemeDark: 'github-dark',
-  codeThemeLight: 'github',
-  animations: true,
-};
+// Phase 8 B3: legacy DEFAULT_SETTINGS removed — defaults now come from
+// shared/settings_schema.js via the typed settings store.
 
 // Chat date bucketing
 export const CHAT_BUCKETS = ['Today', 'Yesterday', 'Previous 7 days', 'Previous 30 days', 'Older'];
@@ -92,7 +85,7 @@ export const NON_CHAT_MARKERS = [
 export const STORAGE_KEYS = {
   API_BASE: 'sangam-api-base',
   ACCESS_TOKEN: 'sangam-access-token',
-  SETTINGS: 'sangam-settings',
+  // Phase 8 B3: SETTINGS ('sangam-settings') removed — /user/settings is the source of truth.
 };
 
 // Auth settings
