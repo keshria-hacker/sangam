@@ -357,7 +357,9 @@ export async function runGeneration({ content, fileIds, regenerate }) {
     </div>`;
   // Phase 8: use live DOM lookup — elements.messages may be stale after view re-mounts.
   const messagesEl = document.getElementById('messages') || elements.messages;
+  console.log('[DEBUG] appending typingNode, messagesEl exists:', !!messagesEl);
   messagesEl?.appendChild(typingNode);
+  console.log('[DEBUG] typingNode in DOM after append:', document.contains(typingNode));
   scrollToBottom(true);
 
   var _thinkStartTime = Date.now();
