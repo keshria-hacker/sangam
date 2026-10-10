@@ -607,6 +607,20 @@ export async function runGeneration({ content, fileIds, regenerate }) {
       warning: (message) => {
         if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') console.warn(message);
       },
+      messageEnd: (event) => {
+        // Phase 8: ensure the final text is in the DOM, even if the
+        // streaming node was detached during the stream.
+        try {
+          const liveMessages = document.getElementById('messages');
+          if (liveMessages && !document.contains(typingNode)) {
+            liveMessages.appendChild(typingNode);
+          }
+          const responseEl = typingNode.querySelector('.assistant-response');
+          if (responseEl && collected) {
+            responseEl.innerHTML = renderMarkdownStream(collected);
+          }
+        } catch { /* ignore */ }
+      },
     });
 
     for await (const { event, data } of parseSSE(stream)) {
