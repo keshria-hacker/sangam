@@ -89,7 +89,8 @@ export function initTray() {
   tray.id = 'activityTray';
   tray.className = 'activity-tray';
   tray.innerHTML = `<div class="tray-bar"></div><div class="tray-list hidden"></div>`;
-  document.body.appendChild(tray);
+  // A6: tray lives inside the main panel, never overlapping the sidebar/footer.
+  (document.querySelector('.main-panel') || document.body).appendChild(tray);
   onJobsChange(render);
   render();
   // Tick elapsed times

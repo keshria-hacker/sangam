@@ -163,6 +163,8 @@ function initDOM() {
  */
 /**
  * Initialize the studio rail (intent-grouped navigation).
+ * A9: only registers handlers here. The rail itself renders in
+ * loadRailFeatures(), called post-auth when /features returns real state.
  */
 async function initRail() {
   const container = document.getElementById('railNav');
@@ -182,6 +184,20 @@ async function initRail() {
     openToolTab('settings');
   });
   // Load features and render
+  // (moved to loadRailFeatures — called post-auth from startApplication)
+  // Re-render rail when features change
+  document.addEventListener('sangam:features-changed', async (e) => {
+    renderRail(container, e.detail?.features || {});
+  });
+}
+
+/**
+ * A9: Fetch /features and render the rail. Called once post-auth from
+ * startApplication, so the rail never shows stale "Turn on" badges.
+ */
+async function loadRailFeatures() {
+  const container = document.getElementById('railNav');
+  if (!container) return;
   try {
     const { apiFetch } = await import('./shared/http.js');
     const data = await (await apiFetch('/features')).json();
@@ -189,10 +205,6 @@ async function initRail() {
   } catch {
     renderRail(container, {});
   }
-  // Re-render rail when features change
-  document.addEventListener('sangam:features-changed', async (e) => {
-    renderRail(container, e.detail?.features || {});
-  });
 }
 
 function initGlobalListeners() {
@@ -505,6 +517,8 @@ export async function startApplication() {
   try {
     await loadProvidersAndModels();
     await sidebarLoadChatList();
+    // A9: render the rail now that /features returns authenticated state.
+    await loadRailFeatures();
     elements.backendDownState?.classList.add('hidden');
     chatStartNewChat();
     // Voice: show mic/speak UI only when the backend flag is on.

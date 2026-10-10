@@ -6,6 +6,8 @@
  * Features that are off show as muted with "Turn on" (never invisible).
  */
 import { openToolTab } from '../features/tabs/tabs.js';
+import { apiPost } from '../shared/http.js';
+import { showToast } from '../shared/toast.js';
 
 console.log('[Module] nav.js loaded');
 
@@ -60,7 +62,9 @@ export function renderRail(container, features = {}) {
       + `<span class="rail-badge hidden"></span>`;
     btn.addEventListener('click', () => {
       if (off) {
-        navigate('settings');
+        // A5: "Turn on" enables the feature, then opens it — never
+        // sends the user to Settings instead.
+        enableAndOpen(item, btn, container);
       } else {
         navigate(item.action);
       }
@@ -72,9 +76,31 @@ export function renderRail(container, features = {}) {
   }
 }
 
+/**
+ * A5: Enable a feature via the backend, refresh the rail, then open it.
+ * The rail item said "Turn on" — so clicking turns it on.
+ */
+async function enableAndOpen(item, btn, container) {
+  btn.disabled = true;
+  try {
+    const res = await apiPost(`/features/${encodeURIComponent(item.feature)}`, { enabled: true });
+    const data = await res.json();
+    showToast({ type: 'success', title: `${item.label} turned on` });
+    // Re-render the rail with fresh feature state, then navigate.
+    const features = data.features || {};
+    renderRail(container, features);
+    navigate(item.action);
+    const fresh = container.querySelector(`.rail-item[data-nav="${item.id}"]`);
+    container.querySelectorAll('.rail-item').forEach((b) => b.classList.remove('active'));
+    fresh?.classList.add('active');
+  } catch (err) {
+    showToast({ type: 'error', title: `Could not turn on ${item.label}`, message: err?.message || String(err) });
+    btn.disabled = false;
+  }
+}
+
 /** Set a live badge on a rail item (e.g. running count). */
-export function setRailBadge(itemId, text) {
-  const btn = document.querySelector(`.rail-item[data-nav="${itemId}"]`);
+export function setRailBadge(itemId, text) {  const btn = document.querySelector(`.rail-item[data-nav="${itemId}"]`);
   const badge = btn?.querySelector('.rail-badge');
   if (badge) {
     badge.textContent = text || '';

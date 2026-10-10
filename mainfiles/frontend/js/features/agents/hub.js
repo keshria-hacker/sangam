@@ -42,7 +42,7 @@ export async function renderAgentHub(bodyEl) {
   bodyEl.innerHTML = `
     <div class="agent-hub">
       <div class="hub-header">
-        <h3><i class="fa-solid fa-robot"></i> Agent Hub</h3>
+        <span class="hub-crumb">Agents</span>
         <button class="btn-primary btn-sm" id="hubNew"><i class="fa-solid fa-plus"></i> New agent</button>
       </div>
       <div id="hubFormWrap"></div>

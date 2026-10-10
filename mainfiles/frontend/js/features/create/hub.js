@@ -97,7 +97,7 @@ export async function renderCreateHub(bodyEl) {
   bodyEl.innerHTML = `
     <div class="create-hub">
       <div class="hub-header">
-        <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Create</h3>
+        <span class="hub-crumb">Create</span>
         <div class="create-new-wrap">
           <button class="btn-primary btn-sm" id="createNewBtn"><i class="fa-solid fa-plus"></i> New <i class="fa-solid fa-chevron-down"></i></button>
           <div class="create-new-menu hidden" id="createNewMenu" role="menu">
