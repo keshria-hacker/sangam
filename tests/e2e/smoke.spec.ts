@@ -68,23 +68,9 @@ async function assertNoBadText(page: Page, where: string) {
 }
 
 async function register(page: Page, ctx: Ctx) {
-  // Single-user app: ensure the one account exists via API, then log in
-  // through the UI form to exercise the real login path.
-  const api = page.request;
-  let resp = await api.post(`${BACKEND_URL}/api/auth/register`, {
-    data: { username: USER, password: PASS },
-  });
-  if (resp.status() === 400 || resp.status() === 403 || resp.status() === 409) {
-    // User already exists — log in instead.
-    resp = await api.post(`${BACKEND_URL}/api/auth/login`, {
-      data: { username: USER, password: PASS },
-    });
-  }
-  expect(resp.ok(), `API register/login failed: ${resp.status()} ${await resp.text()}`).toBe(true);
-
+  // Serial execution + single-user app: first test registers via UI (fresh
+  // DB => register mode), later tests log in via UI (login mode).
   await page.goto(FRONTEND_URL);
-  // The API login above sets a session cookie, so the page may load already
-  // authenticated (form hidden). If the form is visible, log in via UI.
   await page.waitForFunction(
     () => {
       const form = document.querySelector('#authForm');
@@ -94,22 +80,24 @@ async function register(page: Page, ctx: Ctx) {
     },
     { timeout: 20000 }
   );
-  const formVisible = await page.locator('#authForm:not(.hidden)').count();
-  if (formVisible) {
-    await page.fill('#authUsername', USER);
-    await page.fill('#authPassword', PASS);
-    const confirmVisible = await page.locator('#authConfirmWrap:not(.hidden)').count();
-    if (confirmVisible) {
-      throw new Error('Auth form in register mode on non-fresh DB — stale state');
-    }
-    await page.click('#authSubmit');
+  if (await page.locator('#authOverlay.hidden').count()) {
+    ctx.loggedIn = true; // already authenticated
+    await page.waitForTimeout(1500);
+    return;
   }
+  const mode = await page.locator('#authForm').getAttribute('data-mode');
+  await page.fill('#authUsername', USER);
+  await page.fill('#authPassword', PASS);
+  if (mode === 'register') {
+    await page.fill('#authConfirmPassword', PASS);
+  }
+  await page.click('#authSubmit');
   await expect(page.locator('#authOverlay')).toHaveClass(/hidden/, { timeout: 20000 });
   ctx.loggedIn = true;
   await page.waitForTimeout(1500); // let /features + initial fetches settle
 }
 
-test.describe('Smoke (required gate)', () => {
+test.describe.serial('Smoke (required gate)', () => {
   test('CSS variables: every var() used is defined', async ({ page }) => {
     const css = await (await fetch(`${FRONTEND_URL}/css/style.css`)).text();
     // Vars used WITHOUT a fallback: var(--x) — these break if undefined.
