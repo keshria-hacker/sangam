@@ -3166,7 +3166,7 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .agents-page, .create-page, .code-page{padding:20px; max-width:1200px;}
 .agents-subbody, .create-subbody, .code-subbody{margin-top:16px;}
 .runs-list{display:flex; flex-direction:column; gap:8px;}
-.run-row{display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--surface); border:1px solid var(--border-soft); border-radius:var(--radius-sm);}
+.run-row{display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--surface-raised); border:1px solid var(--border-soft); border-radius:var(--radius-sm);}
 .run-row i.fa-solid:first-child{color:var(--text-tertiary);}
 .run-main{flex:1; display:flex; flex-direction:column; gap:2px;}
 .run-main strong{font-size:13px;}
