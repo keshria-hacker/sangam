@@ -184,6 +184,9 @@ test.describe.serial('Smoke (required gate)', () => {
     await page.waitForTimeout(500);
     await page.fill('#messageInput', 'Smoke test hello');
     await page.locator('#sendBtn').click();
+    await page.waitForTimeout(8000);
+    const dbgHtml = await page.locator('#messages').innerHTML();
+    console.log('MESSAGES LEN:', dbgHtml.length, 'HAS REPLY:', dbgHtml.includes('Smoke test reply'));
     try {
       await expect(page.locator('#messages')).toContainText('Smoke test reply', { timeout: 30000 });
     } catch (e) {
