@@ -19,8 +19,9 @@ import { test, expect, Page } from '@playwright/test';
 const FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://127.0.0.1:5500';
 const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:8001';
 const PASS = 'Smoke-Test-Password-123';
-// Single-user app: only one account can exist. All tests share it.
-const USER = `smokeuser${Date.now().toString(36)}`;
+// Single-user app: only one account can exist. Fixed name shared across
+// Playwright workers (each worker loads this spec separately).
+const USER = 'smokeuser';
 
 interface BadResponse { url: string; status: number; method: string }
 interface Ctx {
