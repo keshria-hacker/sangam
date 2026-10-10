@@ -16,6 +16,13 @@
  */
 import { test, expect, Page } from '@playwright/test';
 
+// Phase 8: disable HTTP cache — the smoke test iterates on frontend files.
+test.use({
+  launchOptions: {
+    args: ['--disable-http-cache', '--disk-cache-size=1'],
+  },
+});
+
 const FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://127.0.0.1:5500';
 const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:8001';
 const PASS = 'Smoke-Test-Password-123';
