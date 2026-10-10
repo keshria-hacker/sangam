@@ -33,14 +33,14 @@ function buildActions() {
   const a = app();
   const actions = [
     { id: 'new-chat', label: 'New chat', hint: 'Ctrl+K', run: () => a.startNewChat?.() },
-    { id: 'skills', label: 'Open Skills browser', run: () => a.openSkillsTab?.() },
+    { id: 'skills', label: 'Open Library', run: () => a.openSkillsTab?.() },
     { id: 'settings', label: 'Open Settings', hint: 'Ctrl+,', run: () => a.openSettings?.() },
     { id: 'models', label: 'Switch model', hint: 'Ctrl+M', run: () => a.openModelDropdown?.() },
     {
       id: 'export', label: 'Export current chat as Markdown', run: () => exportChat(),
     },
     { id: 'theme', label: 'Toggle theme', hint: 'Ctrl+Shift+T', run: () => toggleTheme() },
-    { id: 'websearch', label: 'Toggle web search', hint: 'Ctrl+Shift+W', run: () => toggleWebSearch() },
+    { id: 'websearch', label: 'Toggle web search', hint: 'Alt+W', run: () => toggleWebSearch() },
     { id: 'copy', label: 'Copy last response', hint: 'Ctrl+Shift+C', run: () => copyLast() },
     { id: 'regen', label: 'Regenerate last response', hint: 'Ctrl+Shift+R', run: () => a.regenerate?.() },
   ];

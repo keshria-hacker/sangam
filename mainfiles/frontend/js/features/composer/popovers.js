@@ -145,8 +145,8 @@ export function initPopovers() {
             <option value="1024">1,024</option><option value="2048">2,048</option>
             <option value="4096">4,096</option><option value="8192">8,192</option>
           </select></div>
-        <div class="tune-row"><label>Temperature <span id="tuneTempVal"></span></label>
-          <input type="range" id="tuneTemp" min="0" max="2" step="0.1"></div>
+        <div class="tune-row"><label>Temperature</label>
+          <span class="tune-temp"><span id="tuneTempVal"></span><input type="range" id="tuneTemp" min="0" max="2" step="0.1"></span></div>
         <div class="tune-row"><label>Output style</label>
           <select id="tuneStyle">
             <option value="normal">Normal</option><option value="concise">Concise</option>

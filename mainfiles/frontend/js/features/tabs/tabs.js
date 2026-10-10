@@ -166,6 +166,10 @@ export function showTool(tool) {
   $('#toolView')?.classList.remove('hidden');
   const titleEl = $('#toolViewTitle');
   if (titleEl) titleEl.innerHTML = `<i class="fa-solid ${def.icon}"></i> ${def.title}`;
+  // The pinned tab shows the active rail view's name (not "Chat") so the
+  // strip always matches what's on screen.
+  const mainTab = $('#mainTab');
+  if (mainTab) mainTab.innerHTML = `<i class="fa-solid ${def.icon}" aria-hidden="true"></i><span>${def.title}</span>`;
   renderTabStrip();
 }
 
@@ -226,6 +230,11 @@ export function switchTab(tabId) {
   const isMain = tabId === 'main';
   $('#chatView')?.classList.toggle('hidden', !isMain);
   $('#toolView')?.classList.toggle('hidden', isMain);
+  if (isMain) {
+    // Restore the pinned tab's chat label after a rail view renamed it.
+    const mainTab = $('#mainTab');
+    if (mainTab) mainTab.innerHTML = `<i class="fa-solid fa-message" aria-hidden="true"></i><span>Chat</span>`;
+  }
   if (!isMain) {
     const tab = openTabs.find((t) => t.id === tabId);
     if (tab) {

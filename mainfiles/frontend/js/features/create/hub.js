@@ -60,16 +60,6 @@ const TEMPLATES = [
     title: 'DESIGN.md',
     content: `# Design System\n\n> Single source of truth for UI tokens, components, and patterns.\n\n## Tokens\n\n### Color\n| Token | Light | Dark | Usage |\n|-------|-------|------|-------|\n| \`--bg-base\` | #F4F2ED | #121315 | Page ground |\n| \`--bg-surface\` | #FBFAF7 | #191A1D | Chrome |\n| \`--accent\` | #3A342B | #E6E4DE | Ink |\n\n### Typography\n| Token | Value | Usage |\n|-------|-------|-------|\n| \`--font-display\` | Sora | Headings |\n| \`--font-body\` | Inter | Body |\n| \`--font-mono\` | JetBrains Mono | Code |\n\n### Spacing\n- Base unit: 4px\n- Scale: 4 / 8 / 12 / 16 / 24 / 32 / 48\n\n### Radius\n- sm: 6px, md: 8px, lg: 12px, full: 999px\n\n## Components\n\n### Button\n- Primary: ink background, paper text\n- Secondary: transparent, bordered\n- Sizes: sm / md / lg\n\n### Card\n- Surface: --bg-elevated\n- Border: 1px var(--border-soft)\n- Radius: var(--radius-sm)\n\n## Patterns\n- No pure #FFF / #000\n- Color is semantic only (success/warning/danger)\n- 120ms / 200ms micro-interactions\n`,
   },
-  {
-    name: 'Image studio', icon: 'fa-image', type: '_image_studio',
-    title: 'Generate an image',
-    content: '',
-  },
-  {
-    name: 'Voice studio', icon: 'fa-microphone', type: '_voice_studio',
-    title: 'Record or synthesize voice',
-    content: '',
-  },
 ];
 
 // --- module state (one hub instance per mount) ---
@@ -96,8 +86,7 @@ async function renderDocumentsView(bodyEl) {
   viewVersion = null;
   bodyEl.innerHTML = `
     <div class="create-hub">
-      <div class="hub-header">
-        <span class="hub-crumb">Create</span>
+      <div class="hub-header create-hub-header">
         <div class="create-new-wrap">
           <button class="btn-primary btn-sm" id="createNewBtn"><i class="fa-solid fa-plus"></i> New <i class="fa-solid fa-chevron-down"></i></button>
           <div class="create-new-menu hidden" id="createNewMenu" role="menu">
@@ -142,7 +131,7 @@ function wireNewMenu() {
 function renderTemplates() {
   const wrap = root.querySelector('#createTemplates');
   wrap.innerHTML = TEMPLATES.map((t, i) => {
-    const label = t.type.startsWith('_') ? 'Studio' : escapeHtml(TYPE_META[t.type].label);
+    const label = escapeHtml(TYPE_META[t.type].label);
     return `
     <button type="button" class="hub-card create-tpl" data-tpl="${i}">
       <div class="hub-card-head"><i class="fa-solid ${t.icon}"></i><strong>${escapeHtml(t.name)}</strong></div>
@@ -152,15 +141,6 @@ function renderTemplates() {
   wrap.querySelectorAll('[data-tpl]').forEach((b) => {
     b.addEventListener('click', () => {
       const t = TEMPLATES[Number(b.dataset.tpl)];
-      // Studio entries switch the Create page to that sub-view (Phase 8 B7)
-      if (t.type === '_image_studio') {
-        document.querySelector('[data-createsub="image"]')?.click();
-        return;
-      }
-      if (t.type === '_voice_studio') {
-        document.querySelector('[data-createsub="voice"]')?.click();
-        return;
-      }
       createArtifact(t.type, t.title, t.content);
     });
   });

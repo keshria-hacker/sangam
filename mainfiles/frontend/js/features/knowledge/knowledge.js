@@ -402,7 +402,7 @@ async function loadMcp(bodyEl) {
     const data = await (await apiFetch('/extensions')).json();
     const servers = (data.extensions || []).filter((e) => e.kind === 'mcp_server');
     if (!servers.length) {
-      box.innerHTML = `<p class="settings-hint">No MCP servers configured. Add one via the extensions system.</p>`;
+      box.innerHTML = `<p class="settings-hint">No MCP servers configured. Add one in Library → Extensions.</p>`;
       return;
     }
     box.innerHTML = servers.map((s) => `

@@ -109,7 +109,7 @@ function renderSkills(wrap) {
       ${skills.map((s) => `
         <div class="lib-card" data-skill="${escapeHtml(s.id || s.name)}">
           <div class="lib-card-head">
-            <strong>${escapeHtml(s.name)}</strong>
+            <strong>${escapeHtml((s.name || '').replace(/^(skill-pack|skill):/, ''))}</strong>
             ${kindBadge(s.kind)}
           </div>
           <p class="lib-desc">${escapeHtml(s.description || 'No description.')}</p>
@@ -122,7 +122,7 @@ function renderSkills(wrap) {
         </div>`).join('') || '<p class="settings-hint">No skills registered.</p>'}
     </div>
     <div class="lib-section">
-      <h4><i class="fa-solid fa-file-import"></i> Imported drafts <span class="settings-hint">(local, until backend install lands)</span></h4>
+      <h4><i class="fa-solid fa-file-import"></i> Imported drafts</h4>
       <div id="libDrafts" class="lib-grid"></div>
     </div>`;
   wireToggles(wrap);
