@@ -15,7 +15,6 @@ import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';
 import { renderRail, registerNavHandler } from './core/nav.js';
 import { initPopovers } from './features/composer/popovers.js';
-import { initTray } from './features/tray/tray.js';
 import { initInspector } from './features/inspector/inspector.js';
 import { initElements as initSidebarElements, initSidebar, openMobileSidebar, closeMobileSidebar, toggleSidebarCollapse, loadChatList as sidebarLoadChatList, renderChatHistory as sidebarRenderChatHistory, openChat as sidebarOpenChat, deleteChat as sidebarDeleteChat } from './features/sidebar/sidebar.js';
 import { showToast, initToasts } from './shared/toast.js';
@@ -148,7 +147,7 @@ async function initRail() {
   if (!container) return;
   // Register nav handlers
   registerNavHandler('home', () => {
-    showTool('home');
+    openToolTab('home');
   });
   registerNavHandler('chat', () => {
     const { switchTab } = window.__sangamTabs || {};
@@ -156,7 +155,7 @@ async function initRail() {
     document.getElementById('mainTab')?.click();
   });
   registerNavHandler('settings', () => {
-    showTool('settings');
+    openToolTab('settings');
   });
   // Load features and render
   // (moved to loadRailFeatures — called post-auth from startApplication)
@@ -438,7 +437,6 @@ async function init() {
   initTabs();
   initRail();
   initPopovers();
-  initTray();
   initInspector();
   // Phase 8 B7: only the 7 merged pages have renderers. Teams/Compare are
   // Agents sub-views; Skills is a Library sub-view; Images/Voice/Design are

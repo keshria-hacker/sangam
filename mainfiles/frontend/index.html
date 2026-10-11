@@ -84,14 +84,16 @@ if (location.protocol === 'file:') {
 
       <div class="sidebar-header">
         <div class="brand">
-          <span class="logo-mark sidebar-logo-mark" aria-hidden="true">
-            <img src="assets/logo.png" alt="Sangam logo" class="app-logo">
-          </span>
+          <button class="sidebar-brand-toggle" id="collapseSidebar" title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true">
+            <span class="logo-mark sidebar-logo-mark" aria-hidden="true">
+              <img src="assets/logo.png" alt="Sangam logo" class="app-logo">
+            </span>
+            <span class="sidebar-toggle-icon" aria-hidden="true">
+              <i class="fa-solid fa-angles-left"></i>
+            </span>
+          </button>
           <span class="brand-name">Sangam</span>
         </div>
-        <button class="icon-btn ghost" id="collapseSidebar" title="Collapse sidebar" aria-label="Collapse sidebar">
-          <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
-        </button>
       </div>
 
       <button class="new-chat-btn" id="newChatBtn" title="Start a new chat (Ctrl K)">
@@ -114,18 +116,14 @@ if (location.protocol === 'file:') {
       </nav>
 
       <div class="sidebar-footer">
-        <a class="sidebar-footer-btn star-btn" href="https://github.com/keshria-hacker/sangam" target="_blank" rel="noopener" title="Star Sangam on GitHub">
-          <i class="fa-brands fa-github" aria-hidden="true"></i>
-          <span>Star</span>
-        </a>
-        <div class="profile-section" id="profileSection" role="button" tabindex="0" aria-label="Open profile menu" title="Open profile menu">
-          <div class="profile-avatar" id="profileAvatar">N</div>
-          <div class="profile-meta">
+        <button class="profile-section" id="profileSection" type="button" aria-haspopup="dialog" aria-expanded="false">
+          <span class="profile-avatar" id="profileAvatar">N</span>
+          <span class="profile-meta">
             <span class="profile-name" id="profileName">Local account</span>
             <span class="profile-plan">Personal workspace</span>
-          </div>
-          <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
-        </div>
+          </span>
+          <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+        </button>
       </div>
 
     </div>
@@ -165,46 +163,13 @@ if (location.protocol === 'file:') {
         <i class="fa-solid fa-message" aria-hidden="true"></i><span>Chat</span>
       </div>
       <div class="tab-list" id="toolTabList"></div>
+      <button class="tab-add" id="tabAdd" type="button" title="Open a new tab" aria-label="Open a new tab" aria-expanded="false">
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+      </button>
     </div>
 
     <!-- Chat view (main tab) -->
     <div class="chat-view" id="chatView">
-
-    <!-- Top bar -->
-    <header class="topbar">
-      <button class="icon-btn expand-btn hidden" id="expandSidebar" title="Expand sidebar" aria-label="Expand sidebar">
-        <i class="fa-solid fa-angles-right" aria-hidden="true"></i>
-      </button>
-
-      <div class="model-selector" id="modelSelector">
-        <button class="model-selector-btn" id="modelSelectorBtn" aria-haspopup="listbox" aria-expanded="false">
-          <span class="provider-dot" style="--dot-color:#D97757"></span>
-          <span class="model-name">Loading models…</span>
-          <span class="model-provider">Checking providers</span>
-          <span class="status-dot offline" title="Not linked"></span>
-          <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-        </button>
-
-        <div class="model-dropdown" id="modelDropdown" role="listbox">
-          <div class="model-dropdown-search">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="text" id="modelSearch" placeholder="Search models or providers…" aria-label="Search models or providers">
-            <button class="search-clear hidden" id="modelSearchClear" aria-label="Clear search"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-          </div>
-          <div class="model-provider-filters" id="modelProviderFilters" aria-label="Filter models by provider"></div>
-          <div class="model-list" id="modelList"><!-- Populated by JS --></div>
-        </div>
-      </div>
-
-      <div class="topbar-right">
-        <span class="conn-pulse" id="connPulse" title="All linked providers reachable">
-          <span class="pulse-dot"></span> Checking providers
-        </span>
-        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
-          <i class="fa-solid fa-moon" aria-hidden="true"></i>
-        </button>
-      </div>
-    </header>
 
     <!-- Chat scroll region -->
     <div class="chat-scroll" id="chatScroll">
@@ -249,7 +214,7 @@ if (location.protocol === 'file:') {
               <span>Explain temperature vs. token limit</span>
             </button>
           </div>
-          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> New chat · <kbd>Ctrl+P</kbd> Commands · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Alt+W</kbd> Toggle web search · <kbd>Ctrl+Enter</kbd> Send</p>
+          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> New chat · <kbd>Ctrl+P</kbd> Commands · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Alt+W</kbd> Toggle web search</p>
         </div>
 
         <!-- Messages render here -->
@@ -333,6 +298,26 @@ if (location.protocol === 'file:') {
         </div>
 
         <div class="composer-controls">
+          <div class="model-selector" id="modelSelector">
+            <button class="model-selector-btn" id="modelSelectorBtn" aria-haspopup="listbox" aria-expanded="false">
+              <span class="provider-dot" style="--dot-color:#D97757"></span>
+              <span class="model-name">Loading models…</span>
+              <span class="model-provider">Checking providers</span>
+              <span class="status-dot offline" title="Not linked"></span>
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </button>
+
+            <div class="model-dropdown" id="modelDropdown" role="listbox">
+              <div class="model-dropdown-search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="text" id="modelSearch" placeholder="Search models or providers…" aria-label="Search models or providers">
+                <button class="search-clear hidden" id="modelSearchClear" aria-label="Clear search"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+              </div>
+              <div class="model-provider-filters" id="modelProviderFilters" aria-label="Filter models by provider"></div>
+              <div class="model-list" id="modelList"><!-- Populated by JS --></div>
+            </div>
+          </div>
+
           <div class="composer-popover-wrap">
             <button class="pill-control" id="modeBtn" title="Composer mode" aria-haspopup="true">
               <i class="fa-solid fa-comment" aria-hidden="true"></i><span>Chat</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
@@ -352,7 +337,6 @@ if (location.protocol === 'file:') {
             <div class="composer-popover hidden" id="tunePopover" role="menu"></div>
           </div>
 
-          <span class="composer-hint" id="composerHint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to send</span>
           <span class="token-counter" id="tokenCounter" title="Estimated token count"></span>
         </div>
       </div>
@@ -507,6 +491,6 @@ if (location.protocol === 'file:') {
 </script>
 
 <!-- App (ES modules) — ?v=YYYYMMDD cache-bust prevents stale module graph -->
-<script type="module" src="js/app.js?v=20261010b"></script>
+<script type="module" src="js/app.js?v=20261011c"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
  * action. Feeds the rail, command palette, and deep links.
  * Features that are off show as muted with "Turn on" (never invisible).
  */
-import { showTool } from '../features/tabs/tabs.js';
+import { openToolTab } from '../features/tabs/tabs.js';
 import { apiPost } from '../shared/http.js';
 import { showToast } from '../shared/toast.js';
 
@@ -18,15 +18,14 @@ export const NAV_ITEMS = [
   { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'tab:knowledge', feature: null },
   { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'tab:create', feature: null },
   { id: 'code',      label: 'Code',      icon: 'fa-code',             action: 'tab:code',   feature: null },
-  { id: 'library',   label: 'Library',   icon: 'fa-book',             action: 'tab:library', feature: null },
-  // Phase 8 B7: rail is 7 items. Merged away:
+  { id: 'library',   label: 'Library',  icon: 'fa-book',               action: 'tab:library', feature: null },
+  { id: 'settings',  label: 'Settings',  icon: 'fa-gear',              action: 'settings',  feature: null },
+  // Phase 8 B7: merged pages. The old separate tabs are gone:
   // - learn, insights -> Settings sub-pages
   // - images, voice -> Create sub-views
 ];
 
-export const NAV_BOTTOM = [
-  { id: 'settings', label: 'Settings', icon: 'fa-gear', action: 'settings', feature: null },
-];
+export const NAV_BOTTOM = [];
 
 let handlers = {};
 
@@ -41,7 +40,7 @@ export function navigate(action) {
   }
   // Default: tab:xxx shows the tool in the main view (Phase 8 B6: rail replaces view)
   if (action.startsWith('tab:')) {
-    showTool(action.slice(4));
+    openToolTab(action.slice(4));
   }
 }
 
@@ -90,7 +89,6 @@ export function renderRail(container, features = {}) {
         markRailActive(container, item.id);
       }
     });
-    if (item.id === 'settings') btn.classList.add('rail-bottom');
     container.appendChild(btn);
   }
 }
