@@ -11,20 +11,10 @@ import { showToast } from '../shared/toast.js';
 
 console.log('[Module] nav.js loaded');
 
-export const NAV_ITEMS = [
-  { id: 'home',      label: 'Home',      icon: 'fa-house',            action: 'home',      feature: null },
-  { id: 'chat',      label: 'Chat',      icon: 'fa-comment',          action: 'chat',      feature: null },
-  { id: 'agents',    label: 'Agents',    icon: 'fa-robot',            action: 'tab:agents', feature: null },
-  { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'tab:knowledge', feature: null },
-  { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'tab:create', feature: null },
-  { id: 'code',      label: 'Code',      icon: 'fa-code',             action: 'tab:code',   feature: null },
-  { id: 'library',   label: 'Library',  icon: 'fa-book',               action: 'tab:library', feature: null },
-  { id: 'settings',  label: 'Settings',  icon: 'fa-gear',              action: 'settings',  feature: null },
-  // Phase 8 B7: merged pages. The old separate tabs are gone:
-  // - learn, insights -> Settings sub-pages
-  // - images, voice -> Create sub-views
-];
-
+// The sidebar is intentionally focused on chat history. Studio tools remain
+// available through tabs and the command palette instead of duplicating them
+// as a second navigation rail.
+export const NAV_ITEMS = [];
 export const NAV_BOTTOM = [];
 
 let handlers = {};
