@@ -38,10 +38,11 @@ async function login(page: any) {
 test.describe('Golden Paths', () => {
   test('1. First run — app loads, sidebar visible, no dead ends', async ({ page }) => {
     await login(page);
-    // Sidebar nav items should be visible
+    // The sidebar intentionally stays focused on chat history; tools open
+    // through tabs, the profile menu, or the command palette.
     await expect(page.locator('#sidebar')).toBeVisible();
     const navItems = await page.locator('.rail-item').count();
-    expect(navItems).toBeGreaterThan(5);
+    expect(navItems).toBe(0);
     // Main chat input should be usable
     await expect(page.locator('#messageInput')).toBeVisible();
     await page.screenshot({ path: 'tests/e2e/screenshots/golden-1-first-run.png' });
@@ -97,13 +98,10 @@ test.describe('Golden Paths', () => {
 
   test('6. Settings — page loads, toggles work', async ({ page }) => {
     await login(page);
-    const settingsBtn = page.locator('[data-nav="settings"]');
-    if (await settingsBtn.count() > 0) {
-      await settingsBtn.first().click();
-      await page.waitForTimeout(2000);
-      await page.screenshot({ path: 'tests/e2e/screenshots/golden-6-settings.png' });
-    } else {
-      test.skip(true, 'Settings tab not found');
-    }
+    await page.locator('#profileSection').click();
+    await page.locator('#preferencesBtn').click();
+    await page.waitForTimeout(2000);
+    await expect(page.getByText('Research & Web')).toBeVisible();
+    await page.screenshot({ path: 'tests/e2e/screenshots/golden-6-settings.png' });
   });
 });

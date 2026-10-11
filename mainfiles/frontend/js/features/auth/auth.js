@@ -6,6 +6,7 @@ import { getApiBaseUrl, apiFetch, apiPost } from '../../shared/http.js';
 import { showToast, showError } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { STORAGE_KEYS } from '../../shared/constants.js';
+import { openSettings } from '../settings/open.js';
 
 console.log('[Module] auth.js loaded');
 
@@ -173,10 +174,10 @@ export function initProfilePopup() {
     showToast({ type: 'info', message: 'Account settings would open here' });
   }, { signal: sig });
 
-  // Preferences (stub)
+  // Preferences opens the schema-driven Settings page.
   elements.preferencesBtn?.addEventListener('click', () => {
     hideProfilePopup();
-    showToast({ type: 'info', message: 'Preferences would open here' });
+    openSettings();
   }, { signal: sig });
 }
 

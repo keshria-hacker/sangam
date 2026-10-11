@@ -38,7 +38,7 @@
 - Extensible Skills system + skill packs
 - Local authentication (scrypt password hashing, login lockout, forgot/reset flow)
 - Ollama auto-detection and auto-start (Sangam launches `ollama serve` in the background if installed but not running)
-- **Studio shell**: intent-grouped rail, browser-style tabs, Inspector panel, Activity Tray
+- **Studio shell**: chat-focused sidebar, browser-style tabs, Inspector panel, Activity Tray
 - **Knowledge graph**: unified graph of memories, docs, code, chats with provenance
 - **Agent Hub**: custom agents with tools, approval policies, cost budgets, run history
 - **Multi-agent Teams**: fan-out/fan-in with SSE streaming per specialist
@@ -310,7 +310,7 @@ feature owns its own DOM, state, and logic. 47 modules total (verified by
 | Module | Responsibility |
 |--------|----------------|
 | `state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings, etc. Also `createComputed` / `createSyncedSignal` helpers |
-| `nav.js` | Intent-grouped rail navigation (Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings) |
+| `nav.js` | Compatibility hook for future tool navigation; the current UI keeps the sidebar focused on chat history |
 | `jobs.js` | Background job tracking for the Activity Tray |
 
 **Shared** (`js/shared/`):
