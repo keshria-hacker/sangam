@@ -89,7 +89,7 @@ async def chat_stream(  # noqa: PLR0912
         try:
             last_user = next((m.content for m in reversed(payload.messages) if m.role == "user"), "")
             if last_user:
-                results = await websearch.web_search(last_user)
+                results = await websearch.web_search(last_user, max_results=payload.web_search_max_results)
                 web_context = websearch.format_context(last_user, results)
         except Exception as exc:  # noqa: BLE001 — surface but don't kill the chat
             web_context = f"[Web search unavailable: {exc}]"

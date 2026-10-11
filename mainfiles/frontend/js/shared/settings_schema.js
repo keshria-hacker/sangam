@@ -14,6 +14,7 @@ export const SETTING_CATEGORIES = [
   { id: 'models',      label: 'Models & Routing',   icon: 'fa-server' },
   { id: 'agents',      label: 'Agents & Safety',    icon: 'fa-robot' },
   { id: 'knowledge',   label: 'Knowledge & Memory', icon: 'fa-brain' },
+  { id: 'research',    label: 'Research & Web',     icon: 'fa-globe' },
   { id: 'voice_output', label: 'Voice & Output',    icon: 'fa-microphone' },
   // Phase 8 C: 14 categories merged to 7. Removed: workspace, create, library,
   // shortcuts, privacy (analyticsOptIn -> general), doctor (-> models),
@@ -69,6 +70,12 @@ export const SETTINGS_SCHEMA = [
   // ---- Knowledge & Memory ----
   { key: 'memoryAutoExtract', label: 'Auto-extract memories', description: 'Save important facts from conversations.', type: 'boolean',
     default: true, category: 'knowledge' },
+
+  // ---- Research ----
+  { key: 'webSearchEnabled', label: 'Web search', description: 'Allow current web results to be added to research and chat responses.', type: 'boolean',
+    default: true, category: 'research' },
+  { key: 'webSearchMaxResults', label: 'Results per search', description: 'Maximum number of sources to use for a web search.', type: 'number',
+    default: 5, min: 1, max: 10, category: 'research' },
 
   // ---- Voice ----
   { key: 'voiceAutoSpeak', label: 'Auto-speak responses', type: 'boolean',

@@ -57,11 +57,13 @@ const TOOL_DEFS = [
 ];
 
 let enabledTools = new Set(['web_search', 'memory_recall', 'documents']);
+if (getSetting('webSearchEnabled') === false) enabledTools.delete('web_search');
 
 export function getEnabledTools() { return [...enabledTools]; }
 export function isToolEnabled(id) { return enabledTools.has(id); }
 export function setToolEnabled(id, on) {
   if (on) enabledTools.add(id); else enabledTools.delete(id);
+  if (id === 'web_search') setSetting('webSearchEnabled', on);
   document.dispatchEvent(new CustomEvent('sangam:tools-changed', { detail: { tools: [...enabledTools] } }));
   renderToolsButton();
 }
@@ -81,6 +83,14 @@ function closeAllPopovers() {
 export function initPopovers() {
   renderModeButton();
   renderToolsButton();
+  document.addEventListener('sangam:settings-changed', (event) => {
+    if (event.detail?.key !== 'webSearchEnabled') return;
+    const enabled = event.detail.value !== false;
+    if (enabled) enabledTools.add('web_search');
+    else enabledTools.delete('web_search');
+    document.dispatchEvent(new CustomEvent('sangam:tools-changed', { detail: { tools: [...enabledTools] } }));
+    renderToolsButton();
+  });
 
   // Mode popover
   const modeBtn = document.getElementById('modeBtn');

@@ -2660,6 +2660,13 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .sp-section-title i{color:var(--text-tertiary);}
 .sp-section-body .provider-status-row{margin-bottom:6px;}
 .sp-section-body .memory-stats{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px;}
+.settings-search-test{display:flex; gap:8px; align-items:center; max-width:620px;}
+.settings-search-test .provider-key-input{flex:1; min-width:0;}
+.settings-search-results{display:flex; flex-direction:column; gap:6px; margin-top:12px; max-width:620px;}
+.settings-search-result{display:flex; flex-direction:column; gap:3px; padding:10px 12px; border:1px solid var(--border-soft); border-radius:var(--radius-sm); background:var(--bg-elevated); color:var(--text-primary); text-decoration:none;}
+.settings-search-result:hover{border-color:var(--accent); background:var(--bg-hover);}
+.settings-search-result strong{font-size:12px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.settings-search-result span{font-size:11px; line-height:1.4; color:var(--text-tertiary); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
 .sp-setting-right select{min-width:160px;}
 .sp-setting-right input[type="text"]{min-width:200px;}
 .sp-number{width:100px;}
@@ -2673,6 +2680,7 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   .sp-sidebar{width:100%; border-right:none; padding-right:0; border-bottom:1px solid var(--border-soft); padding-bottom:12px;}
   .sp-cats{flex-direction:row; flex-wrap:wrap;}
   .sp-main{padding-left:0; padding-top:16px;}
+  .settings-search-test{align-items:stretch; flex-direction:column;}
 }
 
 /* Home + Doctor */
