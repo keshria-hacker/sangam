@@ -57,32 +57,32 @@ html{transition:background var(--dur-med) var(--ease);}
 
 /* ---------- PAPER — light theme ---------- */
 [data-theme="light"]{
-  /* Fixed ink accent — monochrome chrome (no brand hue) */
-  --accent:#3A342B;          /* deep warm ink */
+  /* Warm amber is reserved for actions and selected states. */
+  --accent:#B8651B;
   --logo-filter:brightness(0);
-  --accent-rgb:58,52,43;
-  --accent-soft:#C7C0B1;     /* muted warm gray — WCAG AA on accent */
-  --on-accent:#FBFAF7;       /* text on accent fill */
+  --accent-rgb:184,101,27;
+  --accent-soft:#8F4E16;
+  --on-accent:#FFF9F0;
 
-  --bg-base:#F4F2ED;          /* warm paper */
-  --bg-surface:#FBFAF7;       /* soft off-white */
-  --bg-elevated:#FEFDF9;      /* raised card — warm off-white, never pure #FFF */
-  --bg-elevated-2:#EDEAE3;    /* subtle gray */
-  --bg-elevated-3:#E5E1D9;    /* deeper gray for inline code */
-  --bg-hover:#F1EFEA;
-  --bg-active:#E7E3D9;
-  --border:#DCD7CC;
-  --border-strong:#C7C0B1;
-  --border-soft:#E6E2D8;
+  --bg-base:#F4F1EA;
+  --bg-surface:#F8F6F1;
+  --bg-elevated:#FBFAF6;
+  --bg-elevated-2:#E8E2D3;
+  --bg-elevated-3:#DED7C8;
+  --bg-hover:#F0ECE3;
+  --bg-active:#E8E2D3;
+  --border:#E3DED1;
+  --border-strong:#CFC5B4;
+  --border-soft:#ECE7DC;
   --text-primary:#201D17;     /* near-black warm ink */
-  --text-secondary:#5A554A;
-  --text-tertiary:#6A6458;    /* WCAG AA on bg-base */
-  --text-disabled:#858074;    /* WCAG AA large text on bg-base */
-  --input-bg:#FEFDF9;
-  --user-bubble:#E9E5DA;      /* monochrome user surface */
+  --text-secondary:#5F594F;
+  --text-tertiary:#6F695D;
+  --text-disabled:#827A6D;
+  --input-bg:#FBFAF6;
+  --user-bubble:#EBE5D8;
   --focus-ring:rgba(var(--accent-rgb),.45);
   --glass-bg:rgba(251,250,247,.9);
-  --composer-bg:rgba(254,253,249,.94);
+  --composer-bg:rgba(251,250,246,.94);
   --shadow-1:0 1px 2px rgba(45,40,30,.06);
   --shadow-2:0 6px 18px rgba(45,40,30,.09);
   --shadow-3:0 20px 48px rgba(45,40,30,.14);
@@ -127,32 +127,32 @@ html{transition:background var(--dur-med) var(--ease);}
 
 /* ---------- INK — dark theme ---------- */
 [data-theme="dark"]{
-  /* Fixed ink accent — monochrome chrome (no brand hue) */
-  --accent:#E6E4DE;          /* soft warm white */
+  /* The same amber signal is softened for the charcoal theme. */
+  --accent:#D99A62;
   --logo-filter:brightness(0) invert(1);
-  --accent-rgb:230,228,222;
-  --accent-soft:#3A3B41;     /* border-strong — WCAG AA on accent */
-  --on-accent:#201D17;       /* text on accent fill */
+  --accent-rgb:217,154,98;
+  --accent-soft:#E7B889;
+  --on-accent:#241A12;
 
-  --bg-base:#121315;          /* deep charcoal */
-  --bg-surface:#191A1D;       /* graphite */
-  --bg-elevated:#202125;
-  --bg-elevated-2:#28292E;
-  --bg-elevated-3:#2E2F34;    /* deeper gray for inline code */
-  --bg-hover:#26272B;
-  --bg-active:#2E2F34;
-  --border:#2C2D32;
-  --border-strong:#3A3B41;
-  --border-soft:#24252A;
-  --text-primary:#EAE9E4;     /* soft white */
-  --text-secondary:#A3A29B;
-  --text-tertiary:#8E8D86;    /* WCAG AA on bg-base */
-  --text-disabled:#6E6D66;    /* WCAG AA large text on bg-base */
-  --input-bg:#202125;
-  --user-bubble:#242529;
+  --bg-base:#1E1D1B;
+  --bg-surface:#242321;
+  --bg-elevated:#292825;
+  --bg-elevated-2:#34322C;
+  --bg-elevated-3:#3B3932;
+  --bg-hover:#2E2C28;
+  --bg-active:#34322C;
+  --border:#38362F;
+  --border-strong:#4A473D;
+  --border-soft:#2D2B27;
+  --text-primary:#ECE8DF;
+  --text-secondary:#AAA397;
+  --text-tertiary:#9D978A;
+  --text-disabled:#787267;
+  --input-bg:#292825;
+  --user-bubble:#33312B;
   --focus-ring:rgba(var(--accent-rgb),.6);
   --glass-bg:rgba(25,26,29,.92);
-  --composer-bg:rgba(32,33,37,.9);
+  --composer-bg:rgba(41,40,37,.94);
   --shadow-1:0 1px 2px rgba(0,0,0,.32);
   --shadow-2:0 8px 24px rgba(0,0,0,.42);
   --shadow-3:0 22px 60px rgba(0,0,0,.55);
@@ -3034,3 +3034,21 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   /* Composer popovers become bottom sheets that can't overflow the viewport */
   .composer-popover{position:fixed; left:12px; right:12px; bottom:90px; min-width:0; max-width:none;}
 }
+
+/* ---------- Warm interaction accents ---------- */
+.new-chat-btn{
+  background:var(--accent);
+  color:var(--on-accent);
+  box-shadow:0 4px 14px rgba(var(--accent-rgb),.18);
+}
+.new-chat-btn:hover{opacity:1; filter:brightness(1.06);}
+.chat-item.active,
+.rail-item.active{
+  background:rgba(var(--accent-rgb),.12);
+}
+.chat-item.active i.chat-icon,
+.rail-item.active i{color:var(--accent);}
+.tab-active{background:var(--bg-base); border-color:var(--border);}
+.composer-row{background:rgba(var(--accent-rgb),.045);}
+.suggestion-card{background:var(--bg-surface);}
+.suggestion-card i{background:rgba(var(--accent-rgb),.13);}

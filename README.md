@@ -84,7 +84,7 @@ Conversation history is stored locally and organized in a date-based sidebar.
 
 ### 🎨 Customizable Interface
 
-A **Paper / Ink** design system — warm paper whites (PAPER) or deep charcoal (INK), with a restrained monochrome palette. Adjust font size, chat width, code theme, and animations from Settings.
+A **Paper / Ink** design system — warm paper whites (PAPER) or deep charcoal (INK), with a restrained amber action accent. Adjust font size, chat width, code theme, and animations from Settings.
 
 ### 🔐 Privacy Focused
 
