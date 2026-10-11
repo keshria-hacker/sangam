@@ -109,6 +109,24 @@
 
 Chat streaming DOM detachment — backend works, frontend render fragile. Documented in STUDIO_AUDIT.md.
 
+## Current Snapshot (2026-10-11)
+
+The current branch has moved beyond the Phase 8 sidebar layout described above:
+
+- The sidebar is intentionally chat-focused: history, Search, New Chat, profile,
+  and collapse controls. The legacy tool rail arrays remain empty by design.
+- Studio tools are opened through browser-style tabs, the tab picker, or the
+  command palette rather than duplicated as sidebar buttons.
+- Profile → Preferences opens the schema-driven Settings page.
+- Settings → Research & Web owns persistent Web Search enablement and the
+  configurable result limit, with a live search test panel.
+- Frontend validation currently covers 49 JavaScript modules.
+- The repository contains 71 test source files. Historical test totals above are
+  retained as dated evidence and are not a current pass guarantee.
+- The full quality gate is not clean: the existing codebase still reports broad
+  Ruff, MyPy, and Bandit-command issues. Targeted frontend syntax, module-link,
+  backend compilation, and whitespace checks pass.
+
 ### Totals
 
 - Pytest: 1103 passed

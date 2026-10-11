@@ -395,7 +395,7 @@ Run the test suite from the project root:
 venv\Scripts\python.exe -m pytest tests -v
 ```
 
-The test suite lives in a single unified tree at `tests/` (60 files: unit, `integration/`, `e2e/`, `manual/`). As of 2026-10-09: **1148 passed, 1 flaky, 100 skipped**.
+The test suite lives in a single unified tree at `tests/` (71 Python/TypeScript/JavaScript source files across unit, `integration/`, `e2e/`, and `manual/`). Run the suite locally rather than relying on historical pass counts.
 
 Tests cover authentication, document processing + RAG, model discovery, streaming, response intelligence, skills + packs, web search, voice, image generation, multi-agent teams, learning mode, response quality, analytics, knowledge graph, agents, artifacts, automations, and the Phase 6 additions (teams SSE streaming, graph provenance, model compare/Arena, fallback chain). Run the suite locally rather than relying on historical pass counts.
 
