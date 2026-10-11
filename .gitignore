@@ -41,10 +41,24 @@ mainfiles/uploads/*
 # --- Debug / temporary files ---
 *.log
 *.debug
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
 debug*/
 # ...but keep the tracked debugging skill under config/skills
 !mainfiles/config/skills/debugging/
 tmp/
+temp/
+
+# --- Generated build and tooling output ---
+build/
+dist/
+.cache/
+.ruff_cache/
+.tox/
+.nox/
 
 # --- Node (if you add tooling later) ---
 node_modules/
@@ -52,6 +66,7 @@ node_modules/
 # --- OS / editor ---
 .DS_Store
 Thumbs.db
+desktop.ini
 *.swp
 *.swo
 *~
