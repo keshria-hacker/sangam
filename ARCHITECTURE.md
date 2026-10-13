@@ -1081,24 +1081,39 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/models` | Yes | Available models (live + curated fallback) |
 | GET | `/api/models/{provider}` | Yes | Per-provider model listing |
 | POST | `/api/models/inaccessible/clear` | Yes | Reset inaccessible-model markers |
+| GET | `/api/analytics/stats` | Yes | Aggregate usage stats (opt-in) |
 | GET | `/api/providers` | Yes | Provider status |
 | GET | `/api/providers/status` | Yes | Circuit breaker + quota states (Phase 6.4d) |
+| GET | `/api/omniroute/status` | Yes | OmniRoute gateway status |
+| POST | `/api/omniroute/config` | Yes | Save OmniRoute endpoint + key |
+| POST | `/api/omniroute/sync` | Yes | Sync models from OmniRoute |
 | POST | `/api/chat/stream` | Yes | Stream chat response (SSE) |
 | POST | `/api/agent/run` | Yes | Run agent loop (SSE streaming) |
 | POST | `/api/agent/approve/{approval_id}` | Yes | Approve/deny tool call |
 | POST | `/api/code-agent/run` | Yes | Code agent execution (SSE) |
-| GET | `/api/code-agent/code-map` | Yes | Codebase AST graph |
+| GET | `/api/designs/{project_id}/{filename}` | Yes | Design Studio generated file serving |
+| POST | `/api/code-agent/code-map` | Yes | Codebase AST graph query |
 | GET | `/api/chats` | Yes | List all chats (with summaries) |
 | POST | `/api/chats` | Yes | Create a chat |
 | GET | `/api/chats/{id}` | Yes | Get chat with messages |
 | DELETE | `/api/chats/{id}` | Yes | Delete chat |
 | GET | `/api/chats/{id}/summary` | Yes | Rolling summary + topics |
+| GET | `/api/chats/{id}/export` | Yes | Export chat as Markdown |
+| POST | `/api/chats/{id}/messages` | Yes | Append message (used by Agent mode) |
 | POST | `/api/messages/{id}/feedback` | Yes | Message quality feedback (up/down + note) |
 | POST | `/api/files` | Yes | Upload document |
-| GET | `/api/user/preferences` | Yes | Response style preferences |
-| PUT | `/api/user/preferences` | Yes | Update response style preferences |
+| POST | `/api/media/upload` | Yes | Upload image/audio, returns attachment |
+| GET | `/api/media/{media_id}` | Yes | Serve stored media file |
 | GET | `/api/user/settings` | Yes | Get all settings (Phase 2) |
 | PUT | `/api/user/settings` | Yes | Update settings |
+| GET | `/api/memory` | Yes | List/search memories (ranked) |
+| POST | `/api/memory` | Yes | Save a memory |
+| DELETE | `/api/memory/{id}` | Yes | Forget a memory |
+| GET | `/api/memory/stats` | Yes | Memory totals by kind |
+| POST | `/api/memory/consolidate` | Yes | Decay + prune stale memories |
+| PUT | `/api/memory/{id}/move` | Yes | Move memory to room/drawer |
+| GET | `/api/memory/rooms` | Yes | Rooms/drawers hierarchy + counts |
+| GET | `/api/memory/rooms/{room}/{drawer}` | Yes | Memories in one room/drawer |
 | GET | `/api/settings/providers` | Yes | Provider key status |
 | PUT | `/api/settings/providers/{id}/key` | Yes | Save API key |
 | DELETE | `/api/settings/providers/{id}/key` | Yes | Remove API key |
@@ -1115,7 +1130,10 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/teams/run` | Yes | Run team (fan-out/fan-in) |
 | POST | `/api/teams/run/stream` | Yes | Stream team run (SSE per specialist, Phase 6.4a) |
 | POST | `/api/teams/retry-agent` | Yes | Retry single specialist |
+| POST | `/api/teams/stop-agent` | Yes | Stop one specialist mid-stream |
 | GET | `/api/runs` | Yes | Agent run history |
+| POST | `/api/runs` | Yes | Record a completed agent run |
+| GET | `/api/runs/{run_id}` | Yes | Run detail with steps |
 | GET | `/api/artifacts` | Yes | List artifacts (Phase 4) |
 | POST | `/api/artifacts` | Yes | Create artifact |
 | GET | `/api/artifacts/{id}` | Yes | Get artifact |
@@ -1132,6 +1150,8 @@ WEB_SEARCH_MAX_RESULTS=5
 | DELETE | `/api/automations/{id}` | Yes | Delete automation |
 | POST | `/api/automations/{id}/run` | Yes | Run now |
 | POST | `/api/compare` | Yes | Parallel model comparison (Phase 6.4c) |
+| POST | `/api/compare/stream` | Yes | Parallel model comparison (SSE) |
+| POST | `/api/routing/evaluate` | Yes | Evaluate routing rules on a message |
 | POST | `/api/arena/vote` | Yes | Record Arena vote |
 | GET | `/api/arena/leaderboard` | Yes | Win rates by model |
 | POST | `/api/voice/tts` | Yes | Text-to-speech |
@@ -1142,6 +1162,9 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/image/status` | Yes | Image engine status |
 | POST | `/api/learn/lesson` | Yes | Generate lesson |
 | POST | `/api/learn/feedback` | Yes | Tutor feedback |
+| POST | `/api/learn/outline` | Yes | Generate lesson outline |
+| POST | `/api/learn/quiz` | Yes | Generate lesson quiz |
+| POST | `/api/learn/grade` | Yes | Grade quiz answers + feedback |
 | GET | `/api/auth/status` | No | Registration open? |
 | POST | `/api/auth/register` | No | Create account |
 | POST | `/api/auth/login` | No | Sign in |
@@ -1155,6 +1178,7 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/skills/execute` | Yes | Execute skill |
 | POST | `/api/skills/chain` | Yes | Chain skills |
 | POST | `/api/skills/auto-suggest` | Yes | Suggest skills |
+| POST | `/api/skills/{id}/pin` | Yes | Pin a skill to a version |
 | GET | `/api/skills/packs` | Yes | List skill packs |
 | POST | `/api/skills/packs/{name}/enable` | Yes | Enable pack |
 | POST | `/api/skills/packs/{name}/disable` | Yes | Disable pack |
