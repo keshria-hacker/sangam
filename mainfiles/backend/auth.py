@@ -180,9 +180,38 @@ async def get_current_user(
         .where(AuthSession.token_hash == token_hash, AuthSession.expires_at > datetime.now(UTC))
     )
     record = result.first()
-    if record is None:
+    if record is not None:
+        return record[1]
+
+    # Batch 6 LAN pairing: device-token fallback. This deliberately does
+    # NOT go through _create_session (which deletes all previous
+    # sessions) — pairing a phone must never log out the laptop. The
+    # 401 details here are machine-readable on purpose: the phone UI
+    # maps device_revoked / device_expired to plain-language messages.
+    # A caller holding the token already proves possession, so naming
+    # its state leaks nothing to a stranger.
+    from .lan_pairing import PairedDevice, as_aware  # local import: avoids import cycles via routes
+
+    device = await db.scalar(select(PairedDevice).where(PairedDevice.token_hash == token_hash))
+    if device is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your session has expired. Please sign in again.")
-    return record[1]
+    if device.revoked_at is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="device_revoked")
+    if as_aware(device.expires_at) is not None and as_aware(device.expires_at) <= datetime.now(UTC):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="device_expired")
+    try:
+        device.last_used_at = datetime.now(UTC)
+        await db.commit()
+    except Exception:
+        # Best-effort touch: a failed write must never fail the request.
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+    user = await db.get(User, device.user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your session has expired. Please sign in again.")
+    return user
 
 
 @router.get("/status", response_model=AuthStatusOut)

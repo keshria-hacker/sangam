@@ -1269,6 +1269,18 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/extensions/{name}/disable` | Yes | Disable extension |
 | GET | `/api/features` | Yes | List feature flags |
 | POST | `/api/features/{name}` | Yes | Toggle feature |
+| POST | `/api/devices/pairing/start` | Yes | Start a LAN pairing (LAN_ENABLED must be on; 10 per 15 min per host) (Batch 6) |
+| GET | `/api/devices/pairing` | Yes | List pairings for the host, incl. codes (Batch 6) |
+| GET | `/api/devices/pairing/{pairing_id}` | Yes | Pairing status: pending/approved/denied/expired/claimed (Batch 6) |
+| POST | `/api/devices/pairing/{pairing_id}/approve` | Yes | Approve a pending pairing (Batch 6) |
+| POST | `/api/devices/pairing/{pairing_id}/deny` | Yes | Deny a pending pairing (Batch 6) |
+| POST | `/api/devices/pairing/claim` | **No** | Claim an approved pairing with its code -> device token, exactly once; rate-limited (Batch 6) |
+| GET | `/api/devices` | Yes | List paired devices (never token hashes or raw tokens) (Batch 6) |
+| DELETE | `/api/devices/{device_id}` | Yes | Revoke one paired device (Batch 6) |
+| POST | `/api/devices/revoke-all` | Yes | Revoke all paired devices (Batch 6) |
+| GET | `/api/devices/lan` | Yes | Host LAN IPv4 addresses + binding hints (Batch 6) |
+| GET | `/api/devices/cert` | Yes | LAN certificate fingerprint / existence (Batch 6) |
+| POST | `/api/devices/cert/regenerate` | Yes | New self-signed cert; revokes all devices + expires pending pairings (Batch 6) |
 
 ### 13.3 Database Schema
 

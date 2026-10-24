@@ -136,3 +136,5 @@ mainfiles/feature_flags.json
 test-results:
 mainfiles/omniroute.json
 mainfiles/instincts.json
+# Batch 6: LAN self-signed certificate + key (never commit)
+mainfiles/config/lan-cert/

@@ -23,6 +23,7 @@ import {
   renderMemorySection, renderVoiceSection, renderRoutesSection, renderDoctorSection,
   renderPresetsSection, renderWebSearchSection, renderInsightsSection,
 } from './sections.js';
+import { renderDevicesSection } from './devices.js';
 import { registerSectionActivator } from '../tabs/tabs.js';
 import { apiFetch } from '../../shared/http.js';
 
@@ -330,6 +331,9 @@ export function renderSettingsPage(bodyEl) {
       safeRender(renderWebSearchSection, list, 'web search');
     } else if (category === 'general') {
       safeRender(renderPresetsSection, list, 'presets');
+    } else if (category === 'devices') {
+      // Batch 6: LAN pairing + paired devices + certificate + threat model.
+      safeRender(renderDevicesSection, list, 'devices');
     }
   }
 

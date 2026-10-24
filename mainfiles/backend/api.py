@@ -232,6 +232,10 @@ from .api_routes.code_agent_routes import (  # noqa: F401
 # the shared router; skills v2 on the skills router) and pipeline tables.
 from .api_routes import engineering_routes  # noqa: F401
 from .api_routes import skills_v2_routes  # noqa: F401
+# Batch 6: importing this module registers the LAN device routes on the
+# shared router (host) and the claim route on the public router, plus the
+# paired_devices table on Base.metadata.
+from .api_routes import devices_routes  # noqa: F401
 from .api_routes.routing_routes import evaluate_routing  # noqa: F401
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401

@@ -3169,3 +3169,42 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .eng-stage pre { white-space: pre-wrap; word-break: break-word; }
 .eng-advance-form { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 .eng-advance-form textarea { width: 100%; min-height: 70px; }
+
+/* Batch 6: Devices & LAN access (Settings → Devices) */
+.devices-section .lan-url-list { margin: 6px 0 6px 18px; }
+.devices-section .lan-url-list code { word-break: break-all; }
+.devices-note code { word-break: break-all; }
+.lan-banner {
+  background: #7c2d12;
+  border: 1px solid #ea580c;
+  color: #ffedd5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  font-weight: 600;
+}
+#sangam-lan-http-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-radius: 0;
+  margin: 0;
+  text-align: center;
+}
+.devices-pair-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.pair-card { border: 1px solid var(--border, #ddd); border-radius: 10px; padding: 14px; margin: 10px 0; max-width: 420px; }
+.qr-wrap { background: #fff; border-radius: 8px; padding: 10px; display: inline-block; margin-bottom: 8px; }
+.qr-wrap canvas { display: block; }
+.pair-code {
+  font-family: var(--font-mono, monospace);
+  font-size: 32px;
+  letter-spacing: 8px;
+  font-weight: 700;
+  margin: 6px 0;
+}
+.device-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border, #ddd); }
+.device-row:last-child { border-bottom: none; }
+.devices-unreachable { border: 1px solid var(--border, #ddd); border-radius: 10px; padding: 16px; margin: 10px 0; }
+.devices-unreachable p:first-child { font-weight: 600; }
+.threat-list { margin: 6px 0 12px 18px; }
+.cert-fingerprint { word-break: break-all; font-size: 12px; }

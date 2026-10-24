@@ -16,6 +16,8 @@ export const SETTING_CATEGORIES = [
   { id: 'knowledge',   label: 'Knowledge & Memory', icon: 'fa-brain' },
   { id: 'research',    label: 'Research & Web',     icon: 'fa-globe' },
   { id: 'voice_output', label: 'Voice & Output',    icon: 'fa-microphone' },
+  // Batch 6: LAN pairing + paired devices live here, not as a new tab.
+  { id: 'devices',     label: 'Devices',            icon: 'fa-mobile-screen' },
   // Phase 8 C: 14 categories merged to 7. Removed: workspace, create, library,
   // shortcuts, privacy (analyticsOptIn -> general), doctor (-> models),
   // learn/insights are sub-pages not settings categories.
@@ -106,6 +108,14 @@ export const SETTINGS_SCHEMA = [
   // ---- Privacy ----
   { key: 'analyticsOptIn', label: 'Usage analytics', description: 'Local-only, opt-in.', type: 'boolean',
     default: false, category: 'general' },
+
+  // ---- Devices & LAN (Batch 6) ----
+  { key: 'LAN_ENABLED', label: 'Allow devices on my Wi-Fi (LAN mode)',
+    description: 'Opt-in, off by default. Lets a phone on the same Wi-Fi pair with this laptop and use the same Sangam. Pairing still needs your approval on this laptop.',
+    type: 'boolean', default: false, category: 'devices' },
+  { key: 'LAN_ALLOW_HTTP', label: 'Allow unencrypted LAN (HTTP fallback)',
+    description: 'Off by default. Only turn on if a phone browser rejects the self-signed certificate. While on, anyone on this Wi-Fi can read your traffic.',
+    type: 'boolean', default: false, category: 'devices' },
 ];
 
 /** Get the default value for a key. */

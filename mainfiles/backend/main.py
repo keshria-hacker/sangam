@@ -112,6 +112,20 @@ def create_app() -> FastAPI:
     This factory function allows tests to create an app instance after
     test-specific settings (e.g., DATABASE_URL) have been applied.
     """
+    # Batch 6 LAN: env-based CORS/CSP extension. LAN origins are not
+    # knowable at build time (the laptop's Wi-Fi IP is assigned by DHCP),
+    # so the operator lists them explicitly, e.g.:
+    #   SANGAM_EXTRA_ORIGINS=http://192.168.1.42:8001,http://192.168.1.42:5500
+    # Never a wildcard: CORS is never silently opened to *.
+    import os as _os
+
+    _extra_origins = [
+        origin.strip()
+        for origin in _os.environ.get("SANGAM_EXTRA_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    _cors_origins = list(dict.fromkeys([*settings.ALLOWED_ORIGINS, *_extra_origins]))
+    _csp_connect = " ".join(["'self'", "http://127.0.0.1:8001", "http://localhost:8001", "ws:", *_extra_origins])
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # Ensure required directories exist
@@ -236,7 +250,7 @@ def create_app() -> FastAPI:
                 "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
                 "img-src 'self' data: blob:; "
                 "font-src 'self' data:; "
-                "connect-src 'self' http://127.0.0.1:8001 http://localhost:8001 ws:; "
+                "connect-src " + _csp_connect + "; "
                 "object-src 'none'; "
                 "frame-ancestors 'none'; "
                 "base-uri 'self'; "
@@ -273,7 +287,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_origins=_cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
