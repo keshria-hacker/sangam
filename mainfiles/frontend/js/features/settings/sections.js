@@ -133,6 +133,49 @@ export async function renderProviderKeysSection(container) {
   });
 }
 
+/** Phase 5: OAuth connectors list (Settings > Models, under provider keys). */
+export async function renderConnectorsSection(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `<h3 class="sp-section-title"><i class="fa-solid fa-plug"></i> OAuth connectors</h3>
+    <div class="sp-section-body" data-conn-list><p class="settings-hint">Loading…</p></div>`;
+  container.appendChild(wrap);
+  const list = wrap.querySelector('[data-conn-list]');
+  try {
+    const data = await (await apiFetch('/connectors')).json();
+    const items = data.connectors || [];
+    if (!items.length) {
+      list.innerHTML = '<p class="settings-hint">No connectors defined.</p>';
+      return;
+    }
+    list.innerHTML = items.map((c) => `
+      <div class="provider-status-row">
+        <span class="provider-label">${escapeHtml(c.label)}</span>
+        <span class="provider-state ${c.connected ? 'online' : 'offline'}">${c.connected ? 'Connected' : (c.configured ? 'Ready to connect' : 'Needs client credentials')}</span>
+        ${c.connected
+          ? `<button class="btn-secondary conn-disconnect" data-name="${escapeHtml(c.name)}">Disconnect</button>`
+          : (c.configured
+            ? `<button class="btn-secondary conn-connect" data-name="${escapeHtml(c.name)}">Connect</button>`
+            : '')}
+      </div>`).join('');
+    list.querySelectorAll('.conn-connect').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const data2 = await (await apiFetch(`/connectors/${encodeURIComponent(btn.dataset.name)}/authorize`)).json();
+        if (data2.authorize_url) window.location.href = data2.authorize_url;
+      });
+    });
+    list.querySelectorAll('.conn-disconnect').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await apiFetch(`/connectors/${encodeURIComponent(btn.dataset.name)}`, { method: 'DELETE' });
+        wrap.remove();
+        renderConnectorsSection(container);
+      });
+    });
+  } catch {
+    list.innerHTML = '<p class="settings-hint">Could not load connectors.</p>';
+  }
+}
+
 export function renderWebSearchSection(container) {
   const wrap = document.createElement('div');
   wrap.className = 'sp-custom-section';

@@ -1133,6 +1133,11 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/media-jobs` | Yes | Create a media worker job, runs in background (Phase 4) |
 | GET | `/api/media-jobs` | Yes | List media jobs (Phase 4) |
 | GET | `/api/media-jobs/{id}` | Yes | Poll one media job (Phase 4) |
+| GET | `/api/connectors` | Yes | List OAuth connectors + status (Phase 5) |
+| GET | `/api/connectors/{name}/authorize` | Yes | OAuth authorize URL (Phase 5) |
+| GET | `/api/connectors/{name}/callback` | Yes | OAuth callback, token stored encrypted (Phase 5) |
+| DELETE | `/api/connectors/{name}` | Yes | Disconnect an OAuth connector (Phase 5) |
+| GET | `/api/system/backup` | Yes | Download backup zip (DB + uploads) (Phase 5) |
 | GET | `/api/memory/export` | Yes | Export memories as JSON download (Phase 2) |
 | POST | `/api/memory/forget` | Yes | Bulk forget memories by filter, confirm required (Phase 2) |
 | GET | `/api/agents` | Yes | List custom agents (Phase 3) |

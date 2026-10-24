@@ -289,6 +289,7 @@ class Workflow(Base):
     version: Mapped[int] = mapped_column(default=1)
     trigger: Mapped[str] = mapped_column(String(64), default="manual")  # manual | hourly | daily | weekly | cron
     webhook_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    webhook_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     enabled: Mapped[bool] = mapped_column(default=True)
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

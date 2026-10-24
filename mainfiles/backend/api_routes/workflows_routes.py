@@ -11,7 +11,7 @@ import secrets
 import uuid
 from datetime import datetime, UTC
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,6 +80,7 @@ async def create_workflow(payload: WorkflowIn, db: AsyncSession = Depends(get_db
         definition_json=json.dumps(payload.definition),
         trigger=payload.trigger,
         webhook_token=secrets.token_urlsafe(24),
+        webhook_secret=secrets.token_urlsafe(24),
         enabled=payload.enabled,
         next_run=parse_schedule(payload.trigger) if payload.trigger != "manual" else None,
     )
@@ -88,6 +89,7 @@ async def create_workflow(payload: WorkflowIn, db: AsyncSession = Depends(get_db
     await db.refresh(wf)
     out = _wf_out(wf)
     out["webhook_token"] = wf.webhook_token  # returned once, at creation
+    out["webhook_secret"] = wf.webhook_secret  # returned once; sign bodies with HMAC-SHA256 of the raw JSON body
     out["webhook_url"] = f"/api/workflows/{wf.id}/webhook?token={wf.webhook_token}"
     return out
 
@@ -183,13 +185,31 @@ async def replay_run(workflow_id: str, run_id: str, db: AsyncSession = Depends(g
 
 
 @public_router.post("/workflows/{workflow_id}/webhook", status_code=201)
-async def webhook_run(workflow_id: str, token: str, payload: dict,
+async def webhook_run(workflow_id: str, request: Request, token: str | None = None,
                       db: AsyncSession = Depends(get_db)):
-    """Webhook trigger: the per-workflow token is the authentication.
-    A wrong or missing token returns 404 (not 401) so workflow ids
-    cannot be probed for existence."""
+    """Webhook trigger, two authentications (Phase 5 signed webhooks):
+    the per-workflow token query param, OR an HMAC-SHA256 signature
+    of the raw request body (header X-Sangam-Signature: ``sha256=<hex>``)
+    using the per-workflow secret. A wrong token/signature returns 404
+    (not 401) so workflow ids cannot be probed for existence."""
+    import hashlib
+    import hmac as _hmac
+
+    raw_body = await request.body()
+    try:
+        payload = json.loads(raw_body or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from None
     wf = await db.get(Workflow, workflow_id)
-    if not wf or not wf.webhook_token or not secrets.compare_digest(token, wf.webhook_token):
+    authed = False
+    if wf and token and wf.webhook_token and secrets.compare_digest(token, wf.webhook_token):
+        authed = True
+    if not authed and wf and wf.webhook_secret:
+        sig = request.headers.get("x-sangam-signature", "")
+        if sig.startswith("sha256="):
+            expected = _hmac.new(wf.webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
+            authed = secrets.compare_digest(sig[len("sha256="):], expected)
+    if not wf or not authed:
         raise HTTPException(status_code=404, detail="Workflow not found")
     if not wf.enabled:
         raise HTTPException(status_code=422, detail="Workflow is disabled")

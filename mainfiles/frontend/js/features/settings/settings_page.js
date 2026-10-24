@@ -19,7 +19,7 @@ import {
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import {
-  renderProviderKeysSection, renderOmnirouteSection, renderFeatureTogglesSection,
+  renderProviderKeysSection, renderConnectorsSection, renderOmnirouteSection, renderFeatureTogglesSection,
   renderMemorySection, renderVoiceSection, renderRoutesSection, renderDoctorSection,
   renderPresetsSection, renderWebSearchSection,
 } from './sections.js';
@@ -309,6 +309,7 @@ export function renderSettingsPage(bodyEl) {
   function renderCustomSections(list, category) {
     if (category === 'models') {
       safeRender(renderProviderKeysSection, list, 'provider keys');
+      safeRender(renderConnectorsSection, list, 'connectors');
       safeRender(renderOmnirouteSection, list, 'OmniRoute');
       safeRender(renderRoutesSection, list, 'routing');
       safeRender(renderDoctorSection, list, 'doctor');
