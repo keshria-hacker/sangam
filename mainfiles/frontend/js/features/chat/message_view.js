@@ -444,6 +444,9 @@ export function buildMessageNode(msg) {
       <div class="msg-actions always-visible" role="group" aria-label="Message actions">
         <button class="msg-action-btn copy-msg-btn" aria-label="Copy message"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy</button>
         <button class="msg-action-btn regenerate-btn" aria-label="Regenerate response"><i class="fa-solid fa-arrow-rotate-right" aria-hidden="true"></i> Regenerate</button>
+        <button class="msg-action-btn save-msg-btn" aria-label="Save answer as a file"><i class="fa-regular fa-bookmark" aria-hidden="true"></i> Save</button>
+        <button class="msg-action-btn workflow-msg-btn" aria-label="Turn this chat into a workflow"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Workflow</button>
+        <button class="msg-action-btn inspect-msg-btn" aria-label="Inspect this message's evidence"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Inspect</button>
         ${window.__sangamVoice ? '<button class="msg-action-btn speak-msg-btn" aria-label="Read aloud"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Speak</button>' : ''}
         <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
         <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
@@ -464,6 +467,75 @@ export function buildMessageNode(msg) {
   // Regenerate button
   const regenBtn = node.querySelector('.regenerate-btn');
   regenBtn.addEventListener('click', () => _regenerate && _regenerate());
+
+  // Save button (UX-refine wave): one click saves the answer as a .md
+  // file via the existing POST /files upload endpoint (md is an allowed
+  // extension and uploads are indexed for retrieval). It lands in
+  // Knowledge's file store — Library holds skills/templates, not user
+  // files, so there is no Library save endpoint to call; the toast says
+  // exactly where the file went instead of pretending otherwise.
+  const saveBtn = node.querySelector('.save-msg-btn');
+  saveBtn?.addEventListener('click', async () => {
+    if (saveBtn.disabled) return;
+    saveBtn.disabled = true;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
+    const form = new FormData();
+    form.append('file', new Blob([msg.content || ''], { type: 'text/markdown' }), `sangam-answer-${stamp}.md`);
+    try {
+      const res = await apiFetch('/files', { method: 'POST', body: form });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `Save failed (${res.status})`);
+      saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Saved';
+      showToast({ type: 'success', title: 'Answer saved', message: 'Saved as a file — find it in Knowledge.' });
+    } catch (err) {
+      saveBtn.disabled = false;
+      showToast({ type: 'error', title: 'Save failed', message: err?.message || String(err) });
+    }
+  });
+
+  // Workflow button (UX-refine wave): one click turns this chat into a
+  // runnable workflow via the existing POST /workflows endpoint — a
+  // single llm node whose prompt is the last user question (or, if the
+  // chat has none, the canvas default {{input.q}} template) — then opens
+  // Work → Workflows with the new workflow listed.
+  const wfBtn = node.querySelector('.workflow-msg-btn');
+  wfBtn?.addEventListener('click', async () => {
+    if (wfBtn.disabled) return;
+    wfBtn.disabled = true;
+    try {
+      const msgs = getMessages();
+      const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
+      const prompt = lastUser?.content?.trim() || '{{input.q}}';
+      const name = `From chat: ${(lastUser?.content || 'answer').slice(0, 60)}`;
+      const res = await apiFetch('/workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          definition: { nodes: [{ id: 'prompt', type: 'llm', config: { prompt } }], edges: [] },
+          trigger: 'manual',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Workflow creation failed (${res.status})`);
+      showToast({ type: 'success', title: 'Workflow created', message: `"${name}" is ready in Work → Workflows.` });
+      const { showToolSection } = await import('../tabs/tabs.js');
+      showToolSection('work', 'workflows');
+    } catch (err) {
+      showToast({ type: 'error', title: 'Workflow failed', message: err?.message || String(err) });
+    } finally {
+      wfBtn.disabled = false;
+    }
+  });
+
+  // Inspect button (UX-refine wave): selects this message in the
+  // Inspector, where its tool calls, sources, and artifacts are shown
+  // next to chat — no tab hop to review evidence.
+  const inspectBtn = node.querySelector('.inspect-msg-btn');
+  inspectBtn?.addEventListener('click', async () => {
+    const { setSelectedMessage, isInspectorVisible, toggleInspector } = await import('../inspector/inspector.js');
+    setSelectedMessage(msg);
+    if (!isInspectorVisible()) toggleInspector();
+  });
 
   // Speak button (voice feature) — toggles to Stop while speaking
   const speakBtn = node.querySelector('.speak-msg-btn');

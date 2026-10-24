@@ -7,6 +7,8 @@
 import { getSelectedModel } from '../../core/state.js';
 import { getActiveJobs } from '../../core/jobs.js';
 import { escapeHtml } from '../../shared/utils.js';
+import { apiGet } from '../../shared/http.js';
+import { showGlobalHttpBanner } from '../settings/http-banner.js';
 
 console.log('[Module] inspector.js loaded');
 
@@ -36,6 +38,39 @@ export function toggleInspector() {
   panel?.classList.toggle('open', visible);
   if (visible) render();
   document.dispatchEvent(new CustomEvent('sangam:inspector-toggled', { detail: { visible } }));
+  if (visible) loadLiveRuns();
+}
+
+/** Live runs from the server, shown in the Inspector on open (UX-refine
+ *  wave): review evidence without opening the Work tab. Failures render
+ *  as a one-line note, never a toast — the Inspector is a side view. */
+async function loadLiveRuns() {
+  const body = document.getElementById('inspectorBody');
+  if (!body) return;
+  let section = body.querySelector('[data-insp-live-runs]');
+  if (!section) {
+    section = document.createElement('section');
+    section.className = 'insp-section';
+    section.setAttribute('data-insp-live-runs', '');
+    body.appendChild(section);
+  }
+  section.innerHTML = '<h4>Live runs</h4><p class="settings-hint">Loading…</p>';
+  try {
+    const data = await (await apiGet('/runs/live')).json();
+    const runs = data.runs || [];
+    section.innerHTML = `<h4>Live runs</h4>` + (runs.length
+      ? runs.slice(0, 5).map((r) => `
+        <div class="insp-ev-item"><strong>${escapeHtml(r.title || r.kind || 'run')}</strong>
+          <span>${escapeHtml(r.state || '')} · ${escapeHtml(r.kind || '')}</span></div>`).join('')
+      : '<p class="settings-hint">No live runs right now.</p>') +
+      `<button type="button" class="btn-secondary" data-insp-open-runs>Open all runs</button>`;
+    section.querySelector('[data-insp-open-runs]')?.addEventListener('click', async () => {
+      const { showToolSection } = await import('../tabs/tabs.js');
+      showToolSection('work', 'activity');
+    });
+  } catch {
+    section.innerHTML = '<h4>Live runs</h4><p class="settings-hint">Could not load live runs.</p>';
+  }
 }
 
 function render() {
@@ -69,15 +104,35 @@ function render() {
         </div>`).join('') + `</section>`;
   }
 
-  // Selected message
+  // Selected message — evidence lives here, not behind a tab hop.
+  // Tool calls, citations, and artifacts are rendered in full: this is
+  // the review surface for agent/code work (UX-refine wave). Previously
+  // only a 300-char preview was shown, and nothing ever called
+  // setSelectedMessage, so the section was dead.
   if (selectedMessage) {
     const m = selectedMessage;
+    const toolHtml = (m.tool_calls && m.tool_calls.length)
+      ? `<div class="insp-evidence"><h5>Tool calls (${m.tool_calls.length})</h5>` + m.tool_calls.map((t) => `
+        <div class="insp-ev-item"><strong>${escapeHtml(t.name || 'tool')}</strong>
+          <span>${escapeHtml(t.status || 'done')}</span>
+          ${t.result ? `<pre>${escapeHtml(String(t.result).slice(0, 500))}</pre>` : ''}
+        </div>`).join('') + `</div>` : '';
+    const citeHtml = (m.citations && m.citations.length)
+      ? `<div class="insp-evidence"><h5>Sources (${m.citations.length})</h5>` + m.citations.map((c) => `
+        <div class="insp-ev-item">${escapeHtml(c.title || 'Source')}
+          ${c.url ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer">open</a>` : ''}</div>`).join('') + `</div>` : '';
+    const artHtml = (m.artifacts && m.artifacts.length)
+      ? `<div class="insp-evidence"><h5>Artifacts (${m.artifacts.length})</h5>` + m.artifacts.map((a) => `
+        <div class="insp-ev-item"><strong>${escapeHtml(a.title || 'Untitled')}</strong>
+          <span>${escapeHtml(a.type || '')}</span></div>`).join('') + `</div>` : '';
     html += `<section class="insp-section"><h4>Message</h4>
       <div class="insp-row"><span>Role</span><strong>${escapeHtml(m.role || '')}</strong></div>
       <div class="insp-row"><span>Model</span><strong>${escapeHtml(m.model || '')}</strong></div>
       ${m.response_time ? `<div class="insp-row"><span>Time</span><strong>${m.response_time}s</strong></div>` : ''}
       ${m.tokens ? `<div class="insp-row"><span>Tokens</span><strong>${m.tokens}</strong></div>` : ''}
       <div class="insp-msg-preview">${escapeHtml((m.content || '').slice(0, 300))}</div>
+      ${toolHtml}${citeHtml}${artHtml}
+      ${(!toolHtml && !citeHtml && !artHtml) ? '<p class="settings-hint">No tool calls, sources, or artifacts on this message.</p>' : ''}
     </section>`;
   }
 
@@ -102,6 +157,11 @@ function render() {
 }
 
 export function initInspector() {
+  // App-shell hook (UX-refine wave): the LAN HTTP-fallback warning must
+  // render globally, not only inside Settings → Devices. initInspector
+  // runs unconditionally in app init; the call is idempotent, so moving
+  // it to app.js later is safe. See settings/http-banner.js.
+  showGlobalHttpBanner();
   if (document.getElementById('inspectorPanel')) return;
   const panel = document.createElement('aside');
   panel.id = 'inspectorPanel';

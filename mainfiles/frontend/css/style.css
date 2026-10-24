@@ -3220,3 +3220,25 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .diagrams-section .diagrams-onboarding { margin: 10px 0; }
 .image-ops { margin: 16px 0; }
 .image-ops .image-gen-row { margin: 8px 0; }
+
+/* UX-refine wave: stepped setup, slash menu, inspector evidence */
+.setup-progress { height: 6px; border-radius: 3px; background: var(--border, #ddd); overflow: hidden; margin-bottom: 8px; }
+.setup-progress-bar { height: 100%; background: var(--accent, #3a7bd5); transition: width 200ms ease; }
+.setup-step-label { font-size: 12px; font-weight: 600; color: var(--text-tertiary, #666); margin: 0 0 12px; }
+.setup-paths { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.setup-paths .setup-path { width: 100%; text-align: left; }
+.setup-step-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.setup-skip { margin-top: 14px; }
+.slash-menu { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; max-height: 280px; overflow-y: auto; background: var(--bg-elevated, #fff); border: 1px solid var(--border, #ddd); border-radius: 10px; box-shadow: var(--shadow-2); z-index: 50; padding: 6px; }
+.slash-menu.hidden { display: none; }
+.slash-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; color: var(--text-primary); }
+.slash-item.active { background: var(--bg-hover, #f0f0f0); }
+.slash-item span { display: flex; flex-direction: column; }
+.slash-item small { color: var(--text-tertiary, #666); font-size: 12px; }
+.slash-item-label { font-size: 12px; color: var(--text-tertiary, #666); flex-shrink: 0; }
+.slash-hint { font-size: 11px; color: var(--text-tertiary, #666); padding: 6px 10px 2px; }
+.insp-evidence { margin-top: 10px; }
+.insp-evidence h5 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary, #666); }
+.insp-ev-item { padding: 6px 0; border-top: 1px solid var(--border, #ddd); font-size: 13px; }
+.insp-ev-item pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; margin: 4px 0 0; max-height: 160px; overflow-y: auto; }
+.insp-ev-item span { color: var(--text-tertiary, #666); margin-left: 6px; }

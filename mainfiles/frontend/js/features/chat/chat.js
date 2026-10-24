@@ -906,14 +906,29 @@ export function initChatEvents() {
     if (evt === 'drop' && e.dataTransfer.files.length) handleFileSelection(e.dataTransfer.files);
   }));
 
-  // Suggestion cards
+  // Suggestion cards — every suggestion must trigger a real action
+  // (UX-refine wave). Cards that need a file (e.g. "summarize an
+  // uploaded document") do NOT send a prompt about a document that was
+  // never attached: they prefill the composer and open the file picker,
+  // so the user attaches first and then sends. All other cards send.
   document.querySelectorAll('.suggestion-card').forEach((card) => {
     card.addEventListener('click', () => {
+      if (card.dataset.needsFile === 'true' && getAttachedFiles().length === 0) {
+        elements.messageInput.value = card.dataset.prompt || '';
+        autoResizeTextarea();
+        elements.fileInput?.click();
+        elements.messageInput?.focus();
+        return;
+      }
       elements.messageInput.value = card.dataset.prompt;
       autoResizeTextarea();
       handleSend();
     });
   });
+
+  // Composer slash-command menu (UX-refine wave): "/" lists real
+  // commands — modes, tools, destinations, Settings. See composer/slash.js.
+  import('../composer/slash.js').then((m) => m.initSlashMenu(elements.messageInput)).catch(() => {});
 
 
   // Token counter - live estimate
