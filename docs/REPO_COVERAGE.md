@@ -109,7 +109,7 @@
 
 Chat streaming DOM detachment — backend works, frontend render fragile. Documented in STUDIO_AUDIT.md.
 
-## Current Snapshot (2026-10-11)
+## Current Snapshot (2026-10-15)
 
 The current branch has moved beyond the Phase 8 sidebar layout described above:
 
@@ -127,8 +127,25 @@ The current branch has moved beyond the Phase 8 sidebar layout described above:
   Ruff, MyPy, and Bandit-command issues. Targeted frontend syntax, module-link,
   backend compilation, and whitespace checks pass.
 
+### Agent Hub — approval policy + cost budget (2026-10-14, this branch)
+
+- Custom agents now carry `approval_policy` (default / automatic / always_ask)
+  and `cost_budget` (USD per run).
+- Backend: validated on create + update; policy mapped to the engine's
+  `require_approval` via `_policy_to_require_approval`; `max_cost_usd`
+  forwarded to `run_agent`.
+- Existing local SQLite DBs are migrated in place by an idempotent
+  `post_create_columns` pass in `database.py` (no Alembic required).
+- Frontend: the new-agent form renders immediately and fills the model select
+  asynchronously; the agent card shows the policy + budget.
+- Verified: `test_agent_approval_policy_and_budget`,
+  `test_policy_mapping`, 9/9 targeted tests, all 49 frontend modules parse + link,
+  backend imports.
+
 ### Totals
 
-- Pytest: 1103 passed
-- Smoke: 3/3 passed
-- Deletions: ~1,800 lines + 7 settings + 7 categories
+- Pytest: 1165 passed, 100 skipped, 0 failed (2026-10-14, targeted re-run after commit; the one historical flaky settings test is fixed — mock-safe /api/v1 prefix)
+- Frontend modules: 49/49 parse + link
+- Backend: imports cleanly
+- Smoke: 3/3 (still valid; not re-run this session)
+- Deletions: ~1,800 lines + 7 settings + 7 categories + 12 integration-program design docs (Phase 0-8 program complete, nothing references them)
