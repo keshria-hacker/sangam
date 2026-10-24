@@ -371,3 +371,27 @@ def test_lan_info(client):
     assert isinstance(data["ips"], list)
     assert isinstance(data["port"], int)
     assert "loaded_via_loopback" in data
+
+
+def test_password_reset_revokes_paired_devices(client, fresh_client):
+    # Parent fix: a password reset must kill paired-device tokens too,
+    # or a stolen phone token survives the credential it was paired under.
+    headers = _auth_headers(client)
+    _enable_lan(client, headers)
+    _, claim = _pair_device(client, headers, fresh_client)
+    token_headers = {"Authorization": f"Bearer {claim['token']}"}
+    assert fresh_client.get("/api/devices", headers=token_headers).status_code == 200
+
+    forgot = client.post("/api/auth/forgot-password", json={"username": "b6_user"})
+    assert forgot.status_code == 200, forgot.text
+    resp = client.post("/api/auth/reset-password", json={
+        "reset_token": forgot.json()["reset_token"],
+        "new_password": "NewStrongPass456!",
+    })
+    assert resp.status_code == 200, resp.text
+
+    row = _db_device(claim["device_id"])
+    assert row is not None and row.revoked_at is not None
+    r = fresh_client.get("/api/devices", headers=token_headers)
+    assert r.status_code == 401
+    assert r.json()["detail"] == "device_revoked"

@@ -403,6 +403,18 @@ async def reset_password(payload: ResetPasswordIn, db: AsyncSession = Depends(ge
     )
     for session in result.scalars().all():
         await db.delete(session)
+    # A password reset also revokes every paired LAN device: a stolen
+    # phone token must not survive the credential it was paired under.
+    from .lan_pairing import PairedDevice  # local import: avoids import cycles via routes
+
+    result = await db.execute(
+        select(PairedDevice).where(
+            PairedDevice.user_id == user.id,
+            PairedDevice.revoked_at.is_(None),
+        )
+    )
+    for device in result.scalars().all():
+        device.revoked_at = datetime.now(UTC)
     await db.commit()
 
     return {"message": "Password reset successfully. Please sign in with your new password."}
