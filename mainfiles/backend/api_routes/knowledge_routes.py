@@ -91,6 +91,85 @@ async def retrieve_knowledge(
     return {"query": q, "method": "hybrid", "results": results}
 
 
+@router.post("/knowledge/ingest-url")
+async def ingest_url(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Phase 2 remainder: ingest a public web page as a document.
+
+    The URL is SSRF-guarded (see ``backend.ingest_url``), fetched
+    without following redirects, stripped to text, stored as an
+    UploadedFile and indexed for hybrid retrieval. Returns the new
+    file_id plus chunk count. No schema change: the source URL is
+    recorded in the stored filename suffix only via the page slug —
+    re-ingesting the same URL creates a second copy (documented limit,
+    not silently deduped).
+    """
+    import httpx
+    from fastapi import HTTPException
+
+    from ..document import truncate_preview
+    from ..ingest_url import (
+        FETCH_TIMEOUT_SECONDS,
+        MAX_BODY_BYTES,
+        IngestUrlError,
+        html_to_text,
+        slug_from_url,
+        validate_url,
+    )
+    from ..rag import index_document
+
+    url = (payload.get("url") or "").strip()
+    try:
+        validate_url(url)
+    except IngestUrlError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(FETCH_TIMEOUT_SECONDS, connect=8.0),
+            follow_redirects=False,
+        ) as client:
+            resp = await client.get(url, headers={"User-Agent": "Sangam/1.0 (+local-first)"})
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Could not fetch URL") from None
+    if resp.status_code in (301, 302, 303, 307, 308):
+        raise HTTPException(status_code=422, detail="Redirects are not followed for ingestion")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"URL returned HTTP {resp.status_code}")
+    content_type = (resp.headers.get("content-type") or "").lower()
+    if "text/html" not in content_type and "text/plain" not in content_type:
+        raise HTTPException(status_code=415, detail=f"Unsupported content type: {content_type or 'unknown'}")
+    body = resp.content[: MAX_BODY_BYTES + 1]
+    if len(body) > MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Page exceeds 2 MB ingestion limit")
+    text = html_to_text(body.decode("utf-8", errors="replace")) if "text/html" in content_type else body.decode("utf-8", errors="replace").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="No readable text found on the page")
+    filename = slug_from_url(url)
+    record = UserFile(
+        filename=filename,
+        stored_path="",
+        extension="txt",
+        size_bytes=len(text.encode("utf-8")),
+        extracted_text=text,
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    chunks = index_document(record.id, text, filename) if text else 0
+    return {
+        "file_id": record.id,
+        "filename": filename,
+        "source_url": url,
+        "chars": len(text),
+        "chunks_indexed": chunks,
+        "preview": truncate_preview(text),
+        "note": "HTML boilerplate may survive extraction; this is a text stripper, not a reader mode.",
+    }
+
+
 @router.get("/knowledge/search")
 async def search_knowledge(
     q: str = Query(min_length=1),

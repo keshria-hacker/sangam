@@ -71,8 +71,27 @@ export async function renderKnowledgeTab(bodyEl) {
             <option value="procedural">Procedural</option>
           </select>
           <button class="btn-secondary" id="knTidy"><i class="fa-solid fa-broom"></i> Tidy</button>
+          <button class="btn-secondary" id="knExport"><i class="fa-solid fa-download"></i> Export</button>
         </div>
         <div id="knMemories" class="kn-mem-list"></div>
+      </section>
+      <section class="kn-section">
+        <h3><i class="fa-solid fa-magnifying-glass"></i> Retrieve documents</h3>
+        <p class="settings-hint">Hybrid search (vector + keyword) over your uploaded documents, with citations.</p>
+        <div class="kn-mem-controls">
+          <input type="text" id="knRetrieveQ" class="provider-key-input" placeholder="Ask about your documents…" aria-label="Retrieve documents query" style="flex:1">
+          <button class="btn-secondary" id="knRetrieveBtn">Retrieve</button>
+        </div>
+        <div id="knRetrieveResults" class="kn-mem-list"></div>
+      </section>
+      <section class="kn-section">
+        <h3><i class="fa-solid fa-globe"></i> Add from URL</h3>
+        <p class="settings-hint">Ingest a public web page as a document. Only public http/https pages are fetched; private addresses and redirects are refused.</p>
+        <div class="kn-mem-controls">
+          <input type="url" id="knIngestUrl" class="provider-key-input" placeholder="https://example.com/article" aria-label="URL to ingest" style="flex:1">
+          <button class="btn-secondary" id="knIngestBtn">Ingest page</button>
+        </div>
+        <div id="knIngestStatus" class="settings-hint"></div>
       </section>
     </div>`;
 
@@ -101,6 +120,12 @@ export async function renderKnowledgeTab(bodyEl) {
   bodyEl.querySelector('#knMemKind').addEventListener('change', () => loadMemories(bodyEl));
   bodyEl.querySelector('#knMemView').addEventListener('change', () => loadMemories(bodyEl));
   bodyEl.querySelector('#knTidy').addEventListener('click', () => tidyMemories(bodyEl));
+  bodyEl.querySelector('#knExport').addEventListener('click', () => exportMemories());
+  bodyEl.querySelector('#knRetrieveBtn').addEventListener('click', () => retrieveDocuments(bodyEl));
+  bodyEl.querySelector('#knRetrieveQ').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') retrieveDocuments(bodyEl);
+  });
+  bodyEl.querySelector('#knIngestBtn').addEventListener('click', () => ingestPage(bodyEl));
 
   await Promise.all([loadGraph(bodyEl), loadMcp(bodyEl), loadMemories(bodyEl)]);
 }
@@ -591,5 +616,68 @@ async function tidyMemories(bodyEl) {
     loadGraph(bodyEl);
   } catch {
     showToast({ type: 'error', title: 'Consolidation failed' });
+  }
+}
+
+/** Phase 2 remainder: download the user's memories as JSON. */
+async function exportMemories() {
+  try {
+    const data = await (await apiFetch('/memory/export')).json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sangam-memories.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast({ type: 'success', title: `Exported ${data.length} memories` });
+  } catch {
+    showToast({ type: 'error', title: 'Export failed' });
+  }
+}
+
+/** Phase 2 remainder: hybrid retrieval with citations. */
+async function retrieveDocuments(bodyEl) {
+  const q = bodyEl.querySelector('#knRetrieveQ').value.trim();
+  const box = bodyEl.querySelector('#knRetrieveResults');
+  if (!q) { box.innerHTML = '<p class="settings-hint">Type a question first.</p>'; return; }
+  box.innerHTML = '<p class="settings-hint">Retrieving…</p>';
+  try {
+    const data = await (await apiFetch(`/knowledge/retrieve?q=${encodeURIComponent(q)}`)).json();
+    const results = data.results || [];
+    if (!results.length) {
+      box.innerHTML = '<p class="settings-hint">No matching documents. Upload a document or ingest a page first.</p>';
+      return;
+    }
+    box.innerHTML = results.map((r) => {
+      const c = r.citation || {};
+      return `<div class="kn-mem">
+        <span class="kn-chip" style="--chip-color:${TYPE_COLORS.document}">${escapeHtml(c.source || 'vector')}</span>
+        <span class="kn-mem-content"><strong>${escapeHtml(c.filename || r.filename || '')}</strong>${c.chunk_index != null ? ` · chunk ${c.chunk_index}` : ''}<br>${escapeHtml(c.excerpt || r.text || '')}</span>
+      </div>`;
+    }).join('');
+  } catch {
+    box.innerHTML = '<p class="settings-hint">Retrieval failed.</p>';
+  }
+}
+
+/** Phase 2 remainder: ingest a public page as a document. */
+async function ingestPage(bodyEl) {
+  const url = bodyEl.querySelector('#knIngestUrl').value.trim();
+  const status = bodyEl.querySelector('#knIngestStatus');
+  if (!url) { status.textContent = 'Paste a URL first.'; return; }
+  status.textContent = 'Fetching page…';
+  try {
+    const res = await apiFetch('/knowledge/ingest-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    status.textContent = `Ingested ${data.filename} (${data.chunks_indexed} chunks).`;
+    showToast({ type: 'success', title: 'Page ingested' });
+    loadGraph(bodyEl);
+  } catch (err) {
+    status.textContent = `Ingest failed: ${err?.message || String(err)}`;
   }
 }

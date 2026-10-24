@@ -92,6 +92,80 @@ async def create_memory(payload: MemoryIn):
     return MemoryOut.from_record(record)
 
 
+@router.get("/memory/export")
+async def export_memories(kind: Literal["episodic", "semantic", "procedural"] | None = None):
+    """Export memories as a JSON download (local-first portability).
+
+    Returns stored memories (or one kind) as a JSON array with a
+    download filename. Honest limit: the memory store caps listings
+    at 200, so an export covers the 200 most-recent memories, not an
+    unbounded archive — the same cap the rooms view already uses.
+    This is the user's own data leaving through their own
+    authenticated session — the same protection as the rest of the
+    memory API.
+    """
+    from fastapi.responses import JSONResponse
+
+    records = await list_memories(kind=MemoryKind(kind) if kind else None, limit=10000)
+    payload = [
+        {
+            "id": r.id,
+            "content": r.content,
+            "kind": r.kind.value,
+            "importance": round(r.importance, 3),
+            "room": r.room,
+            "drawer": r.drawer,
+            "chat_id": r.chat_id,
+            "access_count": r.access_count,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in records
+    ]
+    return JSONResponse(
+        content=payload,
+        headers={"Content-Disposition": "attachment; filename=sangam-memories.json"},
+    )
+
+
+class MemoryForgetIn(BaseModel):
+    kind: Literal["episodic", "semantic", "procedural"] | None = None
+    room: str | None = Field(default=None, max_length=64)
+    older_than_days: int | None = Field(default=None, ge=1)
+    confirm: bool = False
+
+
+@router.post("/memory/forget")
+async def forget_memories(payload: MemoryForgetIn):
+    """Bulk forget by filter. Two guards against accidents: at least
+    one filter must be given (no wipe-all), and ``confirm: true`` is
+    required. Returns the deleted count and ids."""
+    from datetime import datetime, timedelta, timezone
+
+    if not payload.confirm:
+        raise HTTPException(status_code=422, detail="confirm must be true to bulk-forget memories")
+    if payload.kind is None and payload.room is None and payload.older_than_days is None:
+        raise HTTPException(status_code=422, detail="At least one filter (kind, room, older_than_days) is required")
+    cutoff = None
+    if payload.older_than_days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=payload.older_than_days)
+    records = await list_memories(
+        kind=MemoryKind(payload.kind) if payload.kind else None, limit=10000
+    )
+    deleted: list[str] = []
+    for r in records:
+        if payload.room is not None and (r.room or "default") != payload.room:
+            continue
+        if cutoff is not None:
+            created = r.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if created >= cutoff:
+                continue
+        if await delete_memory(r.id):
+            deleted.append(r.id)
+    return {"deleted": len(deleted), "ids": deleted}
+
+
 @router.get("/memory/stats")
 async def get_memory_stats():
     """Totals by kind for the settings UI."""
