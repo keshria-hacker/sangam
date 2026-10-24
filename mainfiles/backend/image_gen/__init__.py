@@ -8,9 +8,15 @@ media pipeline so generated images render in chat like any attachment.
 """
 from __future__ import annotations
 
-from .engines import GeneratedImage
+from .engines import (
+    FooocusControls,
+    GeneratedImage,
+    LoRARef,
+    UnsupportedImageControl,
+    describe_fooocus_controls,
+)
 from .service import ImageGenError, generate_images, image_status, reset_image_gen_for_testing
-from .styles import enhance_prompt, get_style, list_styles
+from .styles import enhance_prompt, expand_wildcards, get_style, list_styles, parse_prompt_weights
 
 
 def register_image_gen_extension() -> bool:
@@ -35,13 +41,19 @@ def register_image_gen_extension() -> bool:
 
 
 __all__ = [
+    "FooocusControls",
     "GeneratedImage",
     "ImageGenError",
+    "LoRARef",
+    "UnsupportedImageControl",
+    "describe_fooocus_controls",
     "enhance_prompt",
+    "expand_wildcards",
     "generate_images",
     "get_style",
     "image_status",
     "list_styles",
+    "parse_prompt_weights",
     "register_image_gen_extension",
     "reset_image_gen_for_testing",
 ]

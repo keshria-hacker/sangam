@@ -413,6 +413,40 @@ async def revoke_all_devices(db: AsyncSession = Depends(get_db), user=Depends(ge
 
 
 # ---------------------------------------------------------------------------
+# mDNS discovery (Wave-2 infra)
+#
+# Advertisement + peer observation only (see backend/mdns.py): stdlib
+# multicast, TTL=1 so nothing leaves the LAN, and OFF unless LAN mode
+# is enabled. Starting discovery here starts the process-wide
+# advertiser; it stops when LAN is off (the endpoint refuses while
+# off, so a stale advertiser is never started from here). QR re-scan
+# stays the fallback when mDNS listening is unavailable.
+# ---------------------------------------------------------------------------
+
+@router.get("/devices/discovery")
+async def mdns_discovery(request: Request, db: AsyncSession = Depends(get_db),
+                         user=Depends(get_current_user)):
+    if not await _lan_enabled(db, user.id):
+        raise HTTPException(
+            status_code=403,
+            detail="LAN mode is off. Turn it on in Settings → Devices first.",
+        )
+    from ..lan_pairing import lan_ipv4_addresses as _lan_ips
+    from ..mdns import mdns_status, start_mdns
+
+    port = request.url.port or 8001
+    advertiser = start_mdns(port, enabled=True, ips=_lan_ips())
+    status = mdns_status()
+    return {
+        **status,
+        "lan_ips": _lan_ips(),
+        "port": port,
+        "fallback": ("QR re-scan in Settings → Devices remains the fallback "
+                     "if no peers appear here."),
+    }
+
+
+# ---------------------------------------------------------------------------
 # LAN info + certificate (host)
 # ---------------------------------------------------------------------------
 

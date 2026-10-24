@@ -1,0 +1,22 @@
+# Example cassette (Keploy-shaped, hand-written, no live traffic).
+# Request fingerprint: POST https://lite.duckduckgo.com/lite/ with the
+# DuckDuckGo-Lite User-Agent header and form body "q=test&kl=".
+# This file documents the format; the replay test in test_deep_infra.py
+# records a fresh cassette into a tmp dir and replays it, so this file
+# is not on the critical path of any test (header variance between
+# httpx versions would otherwise make a hand-written cassette brittle).
+version: 1
+request:
+  method: POST
+  url: https://lite.duckduckgo.com/lite/
+  headers:
+    user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+  body: "q=test&kl="
+response:
+  status: 200
+  headers:
+    content-type: "text/html; charset=utf-8"
+  body_text: "<table><tr><td><a class='result-link' href='https://example.com/pricing'>Example Pricing</a></td><td class='result-snippet'>Example snippet text</td></tr></table>"
+noise:
+  headers: [date, x-request-id]
+  body_fields: []

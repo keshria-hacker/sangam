@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import base64
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,115 @@ class GeneratedImage:
     revised_prompt: str = ""  # populated when the server rewrites the prompt
 
 
+class UnsupportedImageControl(RuntimeError):
+    """A requested control is not supported by the selected engine.
+
+    The API maps this to 422: an unsupported control must never be
+    silently ignored and produce an image that pretends it applied.
+    FaceSwap is excluded entirely (consent-sensitive) and is not a
+    control here at all.
+    """
+
+
+# --- Fooocus controls ---------------------------------------------------------
+# Sampler/scheduler tables mirror Fooocus modules/flags.py as read in the
+# deep-read research (sampler names as Fooocus spells them; the scheduler
+# list is the 11-entry table). Defaults are Fooocus's: sampler
+# dpmpp_2m_sde_gpu, scheduler karras, CFG 7.0, refiner switch 0.8,
+# LoRA weight clamp [-2, 2], CLIP skip 1-12.
+
+FOOCUSS_SAMPLERS: tuple[str, ...] = (
+    "euler", "euler_ancestral", "heun", "dpm_2", "dpm_2_ancestral",
+    "dpmpp_2s_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu",
+    "dpmpp_sde", "dpmpp_2m_sde_heun", "lcm", "tcd", "restart", "ddim",
+    "uni_pc", "uni_pc_bh2", "euler_cfg_pp", "euler_ancestral_cfg_pp",
+    "ddim_cfg_pp", "dpmpp_2m_cfg_pp", "dpmpp_sde_cfg_pp", "heunpp2",
+)
+FOOCUSS_SCHEDULERS: tuple[str, ...] = (
+    "normal", "karras", "exponential", "sgm_uniform", "simple",
+    "ddim_uniform", "lcm", "turbo", "align_your_steps", "tcd",
+    "edm_playground_v2.5",
+)
+FOOCUSS_DEFAULT_SAMPLER = "dpmpp_2m_sde_gpu"
+FOOCUSS_DEFAULT_SCHEDULER = "karras"
+
+
+@dataclass
+class LoRARef:
+    name: str
+    weight: float = 1.0
+
+
+@dataclass
+class FooocusControls:
+    """Diffusion controls, engine-gated (see supported_controls per engine).
+
+    All fields default to None/empty = "not requested". A control that is
+    requested but not in the engine's supported set raises
+    UnsupportedImageControl before any generation happens.
+    ``prompt_weights`` is filled by the service layer from the parsed
+    prompt; it is not a user-supplied API field.
+    """
+
+    sampler: str | None = None
+    scheduler: str | None = None
+    steps: int | None = None
+    cfg: float | None = None
+    seed: int | None = None
+    sharpness: float | None = None
+    clip_skip: int | None = None
+    loras: list[LoRARef] = field(default_factory=list)
+    embeddings: list[str] = field(default_factory=list)
+    prompt_weights: list[tuple[str, float]] = field(default_factory=list)
+
+    def requested_fields(self) -> list[str]:
+        out = []
+        for f in ("sampler", "scheduler", "steps", "cfg", "seed",
+                  "sharpness", "clip_skip", "loras", "embeddings"):
+            if getattr(self, f):
+                out.append(f)
+        return out
+
+    def has_any(self) -> bool:
+        return bool(self.requested_fields())
+
+    def validate(self) -> None:
+        if self.sampler is not None and self.sampler not in FOOCUSS_SAMPLERS:
+            raise ValueError(f"unknown sampler {self.sampler!r} (see /image/status controls)")
+        if self.scheduler is not None and self.scheduler not in FOOCUSS_SCHEDULERS:
+            raise ValueError(f"unknown scheduler {self.scheduler!r} (see /image/status controls)")
+        if self.steps is not None and not (1 <= self.steps <= 150):
+            raise ValueError(f"steps {self.steps} out of range 1-150")
+        if self.cfg is not None and not (0.0 <= self.cfg <= 30.0):
+            raise ValueError(f"cfg {self.cfg} out of range 0-30")
+        if self.sharpness is not None and not (0.0 <= self.sharpness <= 30.0):
+            raise ValueError(f"sharpness {self.sharpness} out of range 0-30")
+        if self.clip_skip is not None and not (1 <= self.clip_skip <= 12):
+            raise ValueError(f"clip_skip {self.clip_skip} out of range 1-12 (Fooocus clip_skip_max)")
+        for lora in self.loras:
+            if not lora.name:
+                raise ValueError("LoRA name must not be empty")
+            if not (-2.0 <= lora.weight <= 2.0):
+                raise ValueError(f"LoRA {lora.name!r} weight {lora.weight} out of Fooocus clamp [-2, 2]")
+
+    def to_dict(self) -> dict:
+        return {
+            "sampler": self.sampler, "scheduler": self.scheduler,
+            "steps": self.steps, "cfg": self.cfg, "seed": self.seed,
+            "sharpness": self.sharpness, "clip_skip": self.clip_skip,
+            "loras": [{"name": l.name, "weight": l.weight} for l in self.loras],
+            "embeddings": list(self.embeddings),
+        }
+
+
+FOOCUSS_CONTROL_FIELDS = frozenset(
+    ("sampler", "scheduler", "steps", "cfg", "seed", "sharpness",
+     "clip_skip", "loras", "embeddings"))
+
+
 class ImageEngine(Protocol):
     name: str
+    supported_controls: frozenset
 
     def is_available(self) -> bool: ...
     def generate(
@@ -54,8 +161,10 @@ class ImageEngine(Protocol):
         negative_prompt: str = "",
         size: str = "1024x1024",
         n: int = 1,
+        controls: FooocusControls | None = None,
     ) -> list[GeneratedImage]:
-        """Generate images. May raise on failure."""
+        """Generate images. May raise on failure. Engines that do not
+        support a requested control raise UnsupportedImageControl."""
         ...
 
 
@@ -65,6 +174,10 @@ class OpenAIImagesEngine:
     """POST {base}/v1/images/generations — OpenAI, local compat servers."""
 
     name = "openai"
+    # The OpenAI images API takes no sampler/scheduler/steps/CFG/seed/
+    # sharpness/CLIP-skip/LoRA/embedding parameters: requesting any of
+    # them here is a 422, never a silently-ignored flag on a real image.
+    supported_controls: frozenset = frozenset()
 
     def _config(self) -> tuple[str, str | None, str]:
         from ..config import settings
@@ -88,7 +201,14 @@ class OpenAIImagesEngine:
         negative_prompt: str = "",
         size: str = "1024x1024",
         n: int = 1,
+        controls: FooocusControls | None = None,
     ) -> list[GeneratedImage]:
+        if controls is not None and controls.has_any():
+            raise UnsupportedImageControl(
+                "The openai engine does not support Fooocus diffusion controls "
+                f"({', '.join(controls.requested_fields())}); use the fooocus "
+                "engine for sampler/scheduler/steps/CFG/seed/sharpness/CLIP-skip/LoRA/embeddings, "
+                "or omit them.")
         import httpx
 
         base, api_key, model = self._config()
@@ -185,8 +305,10 @@ class FooocusEngine:
     """
 
     name = "fooocus"
+    supported_controls: frozenset = FOOCUSS_CONTROL_FIELDS
     _client: object = None
     _load_error: str = ""
+    last_controls: FooocusControls | None = None  # last validated controls (test/debug)
 
     def _connect(self) -> object:
         if self._client is not None:
@@ -223,7 +345,16 @@ class FooocusEngine:
         negative_prompt: str = "",
         size: str = "1024x1024",
         n: int = 1,
+        controls: FooocusControls | None = None,
     ) -> list[GeneratedImage]:
+        # Validate controls BEFORE touching the Gradio client, so a bad
+        # sampler/scheduler/LoRA weight fails fast with a clear error
+        # even when no Fooocus server is running. Real Fooocus is not
+        # available in this environment: after validation the existing
+        # diagnostic path below still applies (see build log).
+        if controls is not None:
+            controls.validate()
+            self.last_controls = controls
         client = self._connect()
         # Introspect the app: find the txt2img-style predict endpoint.
         # Fooocus versions differ; we try the most likely candidates and
@@ -273,5 +404,23 @@ def describe_image_engines() -> list[dict]:
             detail = "experimental Gradio driver"
             if isinstance(engine, FooocusEngine) and engine._load_error:
                 detail = engine._load_error
-        out.append({"name": name, "available": available, "detail": detail})
+        supported = sorted(getattr(engine, "supported_controls", frozenset()) or frozenset())
+        out.append({"name": name, "available": available, "detail": detail,
+                    "supported_controls": supported})
     return out
+
+
+def describe_fooocus_controls() -> dict:
+    """Sampler/scheduler catalogue + ranges for /image/status."""
+    return {
+        "samplers": list(FOOCUSS_SAMPLERS),
+        "schedulers": list(FOOCUSS_SCHEDULERS),
+        "defaults": {"sampler": FOOCUSS_DEFAULT_SAMPLER,
+                     "scheduler": FOOCUSS_DEFAULT_SCHEDULER, "cfg": 7.0},
+        "ranges": {"steps": [1, 150], "cfg": [0.0, 30.0],
+                   "sharpness": [0.0, 30.0], "clip_skip": [1, 12],
+                   "lora_weight": [-2.0, 2.0]},
+        "note": ("Controls are honoured only by the fooocus engine; the "
+                 "openai engine returns 422 when any is requested. "
+                 "FaceSwap is excluded."),
+    }

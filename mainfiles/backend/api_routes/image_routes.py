@@ -18,6 +18,7 @@ from ..config import settings
 from ..feature_flags import is_enabled
 from ..database import get_db
 from ..image_gen import ImageGenError, generate_images, image_status
+from ..image_gen.engines import FooocusControls, LoRARef, UnsupportedImageControl
 from ..image_ops import UnsupportedOp, image_prompt, inpaint, outpaint, upscale, vary
 from .common import router
 from .media_routes import save_media_file
@@ -28,11 +29,32 @@ def _require_image_gen() -> None:
         raise HTTPException(status_code=404, detail="Image generation is not enabled")
 
 
+class LoRAIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    weight: float = Field(default=1.0, ge=-2.0, le=2.0)  # Fooocus LoRA clamp
+
+
 class ImageGenIn(BaseModel):
     prompt: str = Field(min_length=1, max_length=2000)
     style: str | None = None
     size: str | None = Field(default=None, pattern=r"^\d+x\d+$")
     n: int = Field(default=1, ge=1, le=4)
+    # Fooocus diffusion controls — honoured only by the fooocus engine;
+    # any requested control on another engine returns 422, never a fake.
+    sampler: str | None = None
+    scheduler: str | None = None
+    steps: int | None = Field(default=None, ge=1, le=150)
+    cfg: float | None = Field(default=None, ge=0.0, le=30.0)
+    seed: int | None = None
+    sharpness: float | None = Field(default=None, ge=0.0, le=30.0)
+    clip_skip: int | None = Field(default=None, ge=1, le=12)
+    loras: list[LoRAIn] = Field(default_factory=list)
+    embeddings: list[str] = Field(default_factory=list)
+    # Inline wildcard wordlists for __name__ expansion (file-based
+    # expansion lives in the service layer via wildcards_dir).
+    wildcard_words: dict[str, list[str]] | None = None
+    wildcard_seed: int | None = None
+    wildcard_in_order: bool = False
 
 
 @router.get("/image/status")
@@ -50,10 +72,30 @@ async def generate_image_endpoint(
 ):
     """Generate images; returns saved media attachments."""
     _require_image_gen()
+    controls = None
+    if (payload.sampler or payload.scheduler or payload.steps is not None
+            or payload.cfg is not None or payload.seed is not None
+            or payload.sharpness is not None or payload.clip_skip is not None
+            or payload.loras or payload.embeddings):
+        controls = FooocusControls(
+            sampler=payload.sampler, scheduler=payload.scheduler,
+            steps=payload.steps, cfg=payload.cfg, seed=payload.seed,
+            sharpness=payload.sharpness, clip_skip=payload.clip_skip,
+            loras=[LoRARef(name=l.name, weight=l.weight) for l in payload.loras],
+            embeddings=list(payload.embeddings),
+        )
     try:
         attachments = generate_images(
-            payload.prompt, style=payload.style, size=payload.size, n=payload.n
+            payload.prompt, style=payload.style, size=payload.size, n=payload.n,
+            controls=controls, wildcard_seed=payload.wildcard_seed,
+            wildcard_in_order=payload.wildcard_in_order,
+            wildcard_words=payload.wildcard_words,
         )
+    except UnsupportedImageControl as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError as exc:
+        # FooocusControls.validate() failures (bad sampler/scheduler/range)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ImageGenError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     from ..analytics import events as _ae, optional_user_id, record_event as _record
