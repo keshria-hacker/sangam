@@ -286,6 +286,10 @@ def retrieve_relevant_chunks(
                 "text": doc,
                 "filename": meta.get("filename", ""),
                 "score": score,
+                # Provenance (Phase 2): chat provenance previously fell
+                # back to the filename because these keys were absent.
+                "file_id": meta.get("file_id", ""),
+                "chunk_index": meta.get("chunk_index"),
             })
 
         logger.debug(
@@ -295,6 +299,86 @@ def retrieve_relevant_chunks(
     except Exception:
         logger.exception(
             "retrieve_relevant_chunks failed (query=%r, file_ids=%r)",
+            query, file_ids,
+        )
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Hybrid retrieval (Phase 2)
+# ---------------------------------------------------------------------------
+
+def retrieve_hybrid_chunks(
+    query: str,
+    file_ids: list[str],
+    top_k: int = TOP_K,
+) -> list[dict[str, Any]]:
+    """Hybrid retrieval: vector ranking fused with BM25 keyword ranking.
+
+    Fetches up to ``top_k * 3`` vector candidates, then the full chunk
+    pool for the given files (capped at 500, keyword side only) from
+    the same collection, fuses them with RRF and reranks deterministically
+    (see ``backend.hybrid_retrieval``). On any keyword-side failure it
+    degrades to the vector ranking rather than failing the request;
+    on vector failure it returns ``[]`` like the vector-only path.
+    Each result carries a ``citation`` (file_id, filename,
+    chunk_index, excerpt, source) plus ``vector_score`` /
+    ``keyword_score`` / ``score`` (fused blend, higher = better).
+    """
+    if not query or not file_ids or top_k <= 0:
+        return []
+    try:
+        from .hybrid_retrieval import hybrid_rank
+
+        collection = _get_collection()
+        results = collection.query(
+            query_texts=[query],
+            n_results=min(top_k * 3, 50),
+            where={"file_id": {"$in": file_ids}},
+        )
+        docs = (results or {}).get("documents", [[]])[0]
+        metas = (results or {}).get("metadatas", [[]])[0]
+        dists = (results or {}).get("distances", [[]])[0]
+        vector_candidates: list[dict[str, Any]] = []
+        for i, doc in enumerate(docs):
+            if not doc:
+                continue
+            meta = metas[i] if i < len(metas) else {}
+            vector_candidates.append({
+                "id": f"{meta.get('file_id', '')}_{meta.get('chunk_index', i)}",
+                "text": doc,
+                "filename": meta.get("filename", ""),
+                "file_id": meta.get("file_id", ""),
+                "chunk_index": meta.get("chunk_index"),
+                "vector_score": dists[i] if i < len(dists) else None,
+            })
+        if not vector_candidates:
+            return []
+        keyword_candidates: list[dict[str, Any]] = []
+        try:
+            pool = collection.get(
+                where={"file_id": {"$in": file_ids}}, limit=500,
+            ) or {}
+            pool_docs = pool.get("documents", []) or []
+            pool_metas = pool.get("metadatas", []) or []
+            for i, doc in enumerate(pool_docs):
+                if not doc:
+                    continue
+                meta = pool_metas[i] if i < len(pool_metas) else {}
+                keyword_candidates.append({
+                    "id": f"{meta.get('file_id', '')}_{meta.get('chunk_index', i)}",
+                    "text": doc,
+                    "filename": meta.get("filename", ""),
+                    "file_id": meta.get("file_id", ""),
+                    "chunk_index": meta.get("chunk_index"),
+                })
+        except Exception:
+            logger.exception("hybrid keyword pool fetch failed; vector-only")
+            keyword_candidates = []
+        return hybrid_rank(query, vector_candidates, keyword_candidates, top_k=top_k)
+    except Exception:
+        logger.exception(
+            "retrieve_hybrid_chunks failed (query=%r, file_ids=%r)",
             query, file_ids,
         )
         return []

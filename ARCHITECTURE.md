@@ -73,7 +73,7 @@
 │   │   │   ├── code_agent_routes.py    # /agent/*, /code-agent/*
 │   │   │   ├── agents_routes.py        # /agents CRUD + run
 │   │   │   ├── teams_routes.py         # /teams, /teams/run/stream SSE
-│   │   │   ├── knowledge_routes.py     # /knowledge/graph, /knowledge/search
+│   │   │   ├── knowledge_routes.py     # /knowledge/graph, /knowledge/search, /knowledge/retrieve
 │   │   │   ├── artifacts_routes.py     # /artifacts + versions
 │   │   │   ├── automations_routes.py   # /automations CRUD + run-now
 │   │   │   ├── compare_routes.py       # /compare, /arena/*
@@ -247,7 +247,7 @@ app.include_router(skills_router, prefix=settings.API_PREFIX, dependencies=[Depe
 | `code_agent_routes.py` | Agent execution (`/agent/run` SSE, `/agent/approve`) + code agent (`/code-agent/*`) |
 | `agents_routes.py` | Custom agents CRUD (`/agents`) + run (`/agents/{id}/run` SSE) |
 | `teams_routes.py` | Multi-agent teams (`/teams`, `/teams/run`, `/teams/run/stream` SSE, `/teams/retry-agent`) |
-| `knowledge_routes.py` | Knowledge graph (`/knowledge/graph`, `/knowledge/search`) |
+| `knowledge_routes.py` | Knowledge graph (`/knowledge/graph`, `/knowledge/search`, `/knowledge/retrieve`) |
 | `artifacts_routes.py` | Typed artifacts CRUD (`/artifacts`) + versions |
 | `automations_routes.py` | Scheduled tasks (`/automations`) |
 | `compare_routes.py` | Model compare (`/compare`) + Arena (`/arena/vote`, `/arena/leaderboard`) |
@@ -1119,6 +1119,7 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/settings/providers/{id}/models/refresh` | Yes | Re-fetch models for one provider |
 | GET | `/api/knowledge/graph` | Yes | Unified knowledge graph (Phase 3) |
 | GET | `/api/knowledge/search` | Yes | Search across memories, docs, code, chats |
+| GET | `/api/knowledge/retrieve` | Yes | Hybrid retrieval over documents (Phase 2) |
 | GET | `/api/agents` | Yes | List custom agents (Phase 3) |
 | POST | `/api/agents` | Yes | Create custom agent |
 | GET | `/api/agents/{id}` | Yes | Get agent |

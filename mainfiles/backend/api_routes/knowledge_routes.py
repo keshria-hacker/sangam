@@ -64,6 +64,33 @@ async def get_knowledge_graph(
     )
 
 
+@router.get("/knowledge/retrieve")
+async def retrieve_knowledge(
+    q: str = Query(min_length=1),
+    file_ids: str = Query(default=""),
+    top_k: int = Query(default=5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Phase 2 hybrid retrieval over uploaded documents.
+
+    Vector + BM25 fusion with deterministic reranking and per-chunk
+    citations (file_id, filename, chunk_index, excerpt, source).
+    ``file_ids`` is an optional comma-separated list; with none given,
+    it searches all uploaded files (uploads are single-user by design,
+    like the rest of Sangam — see Phase 0 ownership audit). Empty
+    index -> empty results, never an error.
+    """
+    from ..rag import retrieve_hybrid_chunks
+
+    ids = [f.strip() for f in file_ids.split(",") if f.strip()]
+    if not ids:
+        rows = (await db.execute(select(UserFile).limit(200))).scalars().all()
+        ids = [f.id for f in rows]
+    results = retrieve_hybrid_chunks(q, ids, top_k=top_k) if ids else []
+    return {"query": q, "method": "hybrid", "results": results}
+
+
 @router.get("/knowledge/search")
 async def search_knowledge(
     q: str = Query(min_length=1),
