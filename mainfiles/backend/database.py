@@ -96,6 +96,24 @@ async def _add_missing_columns(conn: Any) -> None:
             "cost_budget":
                 "ALTER TABLE custom_agents ADD COLUMN cost_budget FLOAT DEFAULT 0.0",
         },
+        # Deep-read Wave-2: message-evidence persistence + graph hardening.
+        # (New tables — goals, pending_pairings, note_link_index — are
+        # covered by create_all; only new columns on existing tables
+        # need rows here.)
+        "messages": {
+            "tool_calls_json":
+                "ALTER TABLE messages ADD COLUMN tool_calls_json TEXT",
+            "citations_json":
+                "ALTER TABLE messages ADD COLUMN citations_json TEXT",
+            "artifacts_json":
+                "ALTER TABLE messages ADD COLUMN artifacts_json TEXT",
+        },
+        "memory_relations": {
+            "confidence":
+                "ALTER TABLE memory_relations ADD COLUMN confidence FLOAT DEFAULT 1.0",
+            "source_ref":
+                "ALTER TABLE memory_relations ADD COLUMN source_ref VARCHAR(512) DEFAULT ''",
+        },
     }
     for table, cols in needed.items():
         try:

@@ -250,6 +250,17 @@ from .api_routes import skills_v2_routes  # noqa: F401
 # shared router (host) and the claim route on the public router, plus the
 # paired_devices table on Base.metadata.
 from .api_routes import devices_routes  # noqa: F401
+# Deep-read Wave-2: importing these modules registers their routes on
+# the shared router (code-graph, goals, and the deep-routes wrappers
+# for council/debate/hive/hooks/worktrees/skills-creator/personas/lessons).
+from .api_routes import code_graph_routes  # noqa: F401
+from .api_routes import deep_routes  # noqa: F401
+from .api_routes import goals_routes  # noqa: F401
+# Doctor lives in its own module with its own router; include it on the
+# shared router so it is served (and authenticated) like /system/*.
+from .doctor import router as _doctor_router
+
+router.include_router(_doctor_router)
 from .api_routes.routing_routes import evaluate_routing  # noqa: F401
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401

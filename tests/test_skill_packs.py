@@ -46,6 +46,7 @@ def test_list_packs_finds_bundled_packs(pack_state_tmp):
     assert packs["diagramming"].skills == ["archify"]
     assert set(packs["science-essentials"].skills) == {
         "literature-review", "data-analysis", "citation-hygiene",
+        "science-lit-review", "citation-verify",
     }
     assert packs["agent-loop"].skills == ["tool-discipline"]
     assert all(p.enabled is False for p in packs.values())

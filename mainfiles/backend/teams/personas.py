@@ -64,14 +64,18 @@ def parse_persona_file(path: str | Path) -> Persona:
 
 
 def load_personas(directory: str | Path) -> dict[str, Persona]:
-    """Load every ``*.md`` under ``directory``. A missing directory
-    is an empty registry (not an error); a malformed file IS an error
-    — a broken persona must fail startup/validation, not vanish."""
+    """Load every ``*.md`` under ``directory``, recursively (the
+    seeded registry lives in <division>/<slug>.md). A missing
+    directory is an empty registry (not an error); a malformed file
+    IS an error — a broken persona must fail startup/validation,
+    not vanish."""
     directory = Path(directory)
     out: dict[str, Persona] = {}
     if not directory.exists():
         return out
-    for path in sorted(directory.glob("*.md")):
+    for path in sorted(directory.rglob("*.md")):
+        if path.name == "README.md":
+            continue
         persona = parse_persona_file(path)
         if persona.slug in out:
             raise ValueError(f"duplicate persona slug: {persona.slug}")

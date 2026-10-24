@@ -473,7 +473,7 @@ export async function runGeneration({ content, fileIds, mediaIds, regenerate }) 
         showReasoningInNode(typingNode, reasoningContent, { thinkingState: { getThinkingDisplay } });
       },
       toolStart: (event) => {
-        const toolId = event.metadata?.tool_id;
+        const toolId = event.metadata?.tool_call_id || event.metadata?.tool_id;
         const toolName = event.content || 'tool';
         showToolCallInNode(typingNode, {
           id: toolId,
@@ -498,7 +498,7 @@ export async function runGeneration({ content, fileIds, mediaIds, regenerate }) 
         // Status will be updated when tool_result arrives
       },
       toolResult: (event) => {
-        const toolId = event.metadata?.tool_id;
+        const toolId = event.metadata?.tool_call_id || event.metadata?.tool_id;
         showToolCallInNode(typingNode, {
           id: toolId,
           result: event.content,

@@ -251,7 +251,10 @@ def test_reflect_without_model_returns_503_not_fake(client):
         assert not any("Reflection:" in m["content"] for m in r.json())
 
 
-def test_reflect_with_mocked_model_stores_semantic_memory(client, monkeypatch):
+def test_reflect_with_mocked_model_is_read_only(client, monkeypatch):
+    # Deep-read Wave-2: reflect must NOT write its synthesis as a memory
+    # (that polluted recall with its own output). It returns evidence,
+    # proof counts, and trend with stored=False.
     import json
     with client:
         h = _auth_headers(client)
@@ -274,11 +277,11 @@ def test_reflect_with_mocked_model_stores_semantic_memory(client, monkeypatch):
         # Evidence is filtered to actually-recalled ids: the mock's
         # invented id must not survive.
         assert "whatever-id" not in body["evidence_ids"]
-        assert body["stored_memory_id"]
-        # Stored synthesis is a semantic memory prefixed "Reflection: ".
+        assert body["stored"] is False
+        assert "stored_memory_id" not in body
+        # Nothing new was stored by the reflection.
         r = client.get("/api/memory?limit=50", headers=h)
-        stored = [m for m in r.json() if m["id"] == body["stored_memory_id"]]
-        assert stored and stored[0]["content"].startswith("Reflection: ")
+        assert not any("Reflection:" in m["content"] for m in r.json())
 
 
 # -------------------------------------------------------------- notebooks

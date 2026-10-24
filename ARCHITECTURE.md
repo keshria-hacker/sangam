@@ -1136,6 +1136,9 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/notebooks/{id}/notes/{note_id}` | Yes | Get a note with outgoing wiki-links (Batch 4) |
 | POST | `/api/notebooks/{id}/notes/from-chat` | Yes | Save a chat message as a note; 404 if missing (Batch 4) |
 | GET | `/api/notebooks/{id}/notes/{note_id}/backlinks` | Yes | Notes linking [[this title]] (Batch 4) |
+| PUT | `/api/notebooks/{id}/notes/{note_id}` | Yes | Update a note; title change renames with link propagation (Deep-read merge) |
+| POST | `/api/notebooks/{id}/notes/{note_id}/extract-section` | Yes | Extract a section into a new note; source keeps a [[link]] (Deep-read merge) |
+| GET | `/api/notebooks/{id}/notes/{note_id}/expand` | Yes | Token-budgeted graph-expansion retrieval from a seed note (Deep-read merge) |
 | POST | `/api/notebooks/{id}/transforms` | Yes | Run a prompt over sources; stored as transform + note (Batch 4) |
 | GET | `/api/notebooks/{id}/transforms` | Yes | List notebook transforms (Batch 4) |
 | GET | `/api/settings/providers` | Yes | Provider key status |
@@ -1291,7 +1294,7 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/models/ollama/pulls/{pull_id}` | Yes | Poll an Ollama pull (Batch 7) |
 | DELETE | `/api/models/ollama/{model}` | Yes | Delete an Ollama model (Batch 7) |
 | POST | `/api/quality/lint` | Yes | Offline deterministic grammar/spell/repetition lint, candidate issues only (Batch 7) |
-| GET | `/api/quality/adhd-style` | Yes | Prompt-level ADHD style block; wired_into_chat=false (deferred) (Batch 7) |
+| GET | `/api/quality/adhd-style` | Yes | Prompt-level ADHD style block; wired into chat behind adhdFriendly (Deep-read Wave-1) |
 | GET | `/api/diagrams/catalogue` | Yes | Editorial diagram templates (13 types) (Batch 7) |
 | POST | `/api/diagrams/lint` | Yes | Statically checkable style-guide issues only (Batch 7) |
 | GET | `/api/diagrams/brands` | Yes | Saved brand profiles (Batch 7) |
@@ -1304,6 +1307,81 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/image/outpaint` | Yes | Outpaint with a border mask via engine edits (422 if unsupported) (Batch 7) |
 | POST | `/api/image/image-prompt` | Yes | Image-prompt (img2img) via engine edits (422 if unsupported) (Batch 7) |
 | POST | `/api/image/describe` | Yes | Describe an image via a vision chat model; 503 with no model (Batch 7) |
+| GET | `/api/code-graph/find-code` | Yes | Graft-style code search, lexical + PageRank re-rank (Deep-read Wave-2) |
+| GET | `/api/code-graph/file-api` | Yes | File-scoped code API (Deep-read Wave-2) |
+| GET | `/api/code-graph/find-all` | Yes | Find all symbols matching a pattern (Deep-read Wave-2) |
+| GET | `/api/code-graph/repo-map` | Yes | Repository map: clusters/hubs/hotspots (Deep-read Wave-2) |
+| GET | `/api/code-graph/trace` | Yes | Trace calls in/out/both for a symbol (Deep-read Wave-2) |
+| GET | `/api/code-graph/affected` | Yes | Blast radius for a symbol (Deep-read Wave-2) |
+| GET | `/api/code-graph/export` | Yes | Graph export, JSON or standalone HTML (Deep-read Wave-2) |
+| GET | `/api/code-graph/diagram` | Yes | Architecture diagram IR generated from the code graph (Deep-read Wave-2) |
+| GET | `/api/knowledge/graph/check` | Yes | Fingerprint drift vs the cached code graph (Deep-read Wave-2) |
+| GET | `/api/devices/discovery` | Yes | mDNS LAN discovery; 403 unless LAN_ENABLED (Deep-read Wave-2) |
+| GET | `/api/system/doctor` | Yes | System health report with fix hints, never 500s (Deep-read Wave-2) |
+| GET | `/api/engineering/{spec_id}/chain` | Yes | Spec-kit chain state for a spec (Deep-read Wave-2) |
+| POST | `/api/engineering/{spec_id}/chain/advance` | Yes | Advance the spec-kit chain stage (Deep-read Wave-2) |
+| POST | `/api/engineering/{spec_id}/chain/finish` | Yes | Finish chain; gated on package-referencing review verdicts (Deep-read Wave-2) |
+| POST | `/api/engineering/{spec_id}/chain/review-package` | Yes | Build a BASE/HEAD diff review package; 422 on empty diff (Deep-read Wave-2) |
+| POST | `/api/engineering/{spec_id}/chain/review/{axis}` | Yes | Spec or quality review over a review package (Deep-read Wave-2) |
+| POST | `/api/engineering/{spec_id}/chain/review/{axis}/fix` | Yes | Fix loop, 5-round cap, fresh context on rounds 4-5 (Deep-read Wave-2) |
+| POST | `/api/engineering/{spec_id}/chain/tasks/{task_id}/run` | Yes | Real per-task agent run + test ledger row (Deep-read Wave-2) |
+| GET | `/api/goals` | Yes | Goals with task counts (Deep-read Wave-2) |
+| POST | `/api/goals` | Yes | Create a goal (tree via parent_id) (Deep-read Wave-2) |
+| GET | `/api/goals/{goal_id}` | Yes | Goal tree: subgoals + tasks (Deep-read Wave-2) |
+| PATCH | `/api/goals/{goal_id}` | Yes | Update goal title/description/status (Deep-read Wave-2) |
+| GET | `/api/goals/{goal_id}/tasks` | Yes | Tasks of a goal (Deep-read Wave-2) |
+| POST | `/api/goals/{goal_id}/tasks` | Yes | Create a task under a goal (Deep-read Wave-2) |
+| GET | `/api/tasks` | Yes | Open tasks (or all with ?open=false) (Deep-read Wave-2) |
+| GET | `/api/tasks/{task_id}` | Yes | One task (Deep-read Wave-2) |
+| PATCH | `/api/tasks/{task_id}` | Yes | Update task status/priority/work_ref/assignee (Deep-read Wave-2) |
+| POST | `/api/knowledge/crawl` | Yes | BFS deep crawl; requires approved:true, RunStore-mirrored (Deep-read Wave-2) |
+| GET | `/api/knowledge/crawls/{crawl_id}` | Yes | Deep-crawl job status/pages (Deep-read Wave-2) |
+| GET | `/api/notebooks/{notebook_id}/insights` | Yes | Notebook insight rows (Deep-read Wave-2) |
+| POST | `/api/notebooks/{notebook_id}/insights/{insight_id}/save-as-note` | Yes | Promote an insight row to a note (Deep-read Wave-2) |
+| GET | `/api/notebooks/{notebook_id}/saved-transforms` | Yes | Saved prompt transformations (Deep-read Wave-2) |
+| POST | `/api/notebooks/{notebook_id}/saved-transforms` | Yes | Save a prompt transformation (Deep-read Wave-2) |
+| POST | `/api/lessons/from-outline` | Yes | Lesson dict from an outline (Deep-read Wave-2) |
+| POST | `/api/lessons/player` | Yes | Create a lesson player session (Deep-read Wave-2) |
+| GET | `/api/lessons/player/{player_id}` | Yes | Lesson player snapshot (Deep-read Wave-2) |
+| POST | `/api/lessons/player/{player_id}/start` | Yes | Start lesson playback (Deep-read Wave-2) |
+| POST | `/api/lessons/player/{player_id}/pause` | Yes | Pause lesson playback (Deep-read Wave-2) |
+| POST | `/api/lessons/player/{player_id}/resume` | Yes | Resume lesson playback at the same scene (Deep-read Wave-2) |
+| POST | `/api/lessons/player/{player_id}/play-step` | Yes | Advance one lesson action (Deep-read Wave-2) |
+| POST | `/api/lessons/player/{player_id}/interrupt` | Yes | Interrupt with a learner question (Deep-read Wave-2) |
+| POST | `/api/lessons/player/{player_id}/end-discussion` | Yes | End discussion, return to paused cursor (Deep-read Wave-2) |
+| POST | `/api/lessons/player/{player_id}/answer` | Yes | Answer a lesson question action (Deep-read Wave-2) |
+| POST | `/api/skills/creator/draft` | Yes | Draft a contract-format skill (Deep-read Wave-2) |
+| POST | `/api/skills/creator/evaluate` | Yes | Skill-creator eval loop: test prompts, evaluate, rewrite (Deep-read Wave-2) |
+| POST | `/api/skills/creator/publish` | Yes | Publish a skill; refuses unless eval passed + checks pass (Deep-read Wave-2) |
+| POST | `/api/skills/import/preview` | Yes | Dry-run curated import: hashes + scan, writes nothing (Deep-read Wave-2) |
+| POST | `/api/skills/import/install` | Yes | Explicit per-skill install from a preview; hash-drift refused (Deep-read Wave-2) |
+| GET | `/api/skills/personas` | Yes | File-based persona registry listing (Deep-read Wave-2) |
+| GET | `/api/skills/personas/suggest` | Yes | Task-based persona suggestions (Deep-read Wave-2) |
+| GET | `/api/skills/personas/validate` | Yes | Roster validation report (Deep-read Wave-2) |
+| POST | `/api/teams/council/deliberate` | Yes | Council Deliberate mode; splits returned, never manufactured consensus (Deep-read Wave-2) |
+| POST | `/api/teams/debate/estimate` | Yes | Debate cost estimate before start (Deep-read Wave-2) |
+| POST | `/api/teams/debate/run` | Yes | Start a capped debate job (202 + poll id) (Deep-read Wave-2) |
+| GET | `/api/teams/debate/jobs/{job_id}` | Yes | Debate job status/result (Deep-read Wave-2) |
+| POST | `/api/teams/debate/jobs/{job_id}/stop` | Yes | Hard-stop a running debate job (Deep-read Wave-2) |
+| GET | `/api/teams/hive/agents` | Yes | Hive agent registry (Deep-read Wave-2) |
+| POST | `/api/teams/hive/agents` | Yes | Create a hive agent (Deep-read Wave-2) |
+| POST | `/api/teams/hive/agents/{agent_id}/archive` | Yes | Archive a hive agent (Deep-read Wave-2) |
+| GET | `/api/teams/hive/agents/{agent_id}/inbox` | Yes | Hive agent inbox (Deep-read Wave-2) |
+| GET | `/api/teams/hive/agents/{agent_id}/outbox` | Yes | Hive agent outbox (Deep-read Wave-2) |
+| POST | `/api/teams/hive/messages` | Yes | Send a hive message (routed, bounce-never-drop) (Deep-read Wave-2) |
+| POST | `/api/teams/hive/route` | Yes | Route queued hive messages (Deep-read Wave-2) |
+| POST | `/api/teams/hive/closing` | Yes | Closing-time broadcast (Deep-read Wave-2) |
+| GET | `/api/teams/hive/closing/acks` | Yes | Collect closing-time ACKs (Deep-read Wave-2) |
+| POST | `/api/teams/hive/breaker/beat` | Yes | Server-side breaker tick (state in hive/breaker.json) (Deep-read Wave-2) |
+| GET | `/api/teams/hooks/queue` | Yes | External-agent approval queue: pending + head (Deep-read Wave-2) |
+| POST | `/api/teams/hooks/queue/decide` | Yes | Decide the head approval only; stale clicks refused (Deep-read Wave-2) |
+| POST | `/api/teams/hooks/phone/issue` | Yes | Issue a one-decision phone approval token (Deep-read Wave-2) |
+| POST | `/api/teams/hooks/phone/consume` | Yes | Consume a phone token and apply its decision (Deep-read Wave-2) |
+| GET | `/api/teams/worktrees` | Yes | List git worktrees for a repo (Deep-read Wave-2) |
+| POST | `/api/teams/worktrees` | Yes | Create a git worktree (Deep-read Wave-2) |
+| POST | `/api/teams/worktrees/remove` | Yes | Remove a git worktree (Deep-read Wave-2) |
+| POST | `/api/teams/worktrees/run` | Yes | Run an argv command inside a worktree (Deep-read Wave-2) |
+| POST | `/api/teams/worktrees/annotate` | Yes | Validate diff-line review comments against a diff (Deep-read Wave-2) |
 
 ### 13.3 Database Schema
 

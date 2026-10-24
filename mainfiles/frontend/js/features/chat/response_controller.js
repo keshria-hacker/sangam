@@ -305,12 +305,15 @@ export function createResponseController(handlers = {}, options = {}) {
         emit("reasoningEnd", event);
         break;
       case RESPONSE_EVENT_TYPES.TOOL_START:
-        if (toolOpen && currentToolId !== event.metadata?.tool_id) {
+        // Backend emits tool_call_id; older events used tool_id — accept
+        // both, or input deltas never flush (currentToolId stays null).
+        const startKey = event.metadata?.tool_call_id || event.metadata?.tool_id || event.metadata?.id || null;
+        if (toolOpen && currentToolId !== startKey) {
           emit("warning", "Ignored tool_start for different tool without closing previous.");
           return;
         }
         toolOpen = true;
-        currentToolId = event.metadata?.tool_id || null;
+        currentToolId = startKey;
         emit("toolStart", event);
         break;
       case RESPONSE_EVENT_TYPES.TOOL_INPUT_DELTA:

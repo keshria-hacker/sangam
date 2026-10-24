@@ -10,8 +10,38 @@ Edge types: mentions | defines | calls | contains | related
 """
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+
+def _parse_as_of(as_of) -> datetime | None:
+    """Parse an as-of instant (datetime or ISO string) or None."""
+    if as_of is None:
+        return None
+    if isinstance(as_of, datetime):
+        return as_of
+    try:
+        return datetime.fromisoformat(str(as_of).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _valid_at(rel: dict[str, Any], instant: datetime | None) -> bool:
+    """Half-open interval check: valid_from <= t < valid_to (NULL = open)."""
+    if instant is None:
+        return True
+    vf = rel.get("valid_from")
+    vt = rel.get("valid_to")
+    if isinstance(vf, str):
+        vf = datetime.fromisoformat(vf.replace("Z", "+00:00"))
+    if isinstance(vt, str):
+        vt = datetime.fromisoformat(vt.replace("Z", "+00:00"))
+    if vf is not None and instant < vf:
+        return False
+    if vt is not None and instant >= vt:
+        return False
+    return True
 
 
 def build_knowledge_graph(
@@ -20,6 +50,8 @@ def build_knowledge_graph(
     code_graph: dict[str, Any] | None = None,
     chats: list[dict[str, Any]] | None = None,
     max_nodes: int = 200,
+    relations: list[dict[str, Any]] | None = None,
+    as_of=None,
 ) -> dict[str, Any]:
     """Build a unified graph from the available sources."""
     nodes: list[dict[str, Any]] = []
@@ -37,19 +69,28 @@ def build_knowledge_graph(
         return True
 
     def add_edge(frm: str, to: str, etype: str,
-                 provenance: str = "EXTRACTED", source: str | None = None):
+                 provenance: str = "EXTRACTED", source: str | None = None,
+                 confidence: float | None = None,
+                 source_ref: str | None = None):
         """Add an edge with provenance tracking.
 
         Provenance: EXTRACTED (from actual data), INFERRED (from heuristics),
                     AMBIGUOUS (uncertain match).
         Source: where this edge came from (e.g. 'code_ast', 'keyword_match').
+        Confidence/source_ref (memory relations) are surfaced on the
+        edge when present, never invented when absent.
         """
         if frm in seen and to in seen and len(edges) < max_nodes * 3:
-            edges.append({
+            edge: dict[str, Any] = {
                 "from": frm, "to": to, "type": etype,
                 "provenance": provenance,
                 "source": source,
-            })
+            }
+            if confidence is not None:
+                edge["confidence"] = confidence
+            if source_ref:
+                edge["source_ref"] = source_ref
+            edges.append(edge)
 
     # Memories (grouped into wings/rooms by kind)
     wings: dict[str, list[str]] = {}  # kind -> [node_ids]
@@ -109,6 +150,25 @@ def build_knowledge_graph(
                         add_edge(nid, cid, "calls",
                                  provenance="EXTRACTED", source="code_ast")
 
+    # Memory relations (entity graph, hardened): entity nodes joined
+    # by predicate edges carrying confidence + source_ref, honoured
+    # only for the as-of instant when one is given (half-open
+    # intervals; superseded relations are outside their window).
+    instant = _parse_as_of(as_of)
+    for rel in relations or []:
+        if not _valid_at(rel, instant):
+            continue
+        subj, obj = rel.get("subject", ""), rel.get("object", "")
+        if not subj or not obj:
+            continue
+        sid, oid = f"ent:{subj}", f"ent:{obj}"
+        add_node(sid, "entity", subj, {})
+        add_node(oid, "entity", obj, {})
+        add_edge(sid, oid, rel.get("predicate", "related"),
+                 provenance="EXTRACTED", source="memory_graph",
+                 confidence=rel.get("confidence"),
+                 source_ref=rel.get("source_ref"))
+
     # Chats (as context hubs)
     for c in chats or []:
         cid = f"chat:{c.get('id', '')}"
@@ -126,6 +186,8 @@ def build_knowledge_graph(
             "documents": sum(1 for n in nodes if n["type"] == "document"),
             "code": sum(1 for n in nodes if n["type"] == "code"),
             "chats": sum(1 for n in nodes if n["type"] == "chat"),
+            "entities": sum(1 for n in nodes if n["type"] == "entity"),
+            "relations": sum(1 for e in edges if e.get("source") == "memory_graph"),
         },
     }
 

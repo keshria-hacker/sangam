@@ -62,6 +62,13 @@ from ..database import Base, get_db
 from ..ingest_url import fetch_page_text, normalize_url
 from ..memory import extract_llm
 from ..models import Chat, Message, UploadedFile
+from ..note_graph import (
+    NoteLinkIndex,
+    expand_retrieval,
+    extract_section,
+    index_note_rows,
+    rename_note_propagate,
+)
 from .common import router
 
 __all__ = [
@@ -72,7 +79,34 @@ __all__ = [
     "run_notebook_transform", "list_notebook_transforms", "get_note_backlinks",
     "create_saved_transform", "list_saved_transforms",
     "list_notebook_insights", "save_insight_as_note",
+    "update_notebook_note", "extract_note_section", "expand_note_graph",
 ]
+
+
+async def _rebuild_note_index(db: AsyncSession, notebook_id: str) -> None:
+    """Rebuild the notebook's link index from current note contents.
+
+    Whole-notebook rebuild (not per-note): a new note titled X also
+    resolves previously-dangling [[X]] links in older notes, so the
+    index must be recomputed for every note, not just the edited one.
+    Best-effort: index failure never blocks the note write itself.
+    """
+    try:
+        rows = (await db.execute(
+            select(NotebookNote).where(NotebookNote.notebook_id == notebook_id)
+        )).scalars().all()
+        notes_by_title = {r.title: r.id for r in rows}
+        await db.execute(
+            NoteLinkIndex.__table__.delete().where(
+                NoteLinkIndex.notebook_id == notebook_id))
+        for r in rows:
+            for link_row in index_note_rows(
+                    {"id": r.id, "notebook_id": notebook_id,
+                     "content": r.content or ""}, notes_by_title):
+                db.add(NoteLinkIndex(**link_row))
+        await db.commit()
+    except Exception:  # noqa: BLE001 — index is derived data, never fatal
+        await db.rollback()
 
 CONTEXT_MODES = ("excluded", "summary", "full")
 SOURCE_KINDS = ("file", "url", "note", "chat")
@@ -772,6 +806,7 @@ async def save_insight_as_note(
     db.add(row)
     await db.commit()
     await db.refresh(row)
+    await _rebuild_note_index(db, notebook.id)
     return _note_out(row, with_links=True)
 
 
@@ -793,6 +828,7 @@ async def create_notebook_note(
     db.add(row)
     await db.commit()
     await db.refresh(row)
+    await _rebuild_note_index(db, notebook.id)
     return _note_out(row, with_links=True)
 
 
@@ -854,6 +890,7 @@ async def note_from_chat(
     db.add(row)
     await db.commit()
     await db.refresh(row)
+    await _rebuild_note_index(db, notebook.id)
     return _note_out(row, with_links=True)
 
 
@@ -862,9 +899,26 @@ async def get_note_backlinks(
     nb_id: str, note_id: str,
     db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
 ):
-    """Notes in the same notebook whose content contains [[this title]]."""
+    """Notes linking to this note — an index lookup, not a scan.
+
+    Falls back to the content scan only when the index has no rows
+    for the notebook (notes written before indexing existed)."""
     notebook = await _get_notebook(db, user.id, nb_id)
     target = await _get_note(db, user.id, nb_id, note_id)
+    idx_rows = (await db.execute(
+        select(NoteLinkIndex).where(
+            NoteLinkIndex.notebook_id == notebook.id,
+            NoteLinkIndex.target_note_id == target.id)
+    )).scalars().all()
+    if idx_rows:
+        ids = {r.source_note_id for r in idx_rows}
+        rows = (await db.execute(
+            select(NotebookNote).where(NotebookNote.id.in_(ids))
+            .order_by(NotebookNote.created_at, NotebookNote.id)
+        )).scalars().all()
+        return {"note_id": target.id, "title": target.title,
+                "backlinks": [_note_out(r, with_links=True) for r in rows],
+                "via": "index"}
     rows = (await db.execute(
         select(NotebookNote).where(NotebookNote.notebook_id == notebook.id,
                                    NotebookNote.id != target.id)
@@ -872,7 +926,107 @@ async def get_note_backlinks(
     )).scalars().all()
     linking = [r for r in rows if target.title in parse_wiki_links(r.content)]
     return {"note_id": target.id, "title": target.title,
-            "backlinks": [_note_out(r, with_links=True) for r in linking]}
+            "backlinks": [_note_out(r, with_links=True) for r in linking],
+            "via": "scan"}
+
+
+class NoteUpdateIn(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    content: str | None = None
+
+
+@router.put("/notebooks/{nb_id}/notes/{note_id}")
+async def update_notebook_note(
+    nb_id: str, note_id: str, payload: NoteUpdateIn,
+    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+):
+    """Update a note. A title change renames through
+    rename_note_propagate: every linking doc's [[Old Title]] is
+    rewritten to [[New Title]] (piped display text preserved), so
+    renames never silently orphan links."""
+    notebook = await _get_notebook(db, user.id, nb_id)
+    target = await _get_note(db, user.id, nb_id, note_id)
+    rows = (await db.execute(
+        select(NotebookNote).where(NotebookNote.notebook_id == notebook.id)
+        .order_by(NotebookNote.created_at, NotebookNote.id)
+    )).scalars().all()
+    by_id = {r.id: r for r in rows}
+    updates_applied = 0
+    if payload.title is not None and payload.title != target.title:
+        result = rename_note_propagate(
+            [{"id": r.id, "title": r.title, "content": r.content or ""}
+             for r in rows], target.id, payload.title)
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        for upd in result["updates"]:
+            by_id[upd["note_id"]].content = upd["new_content"]
+            updates_applied += 1
+        target.title = payload.title
+    if payload.content is not None:
+        target.content = payload.content
+    await db.commit()
+    await db.refresh(target)
+    await _rebuild_note_index(db, notebook.id)
+    return {"note": _note_out(target, with_links=True),
+            "links_rewritten_in": updates_applied}
+
+
+class ExtractSectionIn(BaseModel):
+    header_title: str = Field(min_length=1)
+    new_title: str = Field(min_length=1, max_length=200)
+
+
+@router.post("/notebooks/{nb_id}/notes/{note_id}/extract-section",
+             status_code=201)
+async def extract_note_section(
+    nb_id: str, note_id: str, payload: ExtractSectionIn,
+    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+):
+    """Extract a section into a new note (iwe's extract op): the new
+    note gets the section subtree; the source keeps the header with a
+    [[NewTitle]] link in place of the body. Missing or ambiguous
+    header -> 422, never a partial rewrite."""
+    notebook = await _get_notebook(db, user.id, nb_id)
+    target = await _get_note(db, user.id, nb_id, note_id)
+    result = extract_section(target.content or "", payload.header_title,
+                             payload.new_title)
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+    target.content = result["updated_source_content"]
+    row = NotebookNote(id=_new_id("nbn"), notebook_id=notebook.id,
+                       user_id=user.id, title=payload.new_title,
+                       content=result["new_note_content"])
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    await _rebuild_note_index(db, notebook.id)
+    return {"source": _note_out(target, with_links=True),
+            "note": _note_out(row, with_links=True)}
+
+
+@router.get("/notebooks/{nb_id}/notes/{note_id}/expand")
+async def expand_note_graph(
+    nb_id: str, note_id: str, depth: int = Query(default=2, ge=1, le=4),
+    max_tokens: int = Query(default=4000, ge=100, le=20000),
+    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+):
+    """Token-budgeted graph-expansion retrieval from a seed note:
+    seeds expand along links + backlinks to ``depth`` levels;
+    periphery is trimmed first, seeds are never trimmed."""
+    notebook = await _get_notebook(db, user.id, nb_id)
+    await _get_note(db, user.id, nb_id, note_id)
+    rows = (await db.execute(
+        select(NotebookNote).where(NotebookNote.notebook_id == notebook.id)
+    )).scalars().all()
+    idx = (await db.execute(
+        select(NoteLinkIndex).where(NoteLinkIndex.notebook_id == notebook.id)
+    )).scalars().all()
+    return expand_retrieval(
+        {r.id: {"id": r.id, "title": r.title, "content": r.content or ""}
+         for r in rows},
+        [{"source_note_id": r.source_note_id,
+          "target_note_id": r.target_note_id} for r in idx],
+        seeds=[note_id], depth=depth, max_tokens=max_tokens)
 
 
 # --------------------------------------------------------------- transforms
@@ -939,6 +1093,7 @@ async def run_notebook_transform(
     await db.commit()
     await db.refresh(transform)
     await db.refresh(note)
+    await _rebuild_note_index(db, notebook.id)
     return {"transform": _transform_out(transform),
             "note": _note_out(note, with_links=True)}
 

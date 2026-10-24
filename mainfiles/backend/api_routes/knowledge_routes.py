@@ -92,8 +92,13 @@ async def get_knowledge_graph(
     user=Depends(get_current_user),
     include_code: bool = Query(default=False),
     max_nodes: int = Query(default=200, le=500),
+    as_of: str | None = Query(default=None),
 ):
-    """Unified knowledge graph: memories, documents, code, chats."""
+    """Unified knowledge graph: memories, documents, code, chats,
+    plus memory-graph relations (entity nodes, predicate edges with
+    confidence + source_ref). ``as_of`` (ISO datetime) filters
+    relations to those true at that instant; without it, relations
+    true right now are shown."""
     # Documents (uploaded files)
     files = (await db.execute(select(UserFile).limit(100))).scalars().all()
     documents = [
@@ -121,6 +126,26 @@ async def get_knowledge_graph(
     except Exception:
         pass
 
+    # Memory-graph relations (as-of filtered; default = now).
+    relations = []
+    try:
+        from datetime import UTC, datetime as _dt
+        from ..memory.graph import query_as_of, relation_out
+        if as_of:
+            try:
+                instant = _dt.fromisoformat(as_of.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(
+                    status_code=422, detail="as_of must be an ISO datetime")
+        else:
+            instant = _dt.now(UTC)
+        rows = await query_as_of(db, user.id, instant)
+        relations = [relation_out(r) for r in rows]
+    except HTTPException:
+        raise
+    except Exception:
+        relations = []
+
     # Code graph (optional, expensive)
     code_g = None
     if include_code:
@@ -134,6 +159,7 @@ async def get_knowledge_graph(
     return build_knowledge_graph(
         memories=memories, documents=documents,
         code_graph=code_g, chats=chat_dicts, max_nodes=max_nodes,
+        relations=relations, as_of=as_of,
     )
 
 

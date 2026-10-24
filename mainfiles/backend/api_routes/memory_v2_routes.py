@@ -296,11 +296,12 @@ async def reflect_memories(
     payload: ReflectIn, db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Reason over recalled memories + entity timelines, then store the
-    synthesis as a semantic memory prefixed "Reflection: ". No model
-    configured -> 503 with a plain message, never a canned reflection."""
-    from ..memory import save_memory
-    from ..memory.models import MemoryKind
+    """Reason over recalled memories + entity timelines. READ-ONLY:
+    the synthesis is returned with evidence ids, proof counts, and
+    trend — it is never written back as a memory (writing a reflection
+    polluted recall with its own synthesis). No model configured ->
+    503 with a plain message, never a canned reflection."""
+    from ..reflection import reflect_read_only
 
     records = await recall(payload.query, user_id=user.id,
                            top_k=payload.top_k, touch=False)
@@ -335,21 +336,10 @@ async def reflect_memories(
         raise HTTPException(
             status_code=503,
             detail="No model is configured, so reflection is unavailable.")
-    parsed = _parse_reflection(raw, valid_ids)
-    if parsed is None:
+    result = reflect_read_only(
+        [{"id": r.id, "created_at": r.created_at} for r in records], raw)
+    if result is None:
         raise HTTPException(
             status_code=503,
             detail="Model output could not be parsed as a reflection; nothing was stored.")
-    evidence_ids = sorted({e for o in parsed["observations"] for e in o["evidence"]})
-    synthesis = parsed["mental_model"] or " ".join(
-        o["text"] for o in parsed["observations"])[:1000]
-    stored = await save_memory(
-        f"Reflection: {synthesis}", kind=MemoryKind.SEMANTIC,
-        chat_id="", user_id=user.id, importance=0.6)
-    return {
-        "observations": parsed["observations"],
-        "mental_model": parsed["mental_model"],
-        "open_questions": parsed["open_questions"],
-        "evidence_ids": evidence_ids,
-        "stored_memory_id": stored.id if stored else None,
-    }
+    return result

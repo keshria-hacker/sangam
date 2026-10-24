@@ -82,7 +82,12 @@ class WebSearchTests(unittest.TestCase):
 
     def test_live_web_search_returns_real_results(self):
         # Hits DuckDuckGo Lite for real; proves web search actually works.
-        # Skips cleanly when network is unavailable.
+        # Live-only: skipped unless SANGAM_LIVE_NETWORK=1, so the suite
+        # never depends on the public network (cassette coverage in
+        # test_deep_infra.py proves the transport path offline).
+        import os
+        if os.environ.get("SANGAM_LIVE_NETWORK") != "1":
+            self.skipTest("Live-only test; set SANGAM_LIVE_NETWORK=1 to run it")
         import socket
         try:
             socket.create_connection(("lite.duckduckgo.com", 443), timeout=5).close()
