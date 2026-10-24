@@ -52,7 +52,12 @@ from ..browser_agent import (
     run_browser_actions,
 )
 from ..database import get_db
-from ..security_catalog import catalog_entry, list_catalog
+from ..security_catalog import (
+    catalog_entry,
+    execution_command,
+    list_catalog,
+    passive_only_reason,
+)
 from ..security_guardrails import (
     PHASES,
     VALIDATION_VERDICTS,
@@ -67,6 +72,7 @@ from ..security_guardrails import (
     extract_host,
     mirror_runstore,
     next_phase,
+    run_isolated_command,
     run_passive_recon,
     severity_from_cvss,
 )
@@ -92,6 +98,16 @@ class RunIn(BaseModel):
     tool_class: str = "recon"
     browser_automation_approved: bool = False
     browser_security_approved: bool = False
+
+
+class ApproveIn(BaseModel):
+    # Optional, all fields optional for backward compatibility (older
+    # clients post {}). When ``tool_name`` is given, THIS approval
+    # names the tool to execute — the approval itself is the explicit
+    # per-run naming of target (on the run) + scope (on the run) +
+    # tool class (on the run) + tool (here).
+    tool_name: str = ""
+    confirmation: str = ""
 
 
 class PhaseIn(BaseModel):
@@ -167,6 +183,87 @@ async def _get_run(db: AsyncSession, user_id: str, run_id: str) -> SecurityRun:
     if not run or run.user_id != user_id:
         raise HTTPException(status_code=404, detail="Security run not found")
     return run
+
+
+def _parse_tool_output(tool_name: str, target: str, stdout: str) -> list[dict]:
+    """Parse sandboxed tool stdout into finding dicts (Wave-2).
+
+    Structured JSONL tools (nuclei, httpx) parse per line; line tools
+    (subfinder, amass) collapse to one summary finding; free-text
+    tools (nmap, nikto, zaproxy) collapse to one summary finding with
+    truncated output as evidence. Everything is capped (50 findings,
+    2000 chars evidence) and nothing here executes anything — the
+    output is data. Findings created from this land in the store with
+    status ``candidate`` and no validation verdict until a human
+    validates them.
+    """
+    out: list[dict] = []
+    text = stdout or ""
+    if tool_name == "nuclei":
+        for line in text.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            info = item.get("info") or {}
+            severity_raw = str(info.get("severity") or "info").lower()
+            cvss = None
+            classification = info.get("classification") or {}
+            try:
+                if classification.get("cvss-score") is not None:
+                    cvss = float(classification["cvss-score"])
+            except (TypeError, ValueError):
+                cvss = None
+            out.append({
+                "title": str(info.get("name") or item.get("templateID") or "nuclei finding"),
+                "severity": severity_raw if severity_raw in (
+                    "info", "low", "medium", "high", "critical") else "unknown",
+                "cvss_score": cvss,
+                "owasp_category": "",
+                "evidence": f"matched: {item.get('matched') or item.get('host') or target} "
+                            f"(template {item.get('templateID') or ''})"[:2000],
+            })
+            if len(out) >= 50:
+                break
+        return out
+    if tool_name == "httpx":
+        for line in text.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            out.append({
+                "title": f"{item.get('url') or target} — HTTP {item.get('status_code') or '?'} "
+                         f"{item.get('title') or ''}".strip(),
+                "severity": "info", "cvss_score": None, "owasp_category": "",
+                "evidence": json.dumps(item)[:2000],
+            })
+            if len(out) >= 50:
+                break
+        return out
+    if tool_name in ("subfinder", "amass"):
+        hosts = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if hosts:
+            out.append({
+                "title": f"{tool_name} discovery for {extract_host(target)}: {len(hosts)} hosts",
+                "severity": "info", "cvss_score": None, "owasp_category": "",
+                "evidence": "\n".join(hosts[:50])[:2000],
+            })
+        return out
+    # Free-text tools: one summary finding, output as evidence.
+    if text.strip():
+        out.append({
+            "title": f"{tool_name} scan of {extract_host(target)}",
+            "severity": "info", "cvss_score": None, "owasp_category": "",
+            "evidence": text[:2000],
+        })
+    return out
 
 
 def _valid_pattern(pattern: str) -> bool:
@@ -297,12 +394,26 @@ async def get_run(run_id: str, db: AsyncSession = Depends(get_db),
 
 
 @router.post("/security/runs/{run_id}/approve")
-async def approve_run(run_id: str, db: AsyncSession = Depends(get_db),
+async def approve_run(run_id: str, payload: ApproveIn | None = None,
+                      db: AsyncSession = Depends(get_db),
                       user=Depends(get_current_user)):
     """Separate approval step: re-checks scope, then executes.
 
     Scope is re-checked against the CURRENT allowlist — deleting the
     target between creation and approval blocks execution (403).
+    This POST *is* the explicit per-run approval: the run creation
+    already named target + scope + tool class, and this approval
+    names them again in the audit row.
+
+    Execution depth (Wave-2): ``tool_class == "recon"`` still runs
+    passive recon only. A run created with ``tool_name`` executes
+    that catalog tool — passive tier directly under this approval,
+    active tier ONLY through ``run_isolated_command`` (Docker ``--rm``
+    or the workspace fallback with its loud warning, never a bare host
+    shell) — and parsed results land in the finding store as
+    ``candidate`` findings awaiting human validation. Passive-only
+    tools (sqlmap, ffuf, gobuster) are NEVER executed: the result
+    records ``not_executed`` + the explicit reason + an audit row.
     """
     run = await _get_run(db, user.id, run_id)
     if run.status != "pending":
@@ -321,8 +432,75 @@ async def approve_run(run_id: str, db: AsyncSession = Depends(get_db),
         run.isolation = "workspace-fallback"
         run.isolation_warning = WORKSPACE_FALLBACK_WARNING
         run.image_used = ""
-    if run.tool_class == "recon":
+    # Tool execution is named at approval time (ApproveIn.tool_name):
+    # the run's creation named target + scope + tool class, and this
+    # approval names the tool. No tool named -> v1 behaviour.
+    tool_name = (payload.tool_name if payload else "") or ""
+    tool_name = tool_name.strip().lower()
+    if run.tool_class == "recon" and not tool_name:
         result = {"recon": run_passive_recon(run.target)}
+    elif tool_name:
+        entry = catalog_entry(tool_name)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"Unknown catalog tool: {tool_name}")
+        setting = (await db.execute(
+            select(SecurityCatalogSetting).where(
+                SecurityCatalogSetting.user_id == user.id,
+                SecurityCatalogSetting.entry_name == entry["name"])
+        )).scalars().first()
+        enabled = setting.enabled if setting is not None else entry["enabled_by_default"]
+        if not enabled:
+            raise HTTPException(status_code=403, detail=(
+                f"Catalog tool {tool_name} is not enabled for this user. "
+                "Enable it explicitly before approving an execution."))
+        reason = passive_only_reason(tool_name)
+        if reason is not None:
+            # Passive-only: NEVER executed; record the call explicitly.
+            result = {"not_executed": reason, "tool": tool_name,
+                      "execution_tier": "passive-only"}
+            db.add(audit_row(run.id, user.id, "run.tool_passive_only",
+                             f"Tool {tool_name} named at approval but NOT executed "
+                             f"(passive-only): {reason}"))
+        else:
+            command = execution_command(tool_name, run.target)
+            if command is None:
+                result = {"not_executed": f"No safe command for {tool_name}.",
+                          "tool": tool_name, "execution_tier": entry["execution_tier"]}
+                db.add(audit_row(run.id, user.id, "run.tool_not_executed",
+                                 f"Tool {tool_name} named at approval but no safe "
+                                 "command could be built; nothing executed."))
+            else:
+                workspace_root = Path(os.environ.get("SANGAM_SECURITY_WORKSPACE_ROOT", "")) \
+                    or (Path.cwd() / ".sangam-security-runs")
+                exec_result = run_isolated_command(command, workspace_root / run.id)
+                run.isolation = exec_result.isolation
+                run.isolation_warning = exec_result.warning
+                run.image_used = exec_result.image_used or (
+                    entry.get("docker_image", "") if exec_result.isolation == "docker" else "")
+                parsed = _parse_tool_output(tool_name, run.target, exec_result.stdout)
+                created = 0
+                for item in parsed:
+                    db.add(SecurityFinding(
+                        id=f"sec-{uuid.uuid4().hex[:12]}", run_id=run.id, user_id=user.id,
+                        title=item["title"][:512], severity=item["severity"],
+                        cvss_score=item["cvss_score"], owasp_category=item["owasp_category"],
+                        evidence=item["evidence"], status="candidate",
+                        validation_verdict=""))
+                    created += 1
+                result = {"tool": tool_name, "execution_tier": entry["execution_tier"],
+                          "isolation": exec_result.isolation,
+                          "isolation_warning": exec_result.warning,
+                          "image_used": run.image_used,
+                          "stdout": exec_result.stdout, "stderr": exec_result.stderr,
+                          "returncode": exec_result.returncode,
+                          "findings_created": created,
+                          "parsed_findings": parsed}
+                db.add(audit_row(run.id, user.id, "run.tool_executed",
+                                 f"Tool {tool_name} executed under approval: "
+                                 f"target={run.target} scope={run.scope or '(none)'} "
+                                 f"tier={entry['execution_tier']} "
+                                 f"isolation={exec_result.isolation} "
+                                 f"findings_created={created}"))
     else:
         # Catalog tools are data-only in v1: nothing is installed or run.
         result = {"not_executed": (
@@ -332,8 +510,9 @@ async def approve_run(run_id: str, db: AsyncSession = Depends(get_db),
     run.status = "executed"
     run.updated_at = datetime.now(UTC)
     db.add(audit_row(run.id, user.id, "run.approved",
-                     f"Run approved and executed: isolation={run.isolation} "
-                     f"tool_class={run.tool_class}"))
+                     f"Run approved and executed: target={run.target} "
+                     f"scope={run.scope or '(none)'} tool_class={run.tool_class} "
+                     f"tool={tool_name or '(none)'} isolation={run.isolation}"))
     await db.commit()
     await db.refresh(run)
     mirror_runstore(run.id, user.id, f"Security run: {run.target}", "succeeded")

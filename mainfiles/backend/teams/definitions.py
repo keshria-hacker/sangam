@@ -16,6 +16,10 @@ class AgentSpec:
     role: str          # short label shown in the UI
     system_prompt: str # the specialist's instructions
     temperature: float = 0.7
+    # Council-style reasoning method (e.g. "adversarial critique").
+    # Empty for ordinary specialists; set for council lenses, where the
+    # method — not a costume — is what makes the seat distinct.
+    method: str = ""
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,51 @@ WRITING_TEAM = TeamDefinition(
         ),
     ),
 )
+
+# Council "Deliberate" panel (see backend/council_mode.py): three lenses
+# with distinct reasoning methods. The domain seat (1.5x base weight)
+# is chosen per question by the caller, never by these definitions.
+COUNCIL_LENSES: tuple[AgentSpec, ...] = (
+    AgentSpec(
+        id="skeptic",
+        role="Skeptic",
+        system_prompt=(
+            "You are the Skeptic lens. Attack the strongest version of "
+            "each claim: find the flaw, the missing evidence, the hidden "
+            "assumption. Never agree for comity; update only when a "
+            "specific flaw in your own argument is named."
+        ),
+        temperature=0.3,
+        method="adversarial critique",
+    ),
+    AgentSpec(
+        id="builder",
+        role="Builder",
+        system_prompt=(
+            "You are the Builder lens. Construct the strongest workable "
+            "version of the proposal: what would it take for this to "
+            "succeed, concretely, step by step?"
+        ),
+        temperature=0.5,
+        method="constructive synthesis",
+    ),
+    AgentSpec(
+        id="pragmatist",
+        role="Pragmatist",
+        system_prompt=(
+            "You are the Pragmatist lens. Judge by cost, risk, and "
+            "reversibility: what is the cheapest testable step, what "
+            "breaks if we are wrong, and what would change your mind?"
+        ),
+        temperature=0.4,
+        method="pragmatic feasibility",
+    ),
+)
+
+
+def get_council_lenses() -> list[AgentSpec]:
+    return list(COUNCIL_LENSES)
+
 
 TEAMS: dict[str, TeamDefinition] = {
     t.id: t for t in (RESEARCH_TEAM, CODE_TEAM, WRITING_TEAM)
