@@ -12,6 +12,20 @@ Engines:
             Fooocus has no REST API; its generate flow is a chained Gradio
             UI interaction, so this driver is version-sensitive and best
             effort. The openai engine is the reliable path.
+
+Capability matrix (Batch 7, image_ops.py mirrors this):
+  op            openai                          fooocus
+  generate      /v1/images/generations          experimental Gradio flow
+  vary          /v1/images/variations           NOT supported (422)
+  upscale       NOT supported by the API        NOT supported (422)
+                -> Pillow lanczos fallback, labelled "local resize"
+  inpaint       /v1/images/edits + mask         NOT supported (422)
+  outpaint      /v1/images/edits + border mask  NOT supported (422)
+  image-prompt  /v1/images/edits + source image NOT supported (422)
+  describe      NOT an image-engine op: goes through the chat provider
+                stream with an image_url message (see image_routes.py).
+An op an engine does not support returns 422, never a fake image.
+FaceSwap is excluded (consent-sensitive) and is not implemented anywhere.
 """
 from __future__ import annotations
 
@@ -106,6 +120,56 @@ class OpenAIImagesEngine:
         if not images:
             raise RuntimeError("Image server returned no images")
         return images
+
+    def _post_images(self, path: str, files: dict, data: dict) -> list[GeneratedImage]:
+        import httpx
+
+        base, api_key, model = self._config()
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        resp = httpx.post(f"{base}{path}", files=files, data=data,
+                          headers=headers, timeout=300)
+        resp.raise_for_status()
+        payload = resp.json().get("data") or []
+        images: list[GeneratedImage] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            if item.get("b64_json"):
+                images.append(GeneratedImage(base64.b64decode(item["b64_json"]), "image/png"))
+            elif item.get("url"):
+                dl = httpx.get(item["url"], timeout=120)
+                dl.raise_for_status()
+                images.append(GeneratedImage(dl.content, "image/png"))
+        if not images:
+            raise RuntimeError("Image server returned no images")
+        return images
+
+    def variations(self, image_bytes: bytes, size: str = "1024x1024") -> list[GeneratedImage]:
+        """POST /v1/images/variations. Strength is NOT an API parameter:
+        the caller records it as advisory only (see image_ops.vary)."""
+        _base, _key, model = self._config()
+        return self._post_images(
+            "/v1/images/variations",
+            {"image": ("image.png", image_bytes, "image/png")},
+            {"model": model, "size": size},
+        )
+
+    def edits(
+        self,
+        image_bytes: bytes,
+        prompt: str,
+        mask_bytes: bytes | None = None,
+        size: str = "1024x1024",
+    ) -> list[GeneratedImage]:
+        """POST /v1/images/edits (image-prompt, inpaint, outpaint)."""
+        _base, _key, model = self._config()
+        files: dict = {"image": ("image.png", image_bytes, "image/png")}
+        if mask_bytes:
+            files["mask"] = ("mask.png", mask_bytes, "image/png")
+        return self._post_images(
+            "/v1/images/edits", files,
+            {"model": model, "prompt": prompt, "size": size},
+        )
 
 
 # --- Fooocus (experimental Gradio driver) ---------------------------------------

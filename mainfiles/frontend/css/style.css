@@ -3208,3 +3208,15 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .devices-unreachable p:first-child { font-weight: 600; }
 .threat-list { margin: 6px 0 12px 18px; }
 .cert-fingerprint { word-break: break-all; font-size: 12px; }
+
+/* Batch 7: Model Fit + Diagrams + Image Ops (appended only) */
+.fit-section .fit-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin: 10px 0; }
+.fit-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border, #ddd); }
+.fit-label.fit-ok { color: #2e7d32; font-weight: 600; }
+.fit-label.fit-no { color: #b3261e; font-weight: 600; }
+.diagrams-section .diagrams-picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.diagrams-section .diagrams-brand-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.diagrams-section .diagrams-preview { overflow: auto; margin-top: 10px; }
+.diagrams-section .diagrams-onboarding { margin: 10px 0; }
+.image-ops { margin: 16px 0; }
+.image-ops .image-gen-row { margin: 8px 0; }

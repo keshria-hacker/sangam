@@ -507,8 +507,13 @@ export function renderQualityPreview(container) {
     <div class="sp-section-body">
       <textarea class="provider-key-input" data-qp-input rows="5" style="width:100%;box-sizing:border-box"
         placeholder="Paste AI-generated text here…" aria-label="Text to preview"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <select class="provider-key-input" data-qp-mode aria-label="Preview mode">
+          <option value="edit">Edit (rewrite + what changed)</option>
+          <option value="detect">Detect (audit only, text unchanged)</option>
+        </select>
         <button class="btn-primary btn-sm" type="button" data-qp-run>Preview cleanup</button>
+        <button class="btn-secondary btn-sm" type="button" data-qp-lint>Lint text</button>
       </div>
       <div data-qp-out style="margin-top:8px"></div>
     </div>`;
@@ -518,19 +523,45 @@ export function renderQualityPreview(container) {
   wrap.querySelector('[data-qp-run]').addEventListener('click', async () => {
     const text = input.value.trim();
     if (!text) { showToast({ type: 'info', title: 'Paste some text first' }); return; }
+    const mode = wrap.querySelector('[data-qp-mode]')?.value || 'edit';
     out.innerHTML = '<p class="settings-hint">Cleaning…</p>';
     try {
       const data = await (await apiFetch('/quality/preview', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, mode }),
       })).json();
+      if (mode === 'detect') {
+        const dets = data.detections || [];
+        out.innerHTML = dets.length
+          ? `<p class="settings-hint">Detect mode — text unchanged. Patterns found:</p><ul>${dets.map((d) => `<li>${escapeHtml(d.pattern)} (line ${escapeHtml(String(d.line))}): “${escapeHtml(d.quote)}”</li>`).join('')}</ul><h4>Unchanged</h4><pre class="lib-skill-md">${escapeHtml(data.original || text)}</pre>`
+          : '<p class="settings-hint">No slop detected — text is already clean.</p>';
+        return;
+      }
       const cleaned = data.cleaned ?? data.preview ?? '';
       const changed = data.changed ?? (cleaned !== text);
+      const what = (data.what_changed || []).map((c) => `<li>${escapeHtml(c.pattern)}: “${escapeHtml(c.before)}” → “${escapeHtml(c.after || '(removed)')}”</li>`).join('');
       out.innerHTML = changed
-        ? `<h4>Cleaned</h4><pre class="lib-skill-md">${escapeHtml(cleaned)}</pre>`
+        ? `<h4>Cleaned</h4><pre class="lib-skill-md">${escapeHtml(cleaned)}</pre>${what ? `<h4>What changed</h4><ul>${what}</ul>` : ''}`
         : '<p class="settings-hint">No slop detected — text is already clean.</p>';
     } catch (err) {
       out.innerHTML = `<p class="team-error">Preview failed: ${escapeHtml(err?.message || String(err))}</p>`;
+    }
+  });
+  wrap.querySelector('[data-qp-lint]').addEventListener('click', async () => {
+    const text = input.value.trim();
+    if (!text) { showToast({ type: 'info', title: 'Paste some text first' }); return; }
+    out.innerHTML = '<p class="settings-hint">Linting…</p>';
+    try {
+      const data = await (await apiFetch('/quality/lint', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })).json();
+      const issues = data.issues || [];
+      out.innerHTML = issues.length
+        ? `<p class="settings-hint">Lint is candidate-only — it never rewrites.</p><ul>${issues.map((i) => `<li>${escapeHtml(i.rule)} (line ${escapeHtml(String(i.line))}): “${escapeHtml(i.quote)}”${i.suggestion ? ` — ${escapeHtml(i.suggestion)}` : ''}</li>`).join('')}</ul>`
+        : '<p class="settings-hint">No lint issues found.</p>';
+    } catch (err) {
+      out.innerHTML = `<p class="team-error">Lint failed: ${escapeHtml(err?.message || String(err))}</p>`;
     }
   });
 }

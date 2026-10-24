@@ -21,8 +21,10 @@ import { escapeHtml } from '../../shared/utils.js';
 import {
   renderProviderKeysSection, renderConnectorsSection, renderOmnirouteSection, renderFeatureTogglesSection,
   renderMemorySection, renderVoiceSection, renderRoutesSection, renderDoctorSection,
-  renderPresetsSection, renderWebSearchSection, renderInsightsSection,
+  renderPresetsSection, renderWebSearchSection, renderInsightsSection, renderQualityPreview,
 } from './sections.js';
+// Batch 7: Model Fit section (Settings > Models & Routing).
+import { renderModelFitSection } from '../create/fit.js';
 import { renderDevicesSection } from './devices.js';
 import { registerSectionActivator } from '../tabs/tabs.js';
 import { apiFetch } from '../../shared/http.js';
@@ -316,10 +318,15 @@ export function renderSettingsPage(bodyEl) {
       safeRender(renderOmnirouteSection, list, 'OmniRoute');
       safeRender(renderRoutesSection, list, 'routing');
       safeRender(renderDoctorSection, list, 'doctor');
+      // Batch 7: Model Fit (hardware, recommend, benchmark, Ollama pull/delete).
+      safeRender(renderModelFitSection, list, 'model fit');
     } else if (category === 'knowledge') {
       safeRender(renderMemorySection, list, 'memory');
     } else if (category === 'voice_output') {
       safeRender(renderVoiceSection, list, 'voice');
+      // Batch 7: the quality preview was exported but never rendered;
+      // wire it here so Detect/Edit + Lint are reachable.
+      safeRender(renderQualityPreview, list, 'quality preview');
     } else if (category === 'agents') {
       safeRender(renderFeatureTogglesSection, list, 'features');
       // Batch 1: Usage is its own visible section here (not buried under

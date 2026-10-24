@@ -511,6 +511,8 @@ function renderDiagram(src) {
 
 const CREATE_SUBVIEWS = [
   { id: 'documents', label: 'Documents', icon: 'fa-file-lines' },
+  // Batch 7: editorial diagrams (catalogue, lint, brands, import, export).
+  { id: 'diagrams', label: 'Diagrams', icon: 'fa-diagram-project' },
   { id: 'image',     label: 'Image',     icon: 'fa-image' },
   { id: 'voice',     label: 'Voice',     icon: 'fa-microphone' },
   { id: 'design',    label: 'Design',    icon: 'fa-palette' },
@@ -551,6 +553,9 @@ async function renderCreateSubview(container, id) {
   try {
     if (id === 'documents') {
       await renderDocumentsView(container);
+    } else if (id === 'diagrams') {
+      const { renderDiagramsSection } = await import('./diagrams.js');
+      await renderDiagramsSection(container);
     } else if (id === 'image') {
       const { renderImageTab } = await import('../image/image.js');
       await renderImageTab(container);

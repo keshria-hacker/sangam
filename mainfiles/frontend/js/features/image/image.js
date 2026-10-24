@@ -209,6 +209,37 @@ export async function renderImageTab(bodyEl) {
         </div>
         <div class="image-gen-status hidden" id="studioStatus">Generating… this can take a minute.</div>
       </div>
+      <div class="image-ops">
+        <h3 class="gallery-title">Image operations</h3>
+        <p class="settings-hint">Pick a source image file, then run an operation. If the configured engine does not support an operation, you get a plain capability message — never a fake image. Upscale without an engine that supports it is a local Pillow resize, not AI upscaling.</p>
+        <div class="image-gen-row">
+          <label>Source image <input type="file" id="opsSource" accept="image/*" aria-label="Source image"></label>
+          <label>Mask (inpaint) <input type="file" id="opsMask" accept="image/png" aria-label="Mask image"></label>
+        </div>
+        <div class="image-gen-row">
+          <input type="text" id="opsPrompt" class="provider-key-input" placeholder="Prompt (inpaint / outpaint / image-prompt / describe)" aria-label="Image operation prompt">
+        </div>
+        <div class="image-gen-row">
+          <select id="opsVaryStrength" class="provider-key-input" aria-label="Vary strength">
+            <option value="subtle">Vary subtle</option>
+            <option value="strong">Vary strong</option>
+          </select>
+          <select id="opsUpscaleFactor" class="provider-key-input" aria-label="Upscale factor">
+            <option value="1.5">Upscale 1.5×</option>
+            <option value="2">Upscale 2×</option>
+          </select>
+        </div>
+        <div class="image-gen-row">
+          <button class="btn-secondary btn-sm" type="button" id="opsVary">Vary</button>
+          <button class="btn-secondary btn-sm" type="button" id="opsUpscale">Upscale</button>
+          <button class="btn-secondary btn-sm" type="button" id="opsInpaint">Inpaint</button>
+          <button class="btn-secondary btn-sm" type="button" id="opsOutpaint">Outpaint</button>
+          <button class="btn-secondary btn-sm" type="button" id="opsImagePrompt">Image prompt</button>
+          <button class="btn-secondary btn-sm" type="button" id="opsDescribe">Describe</button>
+        </div>
+        <div class="image-gen-status hidden" id="opsStatus"></div>
+        <div id="opsDescribeOut"></div>
+      </div>
       <h3 class="gallery-title">Gallery</h3>
       <div class="image-gallery" id="imageGallery"></div>
     </div>`;
@@ -247,6 +278,79 @@ export async function renderImageTab(bodyEl) {
       statusEl.classList.add('hidden');
     }
   });
+  // ---- Batch 7 image ops (vary / upscale / inpaint / outpaint / image-prompt / describe) ----
+  const opsStatus = bodyEl.querySelector('#opsStatus');
+  const opsDescribeOut = bodyEl.querySelector('#opsDescribeOut');
+  function fileToB64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.readAsDataURL(file);
+    });
+  }
+  async function opsSourceB64() {
+    const file = bodyEl.querySelector('#opsSource').files?.[0];
+    if (!file) { showToast({ type: 'info', title: 'Pick a source image first' }); return null; }
+    return fileToB64(file);
+  }
+  async function runOp(path, body, isDescribe) {
+    opsStatus.textContent = 'Working…';
+    opsStatus.classList.remove('hidden');
+    try {
+      const res = await (await apiPost(path, body)).json();
+      if (isDescribe) {
+        opsDescribeOut.innerHTML = `<p>${escapeHtml(res.description || '')}</p><p class="settings-hint">Model: ${escapeHtml(res.model_id || '')}</p>`;
+        opsStatus.classList.add('hidden');
+        return;
+      }
+      const images = (res && res.images) || [];
+      if (!images.length) throw new Error('No images returned');
+      images.forEach((img) => addToGallery({ id: img.id, url: img.url, filename: img.filename, prompt: body.prompt || '' }));
+      renderGallery(bodyEl);
+      opsStatus.textContent = res.method ? `Done via ${res.method}.` : 'Done.';
+      showToast({ type: 'success', title: 'Image operation done' });
+    } catch (err) {
+      // 422 = engine does not support this op: show the capability message, not a silent no-op.
+      opsStatus.textContent = err?.message || String(err);
+      showToast({ type: 'error', title: 'Image operation failed', message: err?.message || String(err) });
+    }
+  }
+  bodyEl.querySelector('#opsVary').addEventListener('click', async () => {
+    const b64 = await opsSourceB64(); if (!b64) return;
+    runOp('/image/vary', { image_b64: b64, strength: bodyEl.querySelector('#opsVaryStrength').value });
+  });
+  bodyEl.querySelector('#opsUpscale').addEventListener('click', async () => {
+    const b64 = await opsSourceB64(); if (!b64) return;
+    runOp('/image/upscale', { image_b64: b64, factor: parseFloat(bodyEl.querySelector('#opsUpscaleFactor').value) });
+  });
+  bodyEl.querySelector('#opsInpaint').addEventListener('click', async () => {
+    const b64 = await opsSourceB64(); if (!b64) return;
+    const maskFile = bodyEl.querySelector('#opsMask').files?.[0];
+    const mask_b64 = maskFile ? await fileToB64(maskFile) : null;
+    const prompt = bodyEl.querySelector('#opsPrompt').value.trim();
+    if (!prompt) { showToast({ type: 'info', title: 'Enter a prompt for inpaint' }); return; }
+    runOp('/image/inpaint', { image_b64: b64, mask_b64, prompt });
+  });
+  bodyEl.querySelector('#opsOutpaint').addEventListener('click', async () => {
+    const b64 = await opsSourceB64(); if (!b64) return;
+    const maskFile = bodyEl.querySelector('#opsMask').files?.[0];
+    const mask_b64 = maskFile ? await fileToB64(maskFile) : null;
+    const prompt = bodyEl.querySelector('#opsPrompt').value.trim();
+    if (!prompt) { showToast({ type: 'info', title: 'Enter a prompt for outpaint' }); return; }
+    runOp('/image/outpaint', { image_b64: b64, mask_b64, prompt });
+  });
+  bodyEl.querySelector('#opsImagePrompt').addEventListener('click', async () => {
+    const b64 = await opsSourceB64(); if (!b64) return;
+    const prompt = bodyEl.querySelector('#opsPrompt').value.trim();
+    if (!prompt) { showToast({ type: 'info', title: 'Enter a prompt for image-prompt' }); return; }
+    runOp('/image/image-prompt', { image_b64: b64, prompt });
+  });
+  bodyEl.querySelector('#opsDescribe').addEventListener('click', async () => {
+    const b64 = await opsSourceB64(); if (!b64) return;
+    runOp('/image/describe', { image_b64: b64, prompt: bodyEl.querySelector('#opsPrompt').value.trim() || null }, true);
+  });
+
   setTimeout(() => promptEl.focus(), 0);
 }
 

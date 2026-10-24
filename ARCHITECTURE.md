@@ -1281,6 +1281,28 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/devices/lan` | Yes | Host LAN IPv4 addresses + binding hints (Batch 6) |
 | GET | `/api/devices/cert` | Yes | LAN certificate fingerprint / existence (Batch 6) |
 | POST | `/api/devices/cert/regenerate` | Yes | New self-signed cert; revokes all devices + expires pending pairings (Batch 6) |
+| GET | `/api/models/hardware` | Yes | Host CPU/RAM/VRAM detection; VRAM unknown unless nvidia-smi answers (Batch 7) |
+| GET | `/api/models/catalogue` | Yes | Built-in model catalogue estimates, embeddings marked non-runnable (Batch 7) |
+| POST | `/api/models/recommend` | Yes | Ranked fit/speed/quality/context recommendations (Batch 7) |
+| POST | `/api/models/benchmark` | Yes | Timed generation via provider stream; local-only unless allow_remote=true (Batch 7) |
+| GET | `/api/models/benchmarks` | Yes | Stored benchmark results, newest first (Batch 7) |
+| POST | `/api/models/ollama/pull` | Yes | Start an Ollama pull (202 + poll id) (Batch 7) |
+| GET | `/api/models/ollama/pulls/{pull_id}` | Yes | Poll an Ollama pull (Batch 7) |
+| DELETE | `/api/models/ollama/{model}` | Yes | Delete an Ollama model (Batch 7) |
+| POST | `/api/quality/lint` | Yes | Offline deterministic grammar/spell/repetition lint, candidate issues only (Batch 7) |
+| GET | `/api/quality/adhd-style` | Yes | Prompt-level ADHD style block; wired_into_chat=false (deferred) (Batch 7) |
+| GET | `/api/diagrams/catalogue` | Yes | Editorial diagram templates (13 types) (Batch 7) |
+| POST | `/api/diagrams/lint` | Yes | Statically checkable style-guide issues only (Batch 7) |
+| GET | `/api/diagrams/brands` | Yes | Saved brand profiles (Batch 7) |
+| POST | `/api/diagrams/brands` | Yes | Create a brand profile (Batch 7) |
+| POST | `/api/diagrams/brands/apply` | Yes | Substitute a brand into a template (Batch 7) |
+| POST | `/api/diagrams/import` | Yes | Best-effort mermaid/drawio/excalidraw import to Mermaid (Batch 7) |
+| POST | `/api/image/vary` | Yes | Vary an image via engine variations (422 if unsupported) (Batch 7) |
+| POST | `/api/image/upscale` | Yes | Upscale; engine or labelled Pillow local resize (Batch 7) |
+| POST | `/api/image/inpaint` | Yes | Inpaint with a mask via engine edits (422 if unsupported) (Batch 7) |
+| POST | `/api/image/outpaint` | Yes | Outpaint with a border mask via engine edits (422 if unsupported) (Batch 7) |
+| POST | `/api/image/image-prompt` | Yes | Image-prompt (img2img) via engine edits (422 if unsupported) (Batch 7) |
+| POST | `/api/image/describe` | Yes | Describe an image via a vision chat model; 503 with no model (Batch 7) |
 
 ### 13.3 Database Schema
 

@@ -52,7 +52,15 @@ from .api_routes.spec_routes import (  # noqa: F401
     build_spec_doc,
     spec_to_task,
 )
-from .api_routes.quality_routes import preview_quality  # noqa: F401
+from .api_routes.quality_routes import (  # noqa: F401
+    get_adhd_style,
+    lint_quality,
+    preview_quality,
+)
+# Batch 7: fit routes register BEFORE models_routes so that
+# GET /models/hardware is not shadowed by GET /models/{provider}.
+from .api_routes import fit_routes  # noqa: F401
+from .api_routes import diagrams_routes  # noqa: F401
 from .api_routes.automations_routes import (  # noqa: F401
     create_automation,
     delete_automation,
@@ -182,8 +190,14 @@ from .api_routes.voice_routes import (  # noqa: F401
     text_to_speech,
 )
 from .api_routes.image_routes import (  # noqa: F401
+    describe_image_endpoint,
     generate_image_endpoint,
     get_image_status,
+    image_prompt_endpoint,
+    inpaint_image_endpoint,
+    outpaint_image_endpoint,
+    upscale_image_endpoint,
+    vary_image_endpoint,
 )
 from .api_routes.teams_routes import (  # noqa: F401
     get_teams,

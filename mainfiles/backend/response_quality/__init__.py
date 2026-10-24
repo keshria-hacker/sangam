@@ -7,8 +7,8 @@ alongside the confidence hedge in response_postprocessor.
 """
 from __future__ import annotations
 
-from .adhd import adhd_format
-from .slop import remove_slop
+from .adhd import adhd_format, adhd_style_text
+from .slop import detect_slop, remove_slop, remove_slop_with_changes
 
 
 def apply_quality(
@@ -46,4 +46,12 @@ def register_quality_extension() -> bool:
     return True
 
 
-__all__ = ["adhd_format", "apply_quality", "register_quality_extension", "remove_slop"]
+__all__ = [
+    "adhd_format",
+    "adhd_style_text",
+    "apply_quality",
+    "detect_slop",
+    "register_quality_extension",
+    "remove_slop",
+    "remove_slop_with_changes",
+]
