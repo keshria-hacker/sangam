@@ -115,3 +115,66 @@ def slug_from_url(url: str) -> str:
     path = re.sub(r"[^a-zA-Z0-9]+", "-", (parsed.path or "").strip("/")).strip("-")
     name = f"{host}-{path}" if path else host
     return (name[:80] or "page") + ".txt"
+
+
+def normalize_url(url: str) -> str:
+    """Canonical form for dedupe: lowercase scheme/host, fragment
+    stripped, default ports dropped, trailing slash removed except
+    for the bare root path. Query strings are kept (they change the
+    page); a URL that fails to parse is returned stripped."""
+    try:
+        parsed = urlparse((url or "").strip())
+        scheme = (parsed.scheme or "https").lower()
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return (url or "").strip()
+        port = parsed.port
+        if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+            port = None
+        netloc = f"{host}:{port}" if port else host
+        path = parsed.path or ""
+        if len(path) > 1 and path.endswith("/"):
+            path = path.rstrip("/")
+        out = f"{scheme}://{netloc}{path}"
+        if parsed.query:
+            out += f"?{parsed.query}"
+        return out
+    except (ValueError, TypeError):
+        return (url or "").strip()
+
+
+async def fetch_page_text(url: str) -> tuple[str, str]:
+    """SSRF-guarded fetch shared by the knowledge ingest endpoint and
+    notebook ingest-on-add. Returns (plain text, content type).
+    Raises IngestUrlError on rejection and ValueError/RuntimeError
+    subclasses on fetch/extraction failure; callers translate those
+    into HTTP statuses (or, for notebook add, a failed-ingest note
+    that never blocks creating the source row)."""
+    import httpx
+
+    validate_url(url)
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(FETCH_TIMEOUT_SECONDS, connect=8.0),
+            follow_redirects=False,
+        ) as client:
+            resp = await client.get(url, headers={"User-Agent": "Sangam/1.0 (+local-first)"})
+    except Exception as exc:  # noqa: BLE001 — network failure is a fetch failure
+        raise RuntimeError(f"Could not fetch URL ({exc})") from exc
+    if resp.status_code in (301, 302, 303, 307, 308):
+        raise IngestUrlError("Redirects are not followed for ingestion")
+    if resp.status_code != 200:
+        raise RuntimeError(f"URL returned HTTP {resp.status_code}")
+    content_type = (resp.headers.get("content-type") or "").lower()
+    if "text/html" not in content_type and "text/plain" not in content_type:
+        raise IngestUrlError(f"Unsupported content type: {content_type or 'unknown'}")
+    body = resp.content[: MAX_BODY_BYTES + 1]
+    if len(body) > MAX_BODY_BYTES:
+        raise IngestUrlError("Page exceeds 2 MB ingestion limit")
+    if "text/html" in content_type:
+        text = html_to_text(body.decode("utf-8", errors="replace"))
+    else:
+        text = body.decode("utf-8", errors="replace").strip()
+    if not text:
+        raise IngestUrlError("No readable text found on the page")
+    return text, content_type
