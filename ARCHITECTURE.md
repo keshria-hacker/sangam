@@ -1121,6 +1121,15 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/knowledge/search` | Yes | Search across memories, docs, code, chats |
 | GET | `/api/knowledge/retrieve` | Yes | Hybrid retrieval over documents (Phase 2) |
 | POST | `/api/knowledge/ingest-url` | Yes | Ingest a public page as a document (Phase 2) |
+| POST | `/api/workflows` | Yes | Create a DAG workflow (Phase 3) |
+| GET | `/api/workflows` | Yes | List workflows (Phase 3) |
+| GET | `/api/workflows/{id}` | Yes | Get workflow (Phase 3) |
+| PUT | `/api/workflows/{id}` | Yes | Update workflow, version bumps on definition change (Phase 3) |
+| DELETE | `/api/workflows/{id}` | Yes | Delete workflow (Phase 3) |
+| POST | `/api/workflows/{id}/run` | Yes | Run workflow manually (Phase 3) |
+| GET | `/api/workflows/{id}/runs` | Yes | List workflow runs (Phase 3) |
+| POST | `/api/workflows/{id}/runs/{run_id}/replay` | Yes | Replay a run with the same input (Phase 3) |
+| POST | `/api/workflows/{id}/webhook` | Yes | Webhook trigger, token-authenticated (Phase 3) |
 | GET | `/api/memory/export` | Yes | Export memories as JSON download (Phase 2) |
 | POST | `/api/memory/forget` | Yes | Bulk forget memories by filter, confirm required (Phase 2) |
 | GET | `/api/agents` | Yes | List custom agents (Phase 3) |

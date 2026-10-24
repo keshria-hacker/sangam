@@ -194,8 +194,15 @@ def create_app() -> FastAPI:
                     logger.info(f"MCP servers connected: {connected}")
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"MCP setup skipped: {exc}")
+        # Phase 3: workflow scheduler loop (opt-in via env, off in tests).
+        import asyncio as _asyncio
+
+        from .workflows import start_workflow_scheduler
+
+        _scheduler_task = _asyncio.create_task(start_workflow_scheduler())
         logger.info("Application startup complete")
         yield
+        _scheduler_task.cancel()
         # Cleanup auto-started Ollama process (if any)
         from .llm import _cleanup_ollama
         _cleanup_ollama()

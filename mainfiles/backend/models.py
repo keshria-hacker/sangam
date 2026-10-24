@@ -271,6 +271,53 @@ class Automation(Base):
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
+class Workflow(Base):
+    """Visual DAG workflow (Phase 3, all-in-one plan).
+
+    definition_json: {"nodes": [{"id", "type", "config", "retries",
+    "timeout_seconds"}], "edges": [{"from", "to"}]}. Node types are
+    a closed set (text, transform, retrieve, memory_save, http_fetch)
+    — there is deliberately no arbitrary-code node.
+    """
+
+    __tablename__ = "workflows"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    definition_json: Mapped[str] = mapped_column(Text, default="{}")
+    version: Mapped[int] = mapped_column(default=1)
+    trigger: Mapped[str] = mapped_column(String(64), default="manual")  # manual | hourly | daily | weekly | cron
+    webhook_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+
+class WorkflowRun(Base):
+    """One execution of a workflow. node_results_json maps node id ->
+    {status: succeeded|failed|skipped, output, error, attempts}.
+    A failed run's failed node entry is its dead letter: the run is
+    kept, the error is recorded, and replay re-runs from the input.
+    """
+
+    __tablename__ = "workflow_runs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(ForeignKey("workflows.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending|running|succeeded|failed
+    input_json: Mapped[str] = mapped_column(Text, default="{}")
+    output_json: Mapped[str] = mapped_column(Text, default="{}")
+    node_results_json: Mapped[str] = mapped_column(Text, default="{}")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    replay_of: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class ArenaResult(Base):
     """Arena vote: which model won a comparison (Phase 6.4c)."""
 

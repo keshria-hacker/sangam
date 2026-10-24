@@ -61,6 +61,16 @@ from .api_routes.automations_routes import (  # noqa: F401
     run_automation_now,
     update_automation,
 )
+from .api_routes.workflows_routes import (  # noqa: F401
+    create_workflow,
+    delete_workflow,
+    get_workflow,
+    list_runs,
+    list_workflows,
+    replay_run,
+    run_workflow,
+    webhook_run,
+)
 from .api_routes.compare_routes import (  # noqa: F401
     arena_leaderboard,
     arena_vote,
