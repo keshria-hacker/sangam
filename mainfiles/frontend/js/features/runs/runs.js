@@ -41,6 +41,11 @@ export function renderRunsTab(bodyEl) {
       <div id="runHistory" role="region" aria-labelledby="historyTitle"><p class="settings-hint">Loading…</p></div>
       <h3 id="artifactsTitle">Artifacts</h3>
       <div id="artifactPanel" role="region" aria-labelledby="artifactsTitle"><p class="settings-hint">Loading…</p></div>
+      <h3 id="mediaJobsTitle">Media jobs</h3>
+      <div id="mediaJobs" role="region" aria-labelledby="mediaJobsTitle"><p class="settings-hint">Loading…</p></div>
+      <h3 id="workflowRunsTitle">Workflow runs</h3>
+      <div id="workflowRuns" role="region" aria-labelledby="workflowRunsTitle"><p class="settings-hint">Loading…</p></div>
+      <div id="runsEmptyActions"></div>
       <div>
         <label for="pruneDays">Delete artifacts not updated in</label>
         <input id="pruneDays" type="number" min="1" value="90" aria-label="Retention days for pruning artifacts" style="width:80px">
@@ -65,7 +70,64 @@ export function renderRunsTab(bodyEl) {
 async function loadAll(bodyEl) {
   await Promise.all([
     loadLive(bodyEl), loadHistory(bodyEl), loadArtifacts(bodyEl),
+    loadMediaJobs(bodyEl), loadWorkflowRuns(bodyEl),
   ]);
+  // Batch 1: an empty Activity feed is a dead end without this — exactly
+  // one clear next action per empty destination.
+  const actions = bodyEl.querySelector('#runsEmptyActions');
+  if (actions) {
+    const liveEmpty = (bodyEl.querySelector('#liveRuns')?.textContent || '').includes('No live runs');
+    const histEmpty = (bodyEl.querySelector('#runHistory')?.textContent || '').includes('No run history yet');
+    if (liveEmpty && histEmpty) {
+      actions.innerHTML = `<p class="settings-hint">Nothing has run yet.</p>
+        <button type="button" class="btn-primary btn-sm" id="runsStartAgent">Run your first agent</button>
+        <button type="button" class="btn-secondary btn-sm" id="runsStartWorkflow">Create your first workflow</button>`;
+      actions.querySelector('#runsStartAgent').addEventListener('click', () => {
+        import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'agents'));
+      });
+      actions.querySelector('#runsStartWorkflow').addEventListener('click', () => {
+        import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'workflows'));
+      });
+    } else {
+      actions.innerHTML = '';
+    }
+  }
+}
+
+/** Batch 1: media jobs mirrored into the Activity feed (tracking lives
+ *  here; creation lives in Create > Media jobs). */
+async function loadMediaJobs(bodyEl) {
+  const wrap = bodyEl.querySelector('#mediaJobs');
+  if (!wrap) return;
+  try {
+    const data = await (await apiFetch('/media-jobs')).json();
+    const jobs = data.jobs || [];
+    wrap.innerHTML = listHtml(jobs, 'No media jobs yet — create one in Create > Media jobs.',
+      (j) => `<strong>${escapeHtml(j.kind || 'job')}</strong> · ${escapeHtml(j.status || '')}${j.error ? ` · ${escapeHtml(j.error)}` : ''}`);
+  } catch {
+    wrap.innerHTML = '<p class="settings-hint">Could not load media jobs.</p>';
+  }
+}
+
+/** Batch 1: workflow runs aggregated across workflows (tracking lives
+ *  here; the per-workflow list inside Workflows stays as a filter view). */
+async function loadWorkflowRuns(bodyEl) {
+  const wrap = bodyEl.querySelector('#workflowRuns');
+  if (!wrap) return;
+  try {
+    const wfs = (await (await apiFetch('/workflows')).json()).workflows || [];
+    const all = [];
+    for (const wf of wfs.slice(0, 10)) {
+      try {
+        const runs = (await (await apiFetch(`/workflows/${encodeURIComponent(wf.id)}/runs`)).json()).runs || [];
+        for (const r of runs.slice(0, 5)) all.push({ wf: wf.name, ...r });
+      } catch { /* one workflow's runs failing must not hide the rest */ }
+    }
+    wrap.innerHTML = listHtml(all.slice(0, 20), 'No workflow runs yet — run a workflow in Work > Workflows.',
+      (r) => `<strong>${escapeHtml(r.wf || '')}</strong> · ${escapeHtml(r.status || r.state || '')}`);
+  } catch {
+    wrap.innerHTML = '<p class="settings-hint">Could not load workflow runs.</p>';
+  }
 }
 
 function listHtml(items, emptyText, row) {

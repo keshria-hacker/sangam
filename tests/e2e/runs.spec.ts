@@ -84,8 +84,11 @@ test('Runs centre: tab, sections, labelled controls, screenshot', async ({ page 
   attachGuards(page);
   await register(page);
 
+  // Batch 1: Runs is now the Activity section inside Work.
   await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="runs"]').click();
+  await page.locator('[data-tab-tool="work"]').click();
+  await page.waitForTimeout(2000);
+  await page.locator('[data-worksection="activity"]').click();
   await page.waitForTimeout(3000);
 
   await expect(page.getByRole('heading', { name: 'Runs centre' })).toBeVisible();

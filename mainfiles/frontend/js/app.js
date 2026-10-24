@@ -9,7 +9,7 @@ import { initElements as initModelsElements, loadProvidersAndModels, renderModel
 import { openSettings } from './features/settings/open.js';
 import { applyAppearance, initAppearance } from './features/settings/appearance.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
-import { initTabs, openToolTab, showTool, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
+import { initTabs, openToolTab, showTool, showToolSection, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
 import { trapFocus } from './shared/focus_trap.js';
 import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';
@@ -275,12 +275,12 @@ function initGlobalListeners() {
   });
   elements.closeShortcuts?.addEventListener('click', closeShortcutsModal);
 
-  // Skills button -> opens Skills tab
-  elements.skillsBtn?.addEventListener('click', () => showTool('skills'));
-  // Code agent button -> opens Code agent tab
-  elements.codeBtn?.addEventListener('click', () => showTool('code'));
-  // Design studio button -> opens Design studio tab
-  elements.designBtn?.addEventListener('click', () => showTool('design'));
+  // Batch 1: the old standalone Skills/Design/Code "tabs" are sections now.
+  // These buttons used to call showTool() with ids that no longer exist in
+  // TOOL_DEFS, so they silently did nothing. They now open the real views.
+  elements.skillsBtn?.addEventListener('click', () => showToolSub('library', 'data-libtab', 'skills'));
+  elements.codeBtn?.addEventListener('click', () => showToolSection('work', 'code'));
+  elements.designBtn?.addEventListener('click', () => showToolSub('create', 'data-createsub', 'design'));
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 
@@ -391,6 +391,8 @@ export async function startApplication() {
     import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
     // Command palette (Ctrl+P).
     import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
+    // Batch 1: guided first-run setup in Chat when no provider is ready.
+    import('./features/setup/setup.js').then((m) => m.maybeShowFirstRunSetup()).catch(() => {});
     // Note: no "Connected" toast on every load — the topbar connection pulse
     // already shows backend status, and a toast here blocks mobile nav.
   } catch (err) {
@@ -438,9 +440,10 @@ async function init() {
   initRail();
   initPopovers();
   initInspector();
-  // Phase 8 B7: only the 7 merged pages have renderers. Teams/Compare are
-  // Agents sub-views; Skills is a Library sub-view; Images/Voice/Design are
-  // Create sub-views; Routes/Learn/Analytics live in Settings.
+  // Batch 1: only the 6 consolidated destinations have renderers.
+  // Agents/Code/Workflows/Activity are Work sections; Media is a Create
+  // section; Skills is a Library sub-view; Study is a Knowledge section;
+  // Usage is a Settings section.
   registerTabRenderer('home', async (bodyEl) => {
     const { renderHome } = await import('./features/home/home.js');
     renderHome(bodyEl);
@@ -465,21 +468,9 @@ async function init() {
     const { renderLibrary } = await import('./features/library/library.js');
     renderLibrary(bodyEl);
   });
-  registerTabRenderer('code', async (bodyEl) => {
-    const { renderCodePage } = await import('./features/code-agent/code-agent.js');
-    renderCodePage(bodyEl);
-  });
-  registerTabRenderer('runs', async (bodyEl) => {
-    const { renderRunsTab } = await import('./features/runs/runs.js');
-    renderRunsTab(bodyEl);
-  });
-  registerTabRenderer('workflows', async (bodyEl) => {
-    const { renderWorkflowsTab } = await import('./features/workflows/workflows.js');
-    renderWorkflowsTab(bodyEl);
-  });
-  registerTabRenderer('media', async (bodyEl) => {
-    const { renderMediaTab } = await import('./features/media/media.js');
-    renderMediaTab(bodyEl);
+  registerTabRenderer('work', async (bodyEl) => {
+    const { renderWorkPage } = await import('./features/work/work.js');
+    renderWorkPage(bodyEl);
   });
 
 

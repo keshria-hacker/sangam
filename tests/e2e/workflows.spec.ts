@@ -81,8 +81,11 @@ test('Workflows: create, run, inspect nodes', async ({ page }) => {
   attachGuards(page);
   await register(page);
 
+  // Batch 1: Workflows is now a section inside Work.
   await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="workflows"]').click();
+  await page.locator('[data-tab-tool="work"]').click();
+  await page.waitForTimeout(2000);
+  await page.locator('[data-worksection="workflows"]').click();
   await page.waitForTimeout(3000);
 
   await expect(page.getByRole('heading', { name: 'Workflows', exact: true })).toBeVisible();

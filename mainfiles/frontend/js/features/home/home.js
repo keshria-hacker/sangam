@@ -141,7 +141,8 @@ export async function renderHome(bodyEl) {
           <button type="button" class="btn-primary btn-sm" id="homeConnectBtn">Connect a provider</button>
         </div>`;
       setupEl.querySelector('#homeConnectBtn')?.addEventListener('click', () => {
-        document.getElementById('settingsBtn')?.click();
+        // Batch 1: #settingsBtn does not exist; open Settings directly.
+        import('../tabs/tabs.js').then((m) => m.showToolSection('settings', 'models'));
       });
     }
   } catch { /* offline — skip setup banner */ }
@@ -262,7 +263,8 @@ export async function renderDoctor(bodyEl) {
   checksEl.querySelectorAll('.doc-fix').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (btn.dataset.fixSettings) {
-        document.getElementById('settingsBtn')?.click();
+        // Batch 1: #settingsBtn does not exist; open Settings directly.
+        import('../tabs/tabs.js').then((m) => m.showTool('settings'));
       } else if (btn.dataset.fixCmd) {
         copyText(btn.dataset.fixCmd, 'Command');
       }

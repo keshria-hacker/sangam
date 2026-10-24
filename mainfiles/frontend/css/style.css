@@ -3130,3 +3130,15 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
     overflow-x: auto;
   }
 }
+
+/* Batch 1 UX consolidation: picker descriptions, first-run setup, Work page */
+.tool-picker-desc { display: block; font-size: 12px; color: var(--text-tertiary); font-weight: 400; margin-top: 2px; }
+.setup-panel { border: 1px solid var(--border, #ddd); border-radius: 12px; padding: 20px; margin: 16px 0; background: var(--bg-secondary, #f8f8f8); }
+.setup-panel h2 { margin: 0 0 8px; }
+.setup-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+.setup-card { border: 1px solid var(--border, #ddd); border-radius: 10px; padding: 14px; background: var(--bg-primary, #fff); }
+.setup-card h3 { margin: 0 0 6px; }
+.setup-banner { display: flex; gap: 10px; align-items: center; border: 1px solid var(--border, #ddd); border-radius: 10px; padding: 10px 12px; margin: 12px 0; background: var(--bg-secondary, #f8f8f8); }
+.setup-banner span { flex: 1; }
+.work-page .work-subbody { margin-top: 12px; }
+.work-page .work-section-body.hidden { display: none; }

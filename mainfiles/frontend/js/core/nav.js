@@ -5,17 +5,27 @@
  * action. Feeds the rail, command palette, and deep links.
  * Features that are off show as muted with "Turn on" (never invisible).
  */
-import { openToolTab } from '../features/tabs/tabs.js';
+import { openToolTab, showTool, switchTab } from '../features/tabs/tabs.js';
 import { apiPost } from '../shared/http.js';
 import { showToast } from '../shared/toast.js';
 
 console.log('[Module] nav.js loaded');
 
-// The sidebar is intentionally focused on chat history. Studio tools remain
-// available through tabs and the command palette instead of duplicating them
-// as a second navigation rail.
-export const NAV_ITEMS = [];
-export const NAV_BOTTOM = [];
+// Batch 1 UX consolidation: the sidebar IS the map of the app. Chat is
+// pinned at the top; the six destinations below it are the only top-level
+// places; Settings sits once at the bottom. Old tabs live as sections
+// inside these destinations (see tabs.js ALIASES), never as rail items.
+export const NAV_ITEMS = [
+  { id: 'chat',      label: 'Chat',      icon: 'fa-message',          action: 'chat' },
+  { id: 'home',      label: 'Home',      icon: 'fa-house',            action: 'view:home' },
+  { id: 'work',      label: 'Work',      icon: 'fa-briefcase',        action: 'view:work' },
+  { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'view:create' },
+  { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'view:knowledge' },
+  { id: 'library',   label: 'Library',   icon: 'fa-book',            action: 'view:library' },
+];
+export const NAV_BOTTOM = [
+  { id: 'settings',  label: 'Settings',  icon: 'fa-gear',             action: 'view:settings' },
+];
 
 let handlers = {};
 
@@ -26,6 +36,15 @@ export function registerNavHandler(action, fn) {
 export function navigate(action) {
   if (handlers[action]) {
     handlers[action]();
+    return;
+  }
+  if (action === 'chat') {
+    switchTab('main');
+    return;
+  }
+  // view:xxx shows the destination in the main view (rail navigation).
+  if (action.startsWith('view:')) {
+    showTool(action.slice(5));
     return;
   }
   // Default: tab:xxx shows the tool in the main view (Phase 8 B6: rail replaces view)

@@ -21,8 +21,10 @@ import { escapeHtml } from '../../shared/utils.js';
 import {
   renderProviderKeysSection, renderConnectorsSection, renderOmnirouteSection, renderFeatureTogglesSection,
   renderMemorySection, renderVoiceSection, renderRoutesSection, renderDoctorSection,
-  renderPresetsSection, renderWebSearchSection,
+  renderPresetsSection, renderWebSearchSection, renderInsightsSection,
 } from './sections.js';
+import { registerSectionActivator } from '../tabs/tabs.js';
+import { apiFetch } from '../../shared/http.js';
 
 console.log('[Module] settings_page.js loaded');
 
@@ -319,6 +321,11 @@ export function renderSettingsPage(bodyEl) {
       safeRender(renderVoiceSection, list, 'voice');
     } else if (category === 'agents') {
       safeRender(renderFeatureTogglesSection, list, 'features');
+      // Batch 1: Usage is its own visible section here (not buried under
+      // toggles), shown when the analytics flag is on.
+      apiFetch('/features').then((r) => r.json()).then((data) => {
+        if (data.features?.analytics) safeRender(renderInsightsSection, list, 'usage');
+      }).catch(() => {});
     } else if (category === 'research') {
       safeRender(renderWebSearchSection, list, 'web search');
     } else if (category === 'general') {
@@ -395,6 +402,36 @@ export function renderSettingsPage(bodyEl) {
       fileInput.value = '';
     };
     reader.readAsText(file);
+  });
+
+  // Batch 1: section activator for palette/alias deep-links. 'usage' opens
+  // the Agents & Safety category and scrolls to the Usage section (or the
+  // Features toggles, with a hint, when analytics is off). 'models' opens
+  // the Models & Routing category (provider keys) — the first-run target.
+  registerSectionActivator('settings', (section) => {
+    if (section === 'usage') {
+      activeCategory = 'agents';
+      query = '';
+      searchInput.value = '';
+      renderCats();
+      renderList();
+      setTimeout(() => {
+        const target = bodyEl.querySelector('[data-insights-body]') || bodyEl.querySelector('[data-ft-list]');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!bodyEl.querySelector('[data-insights-body]')) {
+          showToast({ type: 'info', title: 'Analytics is off', message: 'Turn on Analytics in Features to see usage.' });
+        }
+      }, 400);
+    } else if (section === 'models') {
+      activeCategory = 'models';
+      query = '';
+      searchInput.value = '';
+      renderCats();
+      renderList();
+      setTimeout(() => {
+        bodyEl.querySelector('.sp-custom-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 200);
+    }
   });
 
   renderCats();

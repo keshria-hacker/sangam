@@ -514,6 +514,8 @@ const CREATE_SUBVIEWS = [
   { id: 'image',     label: 'Image',     icon: 'fa-image' },
   { id: 'voice',     label: 'Voice',     icon: 'fa-microphone' },
   { id: 'design',    label: 'Design',    icon: 'fa-palette' },
+  // Batch 1: media-job creation lives in Create; tracking lives in Work > Activity.
+  { id: 'media',     label: 'Media jobs', icon: 'fa-photo-film' },
 ];
 
 /** Merged Create page — the rail 'Create' entry renders this. */
@@ -558,6 +560,9 @@ async function renderCreateSubview(container, id) {
     } else if (id === 'design') {
       const { renderDesignTab } = await import('../design/design-studio.js');
       await renderDesignTab(container);
+    } else if (id === 'media') {
+      const { renderMediaTab } = await import('../media/media.js');
+      await renderMediaTab(container);
     }
   } catch (err) {
     container.innerHTML = `<p class="team-error">Could not load: ${escapeHtml(err?.message || String(err))}</p>`;

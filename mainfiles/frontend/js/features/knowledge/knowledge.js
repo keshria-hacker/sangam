@@ -53,6 +53,7 @@ export async function renderKnowledgeTab(bodyEl) {
         </div>
         <div class="kn-detail hidden" id="knDetail"></div>
       </div>
+      <div id="knGraphEmpty"></div>
       <section class="kn-section">
         <h3><i class="fa-solid fa-plug"></i> MCP tools</h3>
         <div id="knMcp"></div>
@@ -84,6 +85,11 @@ export async function renderKnowledgeTab(bodyEl) {
         </div>
         <div id="knRetrieveResults" class="kn-mem-list"></div>
       </section>
+      <section class="kn-section" data-study-section>
+        <h3><i class="fa-solid fa-graduation-cap"></i> Study</h3>
+        <p class="settings-hint">Interactive lessons and a Socratic tutor, over what you know.</p>
+        <div id="knStudyBody"><p class="settings-hint">Loading…</p></div>
+      </section>
       <section class="kn-section">
         <h3><i class="fa-solid fa-globe"></i> Add from URL</h3>
         <p class="settings-hint">Ingest a public web page as a document. Only public http/https pages are fetched; private addresses and redirects are refused.</p>
@@ -94,6 +100,23 @@ export async function renderKnowledgeTab(bodyEl) {
         <div id="knIngestStatus" class="settings-hint"></div>
       </section>
     </div>`;
+
+  // Batch 1: Study section (Learn) + section activator for palette/aliases.
+  import('../tabs/tabs.js').then((m) => m.registerSectionActivator('knowledge', (section) => {
+    if (section === 'study') {
+      bodyEl.querySelector('[data-study-section]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  })).catch(() => {});
+  import('../learn/learn.js').then((m) => {
+    const studyBody = bodyEl.querySelector('#knStudyBody');
+    if (!studyBody) return;
+    studyBody.innerHTML = '';
+    if (m.renderLearnTab) m.renderLearnTab(studyBody);
+    else studyBody.innerHTML = '<p class="settings-hint">Study unavailable.</p>';
+  }).catch(() => {
+    const studyBody = bodyEl.querySelector('#knStudyBody');
+    if (studyBody) studyBody.innerHTML = '<p class="settings-hint">Study unavailable.</p>';
+  });
 
   // Wire search
   const searchInput = bodyEl.querySelector('#knSearch');
@@ -217,10 +240,20 @@ function layoutAndRender(bodyEl) {
 
   const nodes = graphData.nodes || [];
   const edges = graphData.edges || [];
+  const emptyBox = bodyEl.querySelector('#knGraphEmpty');
   if (!nodes.length) {
     svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" class="kn-loading">No knowledge yet — chat, upload files, or save memories.</text>`;
+    if (emptyBox) {
+      emptyBox.innerHTML = `<button type="button" class="btn-primary btn-sm" id="knEmptyAdd">Add your first document</button>`;
+      emptyBox.querySelector('#knEmptyAdd').addEventListener('click', () => {
+        const input = bodyEl.querySelector('#knIngestUrl');
+        input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        input?.focus();
+      });
+    }
     return;
   }
+  if (emptyBox) emptyBox.innerHTML = '';
 
   const pos = forceLayout(nodes, edges, width, height);
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');

@@ -9,25 +9,77 @@
  */
 import { apiFetch } from '../../shared/http.js';
 
+/**
+ * Consolidated destinations (Batch 1 UX consolidation). Chat is the pinned
+ * main tab and is NOT in this map. Everything else is one of these six;
+ * older tab ids survive only as aliases below, so existing palette actions,
+ * composer pills and specs keep resolving instead of silently dying.
+ */
 const TOOL_DEFS = {
-  home:      { title: 'Home',          icon: 'fa-house',               feature: null },
-  settings:  { title: 'Settings',      icon: 'fa-gear',                feature: null },
-  knowledge: { title: 'Knowledge',     icon: 'fa-brain',               feature: null },
-  agents:    { title: 'Agents',        icon: 'fa-robot',               feature: null },
-  create:    { title: 'Create',        icon: 'fa-wand-magic-sparkles', feature: null },
-  library:   { title: 'Library',       icon: 'fa-book',               feature: null },
-  code:      { title: 'Code',          icon: 'fa-code',                feature: null },
-  runs:      { title: 'Runs',          icon: 'fa-list-check',          feature: null },
-  workflows: { title: 'Workflows',     icon: 'fa-diagram-project',     feature: null },
-  media:     { title: 'Media',         icon: 'fa-photo-film',          feature: null },
-  // Phase 8 B7: merged pages. The old separate tabs are gone:
-  // - teams, compare -> Agents page sub-views
-  // - skills, automations -> Library / Agents sub-views
-  // - routes -> Settings > Models & Routing
-  // - learn, analytics -> Settings sub-pages
-  // - images, voice -> Create sub-views
-  // - design -> Create sub-view
+  home:      { title: 'Home',      icon: 'fa-house',               desc: 'Continue where you left off, and see what is ready.' },
+  work:      { title: 'Work',      icon: 'fa-briefcase',            desc: 'Agents, code, workflows, and everything they did (Activity).' },
+  create:    { title: 'Create',    icon: 'fa-wand-magic-sparkles', desc: 'Make things: documents, images, audio, web pages, media jobs.' },
+  knowledge: { title: 'Knowledge', icon: 'fa-brain',               desc: 'Everything the app remembers and knows, plus Study.' },
+  library:   { title: 'Library',   icon: 'fa-book',               desc: 'Plug things in: skills, tools, extensions, templates.' },
+  settings:  { title: 'Settings',  icon: 'fa-gear',               desc: 'Configure the app, providers, features, and devices.' },
 };
+
+/** Old tab ids -> { destination, section inside it }. */
+const ALIASES = {
+  agents:    { dest: 'work',      section: 'agents' },
+  teams:     { dest: 'work',      section: 'agents' },
+  compare:   { dest: 'work',      section: 'agents' },
+  code:      { dest: 'work',      section: 'code' },
+  workflows: { dest: 'work',      section: 'workflows' },
+  runs:      { dest: 'work',      section: 'activity' },
+  media:     { dest: 'create',    section: 'media' },
+  images:    { dest: 'create',    section: 'image' },
+  voice:     { dest: 'create',    section: 'voice' },
+  design:    { dest: 'create',    section: 'design' },
+  skills:    { dest: 'library',   section: 'skills' },
+  learn:     { dest: 'knowledge', section: 'study' },
+  analytics: { dest: 'settings',  section: 'usage' },
+};
+
+/** Section activators registered by destination modules on render:
+ *  dest -> fn(section) that switches/ scrolls to the section. */
+const sectionActivators = new Map();
+export function registerSectionActivator(dest, fn) {
+  sectionActivators.set(dest, fn);
+}
+
+function resolveTool(tool) {
+  if (TOOL_DEFS[tool]) return { dest: tool, section: null };
+  const alias = ALIASES[tool];
+  if (alias) return { ...alias };
+  return null;
+}
+
+/** Activate a section inside an already-shown destination (polls briefly
+ *  for async renders, then falls back to known section-button attributes). */
+function activateSection(dest, section) {
+  if (!section) return;
+  const tryActivate = () => {
+    const fn = sectionActivators.get(dest);
+    if (fn) { try { fn(section); } catch {} return true; }
+    for (const attr of ['data-worksection', 'data-createsub', 'data-libtab']) {
+      const btn = document.querySelector(`[${attr}="${section}"]`);
+      if (btn) { btn.click(); return true; }
+    }
+    return false;
+  };
+  if (tryActivate()) return;
+  let n = 0;
+  const t = setInterval(() => {
+    if (tryActivate() || ++n > 25) clearInterval(t);
+  }, 120);
+}
+
+/** Show a destination and, if given, its section. */
+export function showToolSection(dest, section) {
+  showTool(dest);
+  activateSection(dest, section);
+}
 
 const openTabs = []; // [{ id, tool, title, icon, mounted }]
 let activeTabId = 'main';
@@ -62,6 +114,7 @@ function openTabPicker() {
   picker.innerHTML = Object.entries(TOOL_DEFS).map(([tool, def]) => `
     <button type="button" role="menuitem" data-tab-tool="${tool}">
       <i class="fa-solid ${def.icon}" aria-hidden="true"></i><span>${def.title}</span>
+      <span class="tool-picker-desc">${def.desc}</span>
     </button>
   `).join('');
 
@@ -149,17 +202,26 @@ function initTabKeyboard() {
   });
 }
 
-/** Open (or focus) a tool tab. Returns the tab id. */
+/** Open (or focus) a tool tab. Old ids resolve through ALIASES to their
+ *  destination + section, so they never silently do nothing. Returns the tab id. */
 export function openToolTab(tool, { newTab = false } = {}) {
-  const def = TOOL_DEFS[tool];
-  if (!def) return null;
-  let tab = newTab ? null : openTabs.find((t) => t.tool === tool);
+  const resolved = resolveTool(tool);
+  if (!resolved) return null;
+  const { dest, section } = resolved;
+  const def = TOOL_DEFS[dest];
+  if (!newTab && section) {
+    // Aliases open in the main view (rail navigation), not as strip tabs.
+    showToolSection(dest, section);
+    return `view-${dest}`;
+  }
+  let tab = newTab ? null : openTabs.find((t) => t.tool === dest);
   if (!tab) {
     const suffix = newTab ? `-${Date.now()}-${openTabs.length}` : '';
-    tab = { id: `tool-${tool}${suffix}`, tool, title: def.title, icon: def.icon, mounted: false };
+    tab = { id: `tool-${dest}${suffix}`, tool: dest, title: def.title, icon: def.icon, mounted: false };
     openTabs.push(tab);
   }
   switchTab(tab.id);
+  if (section) activateSection(dest, section);
   return tab.id;
 }
 
@@ -174,10 +236,14 @@ export function openToolTab(tool, { newTab = false } = {}) {
 const viewCache = new Map(); // tool -> container
 let activeViewTool = null;
 
-/** Show a tool in the main view (rail navigation). Mount-once per tool. */
-export function showTool(tool) {
+/** Show a tool in the main view (rail navigation). Mount-once per tool.
+ *  Aliases resolve to their destination + section. The pinned main tab
+ *  always says "Chat" — it is never renamed to the active tool. */
+export function showTool(requested) {
+  const resolved = resolveTool(requested);
+  if (!resolved) return;
+  const { dest: tool, section } = resolved;
   const def = TOOL_DEFS[tool];
-  if (!def) return;
   activeViewTool = tool;
   activeTabId = 'main'; // strip shows main active; the rail owns the highlight
   const body = $('#toolViewBody');
@@ -203,11 +269,8 @@ export function showTool(tool) {
   $('#toolView')?.classList.remove('hidden');
   const titleEl = $('#toolViewTitle');
   if (titleEl) titleEl.innerHTML = `<i class="fa-solid ${def.icon}"></i> ${def.title}`;
-  // The pinned tab shows the active rail view's name (not "Chat") so the
-  // strip always matches what's on screen.
-  const mainTab = $('#mainTab');
-  if (mainTab) mainTab.innerHTML = `<i class="fa-solid ${def.icon}" aria-hidden="true"></i><span>${def.title}</span>`;
   renderTabStrip();
+  if (section) activateSection(tool, section);
 }
 
 /** Which tool (if any) is currently shown in the main view. */

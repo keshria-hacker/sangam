@@ -54,19 +54,23 @@ function buildActions() {
     run: () => import('../tabs/tabs.js').then((m) => m.showToolSub('agents', 'data-agentsub', 'compare')),
   });
   actions.push({
-    id: 'runs', label: 'Open Runs centre',
-    run: () => import('../tabs/tabs.js').then((m) => m.showTool('runs')),
+    id: 'runs', label: 'Open Activity feed',
+    run: () => import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'activity')),
   });
   if (flags.learning) {
+    // Batch 1: this used to open the bare Settings landing page. Learn now
+    // lives as the Study section inside Knowledge — go there for real.
     actions.push({
       id: 'learn', label: 'Open Learn mode',
-      run: () => import('../tabs/tabs.js').then((m) => { m.showTool('settings'); }),
+      run: () => import('../tabs/tabs.js').then((m) => { m.showToolSection('knowledge', 'study'); }),
     });
   }
   if (flags.analytics) {
+    // Batch 1: Usage now renders as its own section in Settings > Agents &
+    // Safety instead of landing the user on the Settings front page.
     actions.push({
       id: 'usage', label: 'Open Usage analytics',
-      run: () => import('../tabs/tabs.js').then((m) => { m.showTool('settings'); }),
+      run: () => import('../tabs/tabs.js').then((m) => { m.showToolSection('settings', 'usage'); }),
     });
   }
   return actions;
