@@ -110,7 +110,8 @@ def test_pack_extensions_registered(pack_state_tmp):
     from backend.extensions import extensions
 
     count = register_pack_extensions()
-    assert count == 4
+    # 4 original packs + Batch 5's engineering + document-creation packs.
+    assert count == 6
     manifest = extensions.get("skill-pack:spec-driven")
     assert manifest is not None and manifest.version == "1.0.0"
 

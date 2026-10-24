@@ -1447,6 +1447,10 @@ class GetCurrentUserTests(unittest.TestCase):
         mock_result = MagicMock()
         mock_result.first.return_value = None
         mock_db.execute = AsyncMock(return_value=mock_result)
+        # Batch 6: get_current_user falls through to a device-token lookup
+        # (db.scalar) after the session lookup misses. An AsyncMock's
+        # scalar would return a truthy MagicMock, so mock it as no device.
+        mock_db.scalar = AsyncMock(return_value=None)
 
         async def test():
             with self.assertRaises(HTTPException) as ctx:
