@@ -1138,6 +1138,22 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/connectors/{name}/callback` | Yes | OAuth callback, token stored encrypted (Phase 5) |
 | DELETE | `/api/connectors/{name}` | Yes | Disconnect an OAuth connector (Phase 5) |
 | GET | `/api/system/backup` | Yes | Download backup zip (DB + uploads) (Phase 5) |
+| GET | `/api/security/allowlist` | Yes | List target allowlist (Batch 2) |
+| POST | `/api/security/allowlist` | Yes | Add allowlist target (Batch 2) |
+| DELETE | `/api/security/allowlist/{target_id}` | Yes | Remove allowlist target (Batch 2) |
+| GET | `/api/security/catalog` | Yes | Curated security tool catalog, data only (Batch 2) |
+| POST | `/api/security/catalog/{name}/enable` | Yes | Enable/disable a catalog entry (Batch 2) |
+| POST | `/api/security/runs` | Yes | Create a PENDING security run (Batch 2) |
+| GET | `/api/security/runs` | Yes | List security runs (Batch 2) |
+| GET | `/api/security/runs/{run_id}` | Yes | Get one security run (Batch 2) |
+| POST | `/api/security/runs/{run_id}/approve` | Yes | Approve + execute a run (Batch 2) |
+| POST | `/api/security/runs/{run_id}/phase` | Yes | Advance run phase Recon→Reporter (Batch 2) |
+| POST | `/api/security/runs/{run_id}/browser` | Yes | Browser agent, automation/security-test modes (Batch 2) |
+| GET | `/api/security/runs/{run_id}/audit` | Yes | Audit log for a run (Batch 2) |
+| POST | `/api/security/runs/{run_id}/findings` | Yes | Add a finding (Batch 2) |
+| GET | `/api/security/runs/{run_id}/findings` | Yes | List findings (Batch 2) |
+| POST | `/api/security/findings/{finding_id}/validate` | Yes | Set validation verdict (Batch 2) |
+| POST | `/api/security/runs/{run_id}/report` | Yes | Gated report (refuses unless findings PASS) (Batch 2) |
 | GET | `/api/memory/export` | Yes | Export memories as JSON download (Phase 2) |
 | POST | `/api/memory/forget` | Yes | Bulk forget memories by filter, confirm required (Phase 2) |
 | GET | `/api/agents` | Yes | List custom agents (Phase 3) |

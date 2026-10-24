@@ -19,6 +19,7 @@ const SECTIONS = [
   { id: 'code',      label: 'Code',      desc: 'The code agent: describe a task, review the diff.' },
   { id: 'workflows', label: 'Workflows', desc: 'Build and run DAG workflows; replay and inspect nodes.' },
   { id: 'activity',  label: 'Activity',  desc: 'Live runs, run history, media jobs, workflow runs, artifacts.' },
+  { id: 'security',  label: 'Security',  desc: 'Own-systems-only security testing: allowlist, runs, findings, reports.' },
 ];
 
 const LOADERS = {
@@ -26,6 +27,7 @@ const LOADERS = {
   code: async () => (await import('../code-agent/code-agent.js')).renderCodePage,
   workflows: async () => (await import('../workflows/workflows.js')).renderWorkflowsTab,
   activity: async () => (await import('../runs/runs.js')).renderRunsTab,
+  security: async () => (await import('../security/security.js')).renderSecurityPage,
 };
 
 export async function renderWorkPage(bodyEl) {

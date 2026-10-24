@@ -73,6 +73,24 @@ from .api_routes.media_jobs_routes import (  # noqa: F401
     list_media_jobs,
 )
 from .api_routes.system_routes import download_backup  # noqa: F401
+from .api_routes.security_routes import (  # noqa: F401
+    add_allowlist,
+    add_finding,
+    advance_phase,
+    approve_run,
+    build_report,
+    create_run,
+    delete_allowlist,
+    get_catalog,
+    get_run,
+    list_audit,
+    list_allowlist,
+    list_findings,
+    list_runs,
+    run_browser,
+    set_catalog_enabled,
+    validate_finding,
+)
 from .api_routes.workflows_routes import (  # noqa: F401
     create_workflow,
     delete_workflow,
