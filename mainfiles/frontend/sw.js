@@ -1,11 +1,13 @@
 /**
- * Sangam service worker — simple and safe (Phase 5).
+ * Sangam service worker — fresh-first (Phase 5).
  *
- * - Static assets (css/js/fonts/icons): cache-first, fall back to network.
- * - API calls (/api/*): network-first, never cached.
+ * - API calls (/api/*): network-only, never cached.
+ * - Static assets (css/js/fonts/icons): NETWORK-first,
+ *   fall back to the cache when offline. This guarantees UI updates
+ *   are visible after a normal reload — no stale cache pinning.
  * - Versioned cache; old caches purged on activate.
  */
-const CACHE = 'sangam-v1';
+const CACHE = 'sangam-v2';
 const STATIC_PATTERNS = [
   /\/css\//, /\/js\//, /\/assets\//, /favicon\.ico$/,
   /fonts\.googleapis\.com/, /cdnjs\.cloudflare\.com/, /cdn\.jsdelivr\.net/,
@@ -29,7 +31,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
 
-  // Never cache API traffic
+  // Never cache API traffic (also never fail offline on it)
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(request));
     return;
@@ -39,18 +41,18 @@ self.addEventListener('fetch', (event) => {
     url.origin === self.location.origin;
 
   if (isStatic) {
-    // Cache-first for static assets
+    // Network-first: always fresh when online, cache as offline fallback
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((resp) => {
-          if (resp && resp.ok) {
+      fetch(request)
+        .then((resp) => {
+          // Cache only successful same-origin responses
+          if (resp && resp.ok && url.origin === self.location.origin) {
             const clone = resp.clone();
             caches.open(CACHE).then((cache) => cache.put(request, clone));
           }
           return resp;
-        });
-      })
+        })
+        .catch(() => caches.match(request).then((cached) => cached || Response.error()))
     );
   }
   // Non-static, non-API: default browser behavior (no interception)
