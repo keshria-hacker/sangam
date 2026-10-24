@@ -150,21 +150,36 @@ test('Slash menu lists real commands and filters', async ({ page }) => {
   assertClean();
 });
 
-test('Message actions: Save, Workflow, Inspect with evidence in place', async ({ page }) => {
+test('Message actions: Save, Workflow, Inspect with evidence in place', async ({ page, playwright }) => {
   test.setTimeout(180000);
   attachGuards(page);
   await register(page);
 
   // Seed one chat with a user question + an assistant answer via the
-  // existing chats API (no model needed). NOTE: the append endpoint only
-  // persists role/content — tool_calls are dropped server-side (a
-  // backend gap flagged in BUILD_LOG2-ux.md, not fixable frontend-only).
-  // So button visibility is checked on the reloaded message, while the
-  // Inspector evidence rendering is checked by selecting an in-session
-  // message object carrying a tool call (the shape chat.js builds live).
-  const api = page.request;
+  // existing chats API (no model needed). Seeding uses a SEPARATE,
+  // cookie-free request context with the page's LIVE Bearer token
+  // (read from localStorage after login). Why not page.request: it
+  // shares the context's cookies, and auth is cookie-first with no
+  // Bearer fallback — the API login inside register() leaves a
+  // session cookie that the UI-login fallback rotates server-side
+  // (_create_session deletes all prior sessions), so page.request
+  // sends a dead cookie and gets 401 (or 403 without a CSRF header).
+  // The page's own localStorage token is always the live session.
+  // Button visibility is checked on the reloaded message, while the
+  // Inspector evidence rendering is checked by selecting an
+  // in-session message object carrying a tool call (the shape
+  // chat.js builds live); the append endpoint now also persists
+  // evidence lists server-side (merge batch).
+  const liveToken = await page.evaluate(() =>
+    localStorage.getItem('sangam-access-token'));
+  expect(liveToken, 'no live Bearer token in localStorage after login').not.toBeNull();
+  const api = await playwright.request.newContext({
+    extraHTTPHeaders: { Authorization: `Bearer ${liveToken}` },
+  });
   const chat = await api.post(`${BACKEND_URL}/api/chats`, {
-    data: { title: 'UX refine seed', model: '' },
+    // model is required and must resolve; ollama:<name> resolves
+    // without a server call, and this test never streams.
+    data: { title: 'UX refine seed', model: 'ollama:mock' },
   });
   expect(chat.ok(), `create chat failed: ${chat.status()}`).toBe(true);
   const chatId = (await chat.json()).id;

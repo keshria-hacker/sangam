@@ -172,7 +172,11 @@ export function initInspector() {
       <button class="icon-btn" id="inspectorClose" aria-label="Close inspector"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="inspector-body" id="inspectorBody"></div>`;
-  document.querySelector('.app-main')?.appendChild(panel);
+  // The app shell's main element is .main-panel (there is no .app-main
+  // in index.html — the old selector silently dropped the panel, so
+  // the Inspector could never open and toggleInspector no-opped).
+  const main = document.querySelector('.main-panel') || document.body;
+  main.appendChild(panel);
   panel.querySelector('#inspectorClose')?.addEventListener('click', toggleInspector);
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') {

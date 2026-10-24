@@ -116,7 +116,7 @@ Interactive classroom: a teacher agent delivers structured, research-first lesso
 
 ### ✨ Response Quality
 
-One writing pipeline with three independent controls: an offline grammar/spell/repetition lint (deterministic rules, never silent autocorrect), AI-slop cleanup in two modes — Detect (names the pattern and quotes the line, text unchanged) and Edit (minimum edit plus a "What changed" list, 30+ patterns) — and ADHD-friendly post-processing that strips throat-clearing openers, reflows long paragraphs, and caps lists at 5 items with a "+N more" note. The ADHD prompt-level style (action-first, numbered steps, single next step, minute estimates) is available as a style block, not yet wired into live chat. Quality transforms run at persistence time, never on the live stream.
+One writing pipeline with three independent controls: an offline grammar/spell/repetition lint (deterministic rules, never silent autocorrect), AI-slop cleanup in two modes — Detect (names the pattern and quotes the line, text unchanged) and Edit (minimum edit plus a "What changed" list, 30+ patterns) — and ADHD-friendly post-processing that strips throat-clearing openers, reflows long paragraphs, and caps lists at 5 items with a "+N more" note. The ADHD prompt-level style (action-first, numbered steps, single next step, minute estimates) is wired into live chat behind the ADHD-friendly setting. Quality transforms run at persistence time, never on the live stream.
 
 ### 📊 Usage Analytics
 
@@ -132,7 +132,7 @@ One pinned Chat tab (the only chat, never closing) plus six destinations in the 
 
 ### 🧠 Knowledge Graph
 
-Unified graph of memories, documents, code symbols, and chats. SVG visualization with zoom, click-to-inspect, provenance labels (EXTRACTED/INFERRED/AMBIGUOUS), memory wings by type, and "used in this answer" tracking.
+Unified graph of memories, documents, code symbols, and chats. SVG visualization with zoom, click-to-inspect, provenance labels (EXTRACTED/INFERRED/AMBIGUOUS), memory wings by type, and "used in this answer" tracking. Memory-graph relations appear as entity nodes joined by predicate edges carrying confidence and source references, filterable to any as-of instant.
 
 ### 🤖 Agent Hub
 
@@ -164,7 +164,7 @@ Generate UI prototypes from prompts. Sandboxed iframe preview, refine iterativel
 
 ### 🛡️ Security Workspace (own systems only)
 
-Guardrails first: a target allowlist, per-run approval naming target, scope, and tool class, Docker-isolated execution where available (with an explicit workspace-confinement warning where Docker is absent, never silent), and a full audit log mirrored to the Runs store. The workspace runs Recon → Vuln-hunter → Validator → Reporter, stores CVSS findings, supports patch-diff review, and gates reports on every included finding being validated PASS. A curated tool catalog is data-only (pinned, SHA-256-verified installers; high-risk tools disabled by default) — nothing installs or runs a catalog tool automatically, and v1 execution is passive recon only. A browser agent runs in two separately gated modes (automation vs security-test) with an isolated profile and action/screenshot logging. No DDoS, RAT, phishing, brute-force, wireless, session-hijack, backdoor, WAF/CAPTCHA-bypass, or third-party-target tooling — ever.
+Guardrails first: a target allowlist, per-run approval naming target, scope, and tool class, Docker-isolated execution where available (with an explicit workspace-confinement warning where Docker is absent, never silent), and a full audit log mirrored to the Runs store. The workspace runs Recon → Vuln-hunter → Validator → Reporter, stores CVSS findings, supports patch-diff review, and gates reports on every included finding being validated PASS. A curated tool catalog is data-only (pinned, SHA-256-verified installers; high-risk tools disabled by default) — nothing installs or runs a catalog tool automatically. Passive recon tools and active scanners (nmap, nuclei, nikto, zaproxy-baseline) execute only via the isolated sandbox behind per-run approval; sqlmap and ffuf/gobuster stay passive-only by design (injection probes can mutate data; wordlists are never invented). A browser agent runs in two separately gated modes (automation vs security-test) with an isolated profile and action/screenshot logging. No DDoS, RAT, phishing, brute-force, wireless, session-hijack, backdoor, WAF/CAPTCHA-bypass, or third-party-target tooling — ever.
 
 ### 🔀 Workflow Canvas
 
@@ -172,7 +172,7 @@ Visual DAG canvas on the existing workflow engine (cycle detection, timeouts, re
 
 ### 🧠 Memory V2 + Research Notebooks
 
-Beyond typed memories: LLM fact extraction (defensive parsing — unparseable output yields nothing, never invented facts), an entity + temporal graph with validity windows (a new value for the same subject/predicate closes the old row instead of overwriting it), verbatim transcript storage with no length cap, a memory-update API, and a reflect operation that synthesizes observations with evidence IDs and stores them as semantic memories. Notebooks group sources (files, URLs, notes, chats) with per-source context control (excluded / summary / full), saved transformations, notes-from-chat, and [[wiki-links]] with backlinks. LLM extraction is endpoint-only in v1, not wired into the chat loop; summary fallbacks are labelled extractive.
+Beyond typed memories: LLM fact extraction (defensive parsing — unparseable output yields nothing, never invented facts), wired into the chat loop as an opt-in background step after each reply (heuristic extraction stays the no-model fallback), an entity + temporal graph with validity windows (a new value for the same subject/predicate closes the old row instead of overwriting it), verbatim transcript storage with no length cap, a memory-update API, and a read-only reflect operation that synthesizes observations with evidence IDs, proof counts, and trends — it never writes its synthesis back as a memory. Notebooks group sources (files, URLs, notes, chats) with per-source context control (excluded / summary / full), saved transformations, notes-from-chat, and [[wiki-links]] with index-backed backlinks, rename propagation, section extraction, and graph expansion. URL sources are ingested on add (SSRF-guarded) and become real retrievable documents; a BFS deep-crawl job (approval-gated, same-domain, robots-respecting) extends beyond single pages. Retrieval is hybrid (vector + BM25, RRF) with a corrective loop that grades, rewrites, and web-falls-back on weak evidence. Summary fallbacks are labelled extractive.
 
 ### 🏗️ Engineering Pipeline
 
@@ -180,7 +180,7 @@ An enforced grill → brainstorm → design → plan → subagent → review-spe
 
 ### 📱 LAN Pairing
 
-Stay single-user and still use Sangam from your phone over Wi-Fi. Settings → Devices → Pair shows a QR code or 6-digit code (5-minute, single-use, rate-limited) plus mandatory host approval — the code alone is never enough. Each device gets its own Bearer token (SHA-256-hashed server-side, 90-day expiry, revocable per device, revoke-all). TLS with a host-generated self-signed certificate is the default (fingerprint shown next to the QR for manual comparison on first connect); plain HTTP is an explicitly warned opt-in fallback. LAN mode is opt-in and off by default, the server must run with `--host 0.0.0.0`, and the Devices screen states the threat model plainly: what is protected (code guessing/replay, same-Wi-Fi strangers, passive eavesdropping in TLS mode, stolen-phone revocation, hashed token storage) and what is not (physical access to the unlocked laptop, a compromised laptop, an approved compromised phone, the HTTP fallback, internet exposure via port-forwarding).
+Stay single-user and still use Sangam from your phone over Wi-Fi. Settings → Devices → Pair shows a QR code or 6-digit code (5-minute, single-use, rate-limited) plus mandatory host approval — the code alone is never enough. Each device gets its own Bearer token (SHA-256-hashed server-side, 90-day expiry, revocable per device, revoke-all). Pending pairings survive a restart, and device tokens stop working while LAN mode is toggled off (re-enable restores them; revoke is the permanent kill switch). TLS with a host-generated self-signed certificate is the default (fingerprint shown next to the QR for manual comparison on first connect); plain HTTP is an explicitly warned opt-in fallback. LAN mode is opt-in and off by default, the server must run with `--host 0.0.0.0`, and the Devices screen states the threat model plainly: what is protected (code guessing/replay, same-Wi-Fi strangers, passive eavesdropping in TLS mode, stolen-phone revocation, hashed token storage) and what is not (physical access to the unlocked laptop, a compromised laptop, an approved compromised phone, the HTTP fallback, internet exposure via port-forwarding).
 
 ### 🖥️ Model Fit Advisor
 
