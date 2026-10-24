@@ -8,6 +8,31 @@ Generalized loop used by:
 The loop: plan → tool call → observe → answer, with max steps, stop support,
 and per-step SSE streaming. All LLM calls go through Sangam's provider stack
 (DB-encrypted keys, resolved per provider) — never bare litellm.
+
+Deep-read Wave 1 (agent core) changes in this module:
+
+* Tool arguments are parsed strictly: unparseable (possibly truncated)
+  arguments FAIL the call — they never degrade to ``{}`` and execute.
+  A ``length`` finish reason fails every tool call in that message.
+* Every tool call passes the pi-style hook layer (``hooks.py``) via the
+  tool executor, and the ECC risk-tier policy (``permission_policy.py``)
+  in front of the approval gate: a blacklisted call is denied even
+  under the ``automatic`` approval policy, with the rule cited.
+* Approvals are durable: a DB row (``hooks.AgentApproval``) records
+  pending/approved/denied/timeout with a reason. ``timeout`` and
+  ``denied`` are distinct — a timeout is reported as a timeout, not a
+  refusal. The in-memory gate (``_approval_gates``) is kept only as the
+  live wait mechanism for the existing ``/agent/approve`` endpoint.
+* Cost is real: per-response ``usage`` from LiteLLM is accumulated in
+  :class:`CostMeter`. When a provider returns no usage, usage is
+  recorded as unknown (never a fabricated estimate) and logged as such.
+  A USD budget can only be enforced when usage is known and a price is
+  configured; otherwise the run logs that the budget is unenforceable.
+* Loop detection (ECC, 5 identical consecutive calls) stops the run
+  and asks the user instead of burning iterations on retries.
+* At a successful stop, the ECC Stop hook runs report-only batch
+  checks over files the run touched; failures are reported, never
+  auto-fixed.
 """
 from __future__ import annotations
 
@@ -118,17 +143,174 @@ def _tools_schema(names: list[str]) -> list[dict]:
 
 
 async def _execute_tool(name: str, args: dict) -> dict:
-    from .tools.registry import registry
-    tool = registry.get(name)
-    if not tool or not tool.handler:
-        return {"error": f"Unknown tool: {name}"}
+    """Execute one tool via ToolExecutor (hook layer included).
+
+    The executor's before-hooks (config protection, destructive-bash
+    deny) run on every call, and same-file mutations are serialized.
+    Returns the handler's dict unchanged when available, so the loop's
+    tool messages keep their previous shape; failures become
+    ``{"error": ...}`` dicts, as before.
+    """
+    from .hooks import default_guard_registry
+    from .tools.executor import ToolExecutor
+    from .tools.schemas import ToolCall
+    import uuid as _uuid
+
+    global _agent_executor
+    if _agent_executor is None:
+        # Handler-level timeouts still apply; the executor timeout is
+        # only a backstop, so it is generous (previously there was none).
+        _agent_executor = ToolExecutor(
+            hooks=default_guard_registry(), default_timeout=300.0)
+    result = await _agent_executor.execute(
+        ToolCall(id=f"call-{_uuid.uuid4().hex[:12]}", name=name,
+                 arguments=dict(args)))
+    if isinstance(result.data, dict):
+        return result.data
+    if result.is_error:
+        return {"error": result.error or result.content}
+    return {"result": result.content}
+
+
+_agent_executor = None
+
+
+class ToolArgumentsError(ValueError):
+    """Tool arguments could not be parsed, or were not an object.
+
+    Raised instead of degrading to ``{}``: executing a call with
+    invented empty arguments (pi's truncated-output footgun) is never
+    acceptable.
+    """
+
+
+def parse_tool_arguments(raw: Any) -> dict:
+    """Parse a tool call's arguments string strictly.
+
+    Returns the parsed object, which must be a dict. Raises
+    :class:`ToolArgumentsError` on unparseable JSON, non-object JSON,
+    or a non-string input — the caller must fail the call and tell the
+    model to re-issue it with complete arguments.
+    """
+    if not isinstance(raw, str):
+        raise ToolArgumentsError(
+            f"Tool arguments are not a string (got {type(raw).__name__}). "
+            "Re-issue the call with complete JSON arguments.")
     try:
-        result = await tool.handler(**args)
-        return result if isinstance(result, dict) else {"result": result}
-    except TypeError as exc:
-        return {"error": f"Bad arguments for {name}: {exc}"}
-    except Exception as exc:
-        return {"error": f"{name} failed: {exc}"}
+        parsed = json.loads(raw or "{}")
+    except json.JSONDecodeError as exc:
+        raise ToolArgumentsError(
+            f"Tool arguments could not be parsed ({exc}); the output may "
+            "have been truncated. Do NOT execute with partial arguments — "
+            "re-issue the call with complete arguments.") from exc
+    if not isinstance(parsed, dict):
+        raise ToolArgumentsError(
+            "Tool arguments must be a JSON object. Re-issue the call with "
+            "complete object arguments.")
+    return parsed
+
+
+def _field(obj: Any, name: str, default: Any = None) -> Any:
+    """Read a field from a dict-like or attribute-style LLM object."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    getter = getattr(obj, "get", None)
+    if callable(getter):
+        try:
+            return getter(name, default)
+        except Exception:  # noqa: BLE001
+            pass
+    return getattr(obj, name, default)
+
+
+def extract_usage(resp: Any) -> dict[str, int] | None:
+    """Extract real provider usage from a LiteLLM response, or None.
+
+    Accepts attribute-style (``resp.usage.prompt_tokens``) and
+    dict-style usage. Returns None when the provider returned no usable
+    usage — the caller records that as unknown, never estimates it.
+    """
+    usage = getattr(resp, "usage", None)
+    if usage is None and isinstance(resp, dict):
+        usage = resp.get("usage")
+    if usage is None:
+        return None
+    prompt = _field(usage, "prompt_tokens")
+    completion = _field(usage, "completion_tokens")
+    total = _field(usage, "total_tokens")
+    if total is None and prompt is not None and completion is not None:
+        total = prompt + completion
+    if total is None:
+        return None
+    try:
+        return {
+            "prompt_tokens": int(prompt or 0),
+            "completion_tokens": int(completion or 0),
+            "total_tokens": int(total),
+        }
+    except (TypeError, ValueError):
+        return None
+
+
+class CostMeter:
+    """Real per-run cost accounting from provider usage objects.
+
+    No flat-rate formula, no ``len(text)//4`` estimate. ``cost_usd``
+    is None unless a price per 1K tokens is configured — an unknown
+    cost is reported as unknown, not fabricated from a made-up rate.
+    """
+
+    def __init__(self, price_per_1k_usd: float | None = None):
+        self.price_per_1k_usd = price_per_1k_usd
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.total_tokens = 0
+        self.responses = 0
+        self.unknown_responses = 0
+
+    def add(self, usage: dict[str, int] | None) -> bool:
+        """Accumulate one response's usage. Returns True when known."""
+        self.responses += 1
+        if usage is None:
+            self.unknown_responses += 1
+            logger.warning(
+                "provider returned no usage for a response; usage "
+                "recorded as unknown (no estimate substituted)")
+            return False
+        self.prompt_tokens += usage.get("prompt_tokens", 0)
+        self.completion_tokens += usage.get("completion_tokens", 0)
+        self.total_tokens += usage.get("total_tokens", 0)
+        return True
+
+    @property
+    def usage_known(self) -> bool:
+        return self.unknown_responses == 0 and self.responses > 0
+
+    @property
+    def cost_usd(self) -> float | None:
+        if self.price_per_1k_usd is None:
+            return None
+        return self.total_tokens * self.price_per_1k_usd / 1000.0
+
+    def budget_exceeded(self, max_cost_usd: float) -> bool | None:
+        """True when over budget, False when within, None when the
+        cost cannot be determined (unknown usage or no price)."""
+        cost = self.cost_usd
+        if cost is None:
+            return None
+        return cost > max_cost_usd
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens,
+            "responses": self.responses,
+            "unknown_responses": self.unknown_responses,
+            "usage_known": self.usage_known,
+            "cost_usd": self.cost_usd,
+            "cost_known": self.cost_usd is not None,
+        }
 
 
 async def _llm_with_tools(model_id: str, messages: list[dict],
@@ -151,7 +333,11 @@ async def _llm_with_tools(model_id: str, messages: list[dict],
     )
 
 
-# In-memory approval gates: approval_id -> {event, decision}
+# In-memory approval gates: approval_id -> {event, decision, reason}.
+# This dict is ONLY the live wait mechanism for the /agent/approve
+# endpoint. The durable record is the AgentApproval DB row (hooks.py),
+# written and transitioned by run_agent; a restart loses the wait, but
+# never the decision history.
 _approval_gates: dict[str, dict] = {}
 
 # Tools that require approval by default (user can customize via settings)
@@ -159,19 +345,26 @@ DEFAULT_APPROVAL_TOOLS = {"write_file", "edit_file", "run_bash", "execute_code"}
 
 
 def create_approval_gate(approval_id: str) -> dict:
-    """Create an approval gate. Returns {event, decision}."""
+    """Create an approval gate. Returns {event, decision, reason}."""
     import asyncio
-    gate = {"event": asyncio.Event(), "decision": None}
+    gate = {"event": asyncio.Event(), "decision": None, "reason": None}
     _approval_gates[approval_id] = gate
     return gate
 
 
-def resolve_approval(approval_id: str, approved: bool) -> bool:
-    """Resolve a pending approval. Returns True if the gate existed."""
+def resolve_approval(approval_id: str, approved: bool,
+                     reason: str | None = None) -> bool:
+    """Resolve a pending approval. Returns True if the gate existed.
+
+    ``reason`` is the denial reason when denying; it is stored on the
+    gate and persisted to the DB row by the waiting loop. The existing
+    two-argument call shape (used by /agent/approve) keeps working.
+    """
     gate = _approval_gates.pop(approval_id, None)
     if not gate:
         return False
     gate["decision"] = approved
+    gate["reason"] = reason
     gate["event"].set()
     return True
 
@@ -185,7 +378,11 @@ async def run_agent(task: str, model_id: str, db: Any,
                     approval_timeout: float = 120.0,
                     max_cost_usd: float = 0.0,
                     on_usage: Any = None,
-                    max_tools_per_run: int = 0):
+                    max_tools_per_run: int = 0,
+                    approval_policy: str = "default",
+                    price_per_1k_usd: float | None = None,
+                    on_usage_detail: Any = None,
+                    stop_check_budget_s: float = 120.0):
     """Generalized agent loop. Yields AgentStep events for SSE streaming.
 
     Batch 5: at the START of the loop, skills are matched deterministically
@@ -193,8 +390,21 @@ async def run_agent(task: str, model_id: str, db: Any,
     prompt. Matching failures degrade silently (log line, run continues).
     max_tools_per_run (0 = unlimited) budgets fired skills + tool calls:
     firing stops once the budget is reached.
+
+    Wave 1: ``approval_policy`` ("default" | "automatic" | "always_ask")
+    is evaluated through the risk-tier policy on every call; a
+    blacklisted call is denied even under "automatic". ``on_usage``
+    receives the real total token count, or None when the provider
+    returned no usage; ``on_usage_detail`` (when given) receives the
+    full CostMeter snapshot. ``price_per_1k_usd`` enables USD budget
+    enforcement; without it (or without usage) a budget is logged as
+    unenforceable, never enforced on a fabricated number.
     """
+    from .hooks import (LoopDetector, format_stop_report,
+                        record_approval_row, run_stop_checks,
+                        transition_approval_row)
     from .instincts import get_relevant_instincts
+    from .permission_policy import DEFAULT_POLICY
 
     tools = _tools_schema(tool_names or CHAT_AGENT_TOOLS)
     system = system_prompt
@@ -233,28 +443,62 @@ async def run_agent(task: str, model_id: str, db: Any,
             content="Auto-invoked skills: " + ", ".join(
                 str(_skill_field(s, "name", "?")) for s in fired_skills))
 
-    total_tokens = 0
     tools_executed = 0
+    meter = CostMeter(price_per_1k_usd=price_per_1k_usd)
+    loop_detector = LoopDetector()
+    touched_files: list[str] = []
+    budget_warned = False
+
+    def _stop_report_step() -> AgentStep | None:
+        if not touched_files:
+            return None
+        try:
+            report = format_stop_report(
+                run_stop_checks(touched_files, budget_s=stop_check_budget_s))
+        except Exception as exc:  # noqa: BLE001 — Stop hook never breaks a run
+            logger.warning("Stop hook failed: %s", exc)
+            return None
+        if not report:
+            return None
+        return AgentStep(kind="thought", content=report)
+
     for _ in range(max_iterations):
-        # Budget check (rough: $0.01 per 1K tokens)
-        if max_cost_usd > 0 and total_tokens * 0.01 / 1000 > max_cost_usd:
-            yield AgentStep(kind="error",
-                            content=f"Budget exceeded (${max_cost_usd:.2f}). Stopping.")
-            return
+        # Real budget check: only enforceable when cost is known.
+        if max_cost_usd > 0:
+            exceeded = meter.budget_exceeded(max_cost_usd)
+            if exceeded is True:
+                yield AgentStep(kind="error",
+                                content=f"Budget exceeded (${max_cost_usd:.2f}). Stopping.")
+                return
+            if exceeded is None and not budget_warned:
+                budget_warned = True
+                logger.warning(
+                    "cost budget $%.2f cannot be enforced: provider usage "
+                    "unknown or no price per 1K tokens configured; "
+                    "continuing without a USD budget check", max_cost_usd)
         try:
             resp = await _llm_with_tools(model_id, messages, tools, db)
         except Exception as exc:
             yield AgentStep(kind="error", content=f"LLM call failed: {exc}")
             return
 
-        msg = resp.choices[0].message
-        text = msg.get("content") or ""
-        tool_calls = msg.get("tool_calls") or []
-        # Rough token estimate
-        total_tokens += len(text) // 4 + 100
+        choice = resp.choices[0]
+        msg = _field(choice, "message", {}) or {}
+        text = _field(msg, "content") or ""
+        tool_calls = _field(msg, "tool_calls") or []
+        finish_reason = _field(choice, "finish_reason")
+        # Real provider usage — never the old len(text)//4 estimate.
+        latest_known = meter.add(extract_usage(resp))
         if on_usage:
             try:
-                on_usage(total_tokens)
+                # Cumulative real tokens, or None when the latest
+                # response carried no usage (unknown, not zero).
+                on_usage(meter.total_tokens if latest_known else None)
+            except Exception:
+                pass
+        if on_usage_detail:
+            try:
+                on_usage_detail(meter.snapshot())
             except Exception:
                 pass
 
@@ -264,7 +508,30 @@ async def run_agent(task: str, model_id: str, db: Any,
 
         if not tool_calls:
             yield AgentStep(kind="answer", content=text or "Done.")
+            step = _stop_report_step()
+            if step is not None:
+                yield step
             return
+
+        # Truncated output is poison (pi): a `length` finish reason means
+        # arguments may be corrupt, so fail every call — never execute.
+        if finish_reason == "length":
+            yield AgentStep(
+                kind="error",
+                content="Model output was truncated (length limit); tool "
+                        "calls from this message were NOT executed because "
+                        "their arguments may be corrupt. Re-issue them.")
+            for tc in tool_calls:
+                fname = _field(_field(tc, "function", {}), "name", "")
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": _field(tc, "id", ""),
+                    "name": fname,
+                    "content": json.dumps({"error": "Tool call not executed: "
+                        "model output was truncated; re-issue the call with "
+                        "complete arguments."}),
+                })
+            continue
 
         for tc in tool_calls:
             # Batch 5 tool-count budget: fired skills + tools executed.
@@ -272,18 +539,63 @@ async def run_agent(task: str, model_id: str, db: Any,
                 yield AgentStep(kind="error",
                                 content=f"Tool budget exceeded ({max_tools_per_run}). Stopping.")
                 return
-            fname = tc["function"]["name"]
+            fn = _field(tc, "function", {}) or {}
+            fname = _field(fn, "name", "")
+            raw_args = _field(fn, "arguments") or "{}"
             try:
-                fargs = json.loads(tc["function"].get("arguments") or "{}")
-            except json.JSONDecodeError:
-                fargs = {}
-            # Approval gate for sensitive tools
-            needs_approval = (require_approval is None and fname in DEFAULT_APPROVAL_TOOLS) or \
-                             (require_approval is not None and fname in require_approval)
+                fargs = parse_tool_arguments(raw_args)
+            except ToolArgumentsError as exc:
+                # Never execute with degraded {} arguments.
+                yield AgentStep(kind="error",
+                                content=f"Tool call to {fname} NOT executed: {exc}")
+                messages.append({
+                    "role": "tool", "tool_call_id": _field(tc, "id", ""),
+                    "name": fname,
+                    "content": json.dumps({"error": str(exc)}),
+                })
+                loop_detector.record(fname, {"_unparseable": str(raw_args)[:200]})
+                continue
+            # Loop detection: 5 identical consecutive calls stop the run
+            # and ask the user — never auto-retry with a new strategy.
+            if loop_detector.record(fname, fargs):
+                yield AgentStep(
+                    kind="error",
+                    content=f"Loop detected: {fname} with identical "
+                            f"arguments was called {loop_detector.threshold} "
+                            "times in a row. Stopping and awaiting user "
+                            "direction instead of retrying.")
+                return
+            # Risk-tier policy in front of the approval gate. A blacklist
+            # denial wins even under the automatic policy, with the rule
+            # cited; the call is never executed and never gated.
+            decision = DEFAULT_POLICY.evaluate(
+                fname, fargs, approval_policy=approval_policy,
+                require_approval=require_approval)
+            if decision.decision == "deny":
+                detail = {"error": decision.reason}
+                if decision.rule_id:
+                    detail["rule"] = decision.rule_id
+                if decision.recovery_hint:
+                    detail["recovery_hint"] = decision.recovery_hint
+                yield AgentStep(kind="tool_result",
+                                content=f"Denied by policy"
+                                        f" ({decision.rule_id}): {decision.reason}"
+                                        + (f" {decision.recovery_hint}"
+                                           if decision.recovery_hint else ""),
+                                tool_name=fname)
+                messages.append({
+                    "role": "tool", "tool_call_id": _field(tc, "id", ""),
+                    "name": fname,
+                    "content": json.dumps(detail),
+                })
+                continue
+            needs_approval = decision.decision == "ask"
             if needs_approval:
                 import asyncio, uuid
                 approval_id = f"appr-{uuid.uuid4().hex[:12]}"
                 gate = create_approval_gate(approval_id)
+                if db is not None:
+                    await record_approval_row(db, approval_id, fname, fargs)
                 yield AgentStep(kind="approval_needed",
                                 content=f"Approval needed: {fname}({json.dumps(fargs)[:200]})",
                                 tool_name=fname, tool_args=fargs,
@@ -292,34 +604,53 @@ async def run_agent(task: str, model_id: str, db: Any,
                     await asyncio.wait_for(gate["event"].wait(), timeout=approval_timeout)
                 except asyncio.TimeoutError:
                     _approval_gates.pop(approval_id, None)
-                    yield AgentStep(kind="error", content=f"Approval timed out for {fname} — skipped.")
+                    if db is not None:
+                        await transition_approval_row(
+                            db, approval_id, "timeout",
+                            f"Approval timed out after {approval_timeout}s "
+                            "(not a refusal)")
+                    yield AgentStep(kind="error", content=f"Approval timed out for {fname} (not a refusal) — skipped.")
                     messages.append({
-                        "role": "tool", "tool_call_id": tc.get("id", ""), "name": fname,
-                        "content": json.dumps({"error": "User did not approve in time. Tool skipped."}),
+                        "role": "tool", "tool_call_id": _field(tc, "id", ""), "name": fname,
+                        "content": json.dumps({"error": "Approval timed out (not a refusal). Tool skipped."}),
                     })
                     continue
                 if not gate["decision"]:
-                    yield AgentStep(kind="tool_result", content="Denied by user.",
+                    reason = gate.get("reason") or "denied by user"
+                    if db is not None:
+                        await transition_approval_row(
+                            db, approval_id, "denied", reason)
+                    yield AgentStep(kind="tool_result",
+                                    content=f"Denied by user: {reason}",
                                     tool_name=fname)
                     messages.append({
-                        "role": "tool", "tool_call_id": tc.get("id", ""), "name": fname,
-                        "content": json.dumps({"error": "User denied this action."}),
+                        "role": "tool", "tool_call_id": _field(tc, "id", ""), "name": fname,
+                        "content": json.dumps({"error": f"User denied this action: {reason}"}),
                     })
                     continue
+                if db is not None:
+                    await transition_approval_row(db, approval_id, "approved")
             yield AgentStep(kind="tool_call", content=f"{fname}({json.dumps(fargs)[:200]})",
                             tool_name=fname, tool_args=fargs)
             result = await _execute_tool(fname, fargs)
             tools_executed += 1
-            result_str = json.dumps(result)[:8000]
+            if fname in ("write_file", "edit_file") and result.get("ok"):
+                path = fargs.get("path")
+                if isinstance(path, str) and path:
+                    touched_files.append(path)
+            result_str = json.dumps(result, default=str)[:8000]
             yield AgentStep(kind="tool_result", content=result_str,
                             tool_name=fname)
             messages.append({
                 "role": "tool",
-                "tool_call_id": tc.get("id", ""),
+                "tool_call_id": _field(tc, "id", ""),
                 "name": fname,
                 "content": result_str,
             })
 
+    step = _stop_report_step()
+    if step is not None:
+        yield step
     yield AgentStep(kind="done", content="Reached max steps. Stopping.")
 
 
