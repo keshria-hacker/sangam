@@ -3,6 +3,7 @@ database.py — async SQLAlchemy engine, session factory, and the Base
 declarative class that models.py builds ORM tables from.
 """
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -80,6 +81,36 @@ class Base(DeclarativeBase):
     pass
 
 
+async def _add_missing_columns(conn: Any) -> None:
+    """Idempotently add columns introduced after a table already exists.
+
+    create_all won't alter existing tables, so lightweight ALTERs keep
+    existing local SQLite databases in sync without a full Alembic run.
+    """
+    from sqlalchemy import text
+
+    needed: dict[str, dict[str, str]] = {
+        "custom_agents": {
+            "approval_policy":
+                "ALTER TABLE custom_agents ADD COLUMN approval_policy VARCHAR(20) DEFAULT 'default'",
+            "cost_budget":
+                "ALTER TABLE custom_agents ADD COLUMN cost_budget FLOAT DEFAULT 0.0",
+        },
+    }
+    for table, cols in needed.items():
+        try:
+            result = await conn.execute(text(f"PRAGMA table_info({table})"))
+            existing = {row[1] for row in result.fetchall()}
+        except Exception:
+            continue
+        for col, ddl in cols.items():
+            if col not in existing:
+                try:
+                    await conn.execute(text(ddl))
+                except Exception:
+                    pass
+
+
 async def init_db() -> None:
     """Create tables on startup. For anything beyond SQLite-for-a-resume-project,
     replace this with Alembic migrations."""
@@ -87,6 +118,7 @@ async def init_db() -> None:
     from . import models  # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _add_missing_columns(conn)
 
 
 async def reset_db() -> None:

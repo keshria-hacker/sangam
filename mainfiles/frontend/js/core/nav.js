@@ -5,28 +5,17 @@
  * action. Feeds the rail, command palette, and deep links.
  * Features that are off show as muted with "Turn on" (never invisible).
  */
-import { showTool } from '../features/tabs/tabs.js';
+import { openToolTab } from '../features/tabs/tabs.js';
 import { apiPost } from '../shared/http.js';
 import { showToast } from '../shared/toast.js';
 
 console.log('[Module] nav.js loaded');
 
-export const NAV_ITEMS = [
-  { id: 'home',      label: 'Home',      icon: 'fa-house',            action: 'home',      feature: null },
-  { id: 'chat',      label: 'Chat',      icon: 'fa-comment',          action: 'chat',      feature: null },
-  { id: 'agents',    label: 'Agents',    icon: 'fa-robot',            action: 'tab:agents', feature: null },
-  { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'tab:knowledge', feature: null },
-  { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'tab:create', feature: null },
-  { id: 'code',      label: 'Code',      icon: 'fa-code',             action: 'tab:code',   feature: null },
-  { id: 'library',   label: 'Library',   icon: 'fa-book',             action: 'tab:library', feature: null },
-  // Phase 8 B7: rail is 7 items. Merged away:
-  // - learn, insights -> Settings sub-pages
-  // - images, voice -> Create sub-views
-];
-
-export const NAV_BOTTOM = [
-  { id: 'settings', label: 'Settings', icon: 'fa-gear', action: 'settings', feature: null },
-];
+// The sidebar is intentionally focused on chat history. Studio tools remain
+// available through tabs and the command palette instead of duplicating them
+// as a second navigation rail.
+export const NAV_ITEMS = [];
+export const NAV_BOTTOM = [];
 
 let handlers = {};
 
@@ -41,7 +30,7 @@ export function navigate(action) {
   }
   // Default: tab:xxx shows the tool in the main view (Phase 8 B6: rail replaces view)
   if (action.startsWith('tab:')) {
-    showTool(action.slice(4));
+    openToolTab(action.slice(4));
   }
 }
 
@@ -90,7 +79,6 @@ export function renderRail(container, features = {}) {
         markRailActive(container, item.id);
       }
     });
-    if (item.id === 'settings') btn.classList.add('rail-bottom');
     container.appendChild(btn);
   }
 }

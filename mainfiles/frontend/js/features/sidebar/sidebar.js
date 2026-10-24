@@ -356,7 +356,6 @@ export function initSidebar() {
   var collapsed = getSidebarCollapsed();
   if (elements.sidebar) elements.sidebar.classList.toggle('collapsed', collapsed);
   if (elements.expandSidebar) elements.expandSidebar.classList.toggle('hidden', !collapsed);
-  if (elements.collapseSidebar) elements.collapseSidebar.classList.toggle('hidden', collapsed);
   if (elements.collapseSidebar) {
     elements.collapseSidebar.setAttribute('aria-expanded', String(!collapsed));
     elements.collapseSidebar.setAttribute('aria-label', collapsed ? 'Expand navigation rail' : 'Collapse sidebar');

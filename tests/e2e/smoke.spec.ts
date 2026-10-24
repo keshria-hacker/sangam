@@ -142,30 +142,14 @@ test.describe('Smoke (required gate)', () => {
     assertClean(ctx, 'register');
     await assertNoBadText(page, 'post-register');
 
-    // 2. Visit every rail item
-    await page.waitForFunction(
-      () => document.querySelectorAll('.rail-item[data-nav]').length > 3,
-      { timeout: 15000 }
-    );
-    const railIds: string[] = await page.evaluate(() =>
-      [...document.querySelectorAll('.rail-item[data-nav]')].map((el) =>
-        (el as HTMLElement).dataset.nav as string
-      )
-    );
-    expect(railIds.length).toBeGreaterThan(3);
-    for (const id of railIds) {
-      const item = page.locator(`.rail-item[data-nav="${id}"]`).first();
-      if (!(await item.isVisible())) continue;
-      await item.click();
-      await page.waitForTimeout(900);
-      assertClean(ctx, `rail:${id}`);
-      await assertNoBadText(page, `rail:${id}`);
-      await page.screenshot({ path: `tests/e2e/screenshots/smoke-rail-${id}.png` });
-    }
+    // 2. The current sidebar is intentionally chat-focused. Tool views are
+    // opened from tabs, the profile menu, or the command palette.
+    await expect(page.locator('#sidebar')).toBeVisible();
+    expect(await page.locator('.rail-item[data-nav]').count()).toBe(0);
 
     // 3. Composer popovers (back on chat view) — B4: Temp/Tokens pills deleted,
     // Tune is the single owner. Popovers: Mode, Tools, Tune.
-    await page.locator('.rail-item[data-nav="chat"]').first().click();
+    await page.locator('#mainTab').click();
     await page.waitForTimeout(800);
     for (const btn of ['#modeBtn', '#toolsBtn', '#tuneBtn']) {
       const el = page.locator(btn);
@@ -180,17 +164,16 @@ test.describe('Smoke (required gate)', () => {
     await assertNoBadText(page, 'popovers');
 
     // 4. Settings page
-    const settingsNav = page.locator('.rail-item[data-nav="settings"]').first();
-    if (await settingsNav.count()) {
-      await settingsNav.click();
-      await page.waitForTimeout(1200);
-      assertClean(ctx, 'settings');
-      await assertNoBadText(page, 'settings');
-      await page.screenshot({ path: 'tests/e2e/screenshots/smoke-settings.png' });
-    }
+    await page.locator('#profileSection').click();
+    await page.locator('#preferencesBtn').click();
+    await page.waitForTimeout(1200);
+    assertClean(ctx, 'settings');
+    await assertNoBadText(page, 'settings');
+    await expect(page.getByText('Research & Web')).toBeVisible();
+    await page.screenshot({ path: 'tests/e2e/screenshots/smoke-settings.png' });
 
     // 5. Send one chat message against the mock model
-    await page.locator('.rail-item[data-nav="chat"]').first().click();
+    await page.locator('#mainTab').click();
     await page.waitForTimeout(800);
     // Select the mock model — it MUST exist (SANGAM_MOCK_PROVIDER=1).
     await page.locator('#modelSelectorBtn').click();
@@ -213,7 +196,9 @@ test.describe('Smoke (required gate)', () => {
     await page.screenshot({ path: 'tests/e2e/screenshots/smoke-chat.png' });
 
     // 6. Knowledge graph must load (not stuck, not error)
-    await page.locator('.rail-item[data-nav="knowledge"]').first().click();
+    await page.locator('#mainTab').click();
+    await page.locator('#tabAdd').click();
+    await page.locator('[data-tab-tool="knowledge"]').click();
     await page.waitForTimeout(4000);
     const graphText = await page.evaluate(() => document.body.innerText || '');
     expect(graphText, 'knowledge graph failed to load').not.toContain('Could not load graph');

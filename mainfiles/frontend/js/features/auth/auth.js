@@ -6,6 +6,7 @@ import { getApiBaseUrl, apiFetch, apiPost } from '../../shared/http.js';
 import { showToast, showError } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { STORAGE_KEYS } from '../../shared/constants.js';
+import { openSettings } from '../settings/open.js';
 
 console.log('[Module] auth.js loaded');
 
@@ -173,15 +174,16 @@ export function initProfilePopup() {
     showToast({ type: 'info', message: 'Account settings would open here' });
   }, { signal: sig });
 
-  // Preferences (stub)
+  // Preferences opens the schema-driven Settings page.
   elements.preferencesBtn?.addEventListener('click', () => {
     hideProfilePopup();
-    showToast({ type: 'info', message: 'Preferences would open here' });
+    openSettings();
   }, { signal: sig });
 }
 
 /** Position the popup — above profile section, fully in viewport */
 function positionProfilePopup() {
+  if (!elements.profileSection || !elements.profilePopup) return;
   const rect = elements.profileSection.getBoundingClientRect();
   const popup = elements.profilePopup;
   const gap = 8;
@@ -215,6 +217,7 @@ function positionProfilePopup() {
 
 /** Toggle popup visibility */
 function toggleProfilePopup() {
+  if (!elements.profilePopup) return;
   if (elements.profilePopup.classList.contains('show')) {
     hideProfilePopup();
   } else {
@@ -224,10 +227,12 @@ function toggleProfilePopup() {
 
 /** Show the popup with focus management */
 function showProfilePopup() {
+  if (!elements.profilePopup) return;
   // Save currently focused element to restore later
   _prevFocus = document.activeElement;
   positionProfilePopup();
   elements.profilePopup.classList.add('show');
+  elements.profileSection?.setAttribute('aria-expanded', 'true');
   // Focus first button inside popup
   const firstBtn = elements.profilePopup.querySelector('button');
   if (firstBtn) firstBtn.focus();
@@ -235,6 +240,7 @@ function showProfilePopup() {
 
 /** Hide the popup and restore focus */
 function hideProfilePopup() {
+  elements.profileSection?.setAttribute('aria-expanded', 'false');
   elements.profilePopup.classList.remove('show');
   // Restore focus to the profile section trigger
   if (_prevFocus && _prevFocus !== document.body) {
@@ -368,8 +374,8 @@ export async function initializeAuth() {
  * Set user profile in UI.
  */
 function setProfile(username) {
-  elements.profileName.textContent = username;
-  elements.profileAvatar.textContent = username.slice(0, 1).toUpperCase();
+  if (elements.profileName) elements.profileName.textContent = username;
+  if (elements.profileAvatar) elements.profileAvatar.textContent = username.slice(0, 1).toUpperCase();
 
   // Update popup profile info from cache
   if (elements.profilePopupName) elements.profilePopupName.textContent = username;

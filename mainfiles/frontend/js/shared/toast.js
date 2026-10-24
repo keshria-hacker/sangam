@@ -37,9 +37,12 @@ export function showToast({ type = 'info', title = '', message = '', duration = 
     class: `toast ${type}`,
     dataset: { dedup: dedupKey },
   }, `
-    <i class="fa-solid ${TOAST_ICONS[type] || TOAST_ICONS.info}"></i>
-    <div class="toast-text">${title ? `<strong>${escapeHtml(title)}</strong>` : ''}${message ? ` ${escapeHtml(message)}` : ''}</div>
-    <button class="toast-close" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+    <span class="toast-icon" aria-hidden="true"><i class="fa-solid ${TOAST_ICONS[type] || TOAST_ICONS.info}"></i></span>
+    <div class="toast-text">
+      ${title ? `<strong>${escapeHtml(title)}</strong>` : ''}
+      ${message ? `<span>${escapeHtml(message)}</span>` : ''}
+    </div>
+    <button class="toast-close" type="button" aria-label="Dismiss notification"><i class="fa-solid fa-xmark"></i></button>
     <div class="toast-bar"></div>
   `);
 

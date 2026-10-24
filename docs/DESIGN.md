@@ -14,7 +14,7 @@
 - `--text-tertiary`: Muted text
 - `--border`: Borders
 - `--border-soft`: Subtle borders
-- `--accent`: Primary accent (blue)
+- `--accent`: Primary action accent (amber, theme-aware)
 - `--danger`: Error states (uses `--danger-rgb` for alpha)
 - `--focus-ring`: Focus outline (2px, consistent)
 
@@ -50,9 +50,10 @@
 - `aria-modal="true"`, Escape to close
 
 ### Navigation
-- `.rail-item`: Sidebar nav item (icon + label)
-- `.rail-off`: Disabled state (shows "Turn on")
-- `data-nav`: Navigation identifier
+- `.sidebar`: Chat-focused sidebar with history, search, and New Chat
+- `.chat-item`: Chat history item; collapsed mode renders compact rounded tiles
+- `.rail-item`: Legacy-compatible tool rail hook; currently empty by design
+- `data-nav`: Navigation identifier for future tool entries
 
 ### Tabs
 - `role="tablist"`, `role="tab"`, `aria-selected`
@@ -79,8 +80,9 @@
 - Backend: `/api/voice/*` (FEATURE_VOICE)
 
 ## Layout
-- Intent-grouped rail: Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings
+- Chat-focused sidebar with searchable history and compact collapsed state
 - Main chat is pinned (never closes)
 - Tool tabs for side-by-side work
+- Settings is opened from the profile menu or command palette
 - Right Inspector panel (Ctrl+Shift+I)
 - Activity Tray for background jobs

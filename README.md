@@ -26,7 +26,7 @@ A privacy-first AI workspace for chatting with cloud and local LLMs from a singl
 
 Sangam is an open-source, privacy-first AI chat platform that brings multiple Large Language Models into one unified workspace.
 
-Connect cloud providers such as **OpenAI, Anthropic, Gemini, NVIDIA NIM, Groq, Mistral, DeepSeek, OpenRouter** and more — or run models locally through **Ollama**,**omniroute**.
+Connect cloud providers such as **OpenAI, Anthropic, Gemini, NVIDIA NIM, Groq, Mistral, DeepSeek, OpenRouter** and more — or run models locally through **Ollama** and **OmniRoute**.
 
 Switch models, upload documents, use RAG, search the web, manage provider keys, and keep your conversations in one place.
 
@@ -72,7 +72,7 @@ Sangam chunks documents, generates embeddings, retrieves relevant sections, and 
 
 ### 🌐 Web Search
 
-Augment conversations with live web results using the built-in search integration.
+Augment conversations with live web results using the built-in DuckDuckGo integration, or configure Tavily/Brave for a keyed provider. Web Search can be enabled, disabled, limited to 1–10 sources, and tested from **Settings → Research & Web**.
 
 ### 🧩 Skills
 
@@ -84,7 +84,7 @@ Conversation history is stored locally and organized in a date-based sidebar.
 
 ### 🎨 Customizable Interface
 
-A **Paper / Ink** design system — warm paper whites (PAPER) or deep charcoal (INK), with a restrained monochrome palette. Adjust font size, chat width, code theme, and animations from Settings.
+A **Paper / Ink** design system — warm paper whites (PAPER) or deep charcoal (INK), with a restrained amber action accent. Adjust font size, chat width, code theme, and animations from Settings.
 
 ### 🔐 Privacy Focused
 
@@ -128,7 +128,7 @@ Press Ctrl+P for a quick launcher: new chat, skills, teams, export, theme, and m
 
 ### 🏢 AI Studio Shell
 
-Intent-grouped navigation (Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings). Browser-style tabs for side-by-side work — main chat stays pinned. Right Inspector panel (Ctrl+Shift+I), Activity Tray for background jobs, typed settings with search.
+Chat-focused sidebar with searchable history, compact collapse behavior, browser-style tabs for side-by-side work, and typed settings with search. Studio tools remain available through tabs and the command palette instead of duplicating them in the sidebar. Right Inspector panel (Ctrl+Shift+I) and Activity Tray support background work.
 
 ### 🧠 Knowledge Graph
 
@@ -395,18 +395,18 @@ Run the test suite from the project root:
 venv\Scripts\python.exe -m pytest tests -v
 ```
 
-The test suite lives in a single unified tree at `tests/` (60 files: unit, `integration/`, `e2e/`, `manual/`). As of 2026-10-09: **1148 passed, 1 flaky, 100 skipped**.
+The test suite lives in a single unified tree at `tests/` (71 Python/TypeScript/JavaScript source files across unit, `integration/`, `e2e/`, and `manual/`). Run the suite locally rather than relying on historical pass counts.
 
-Tests cover authentication, document processing + RAG, model discovery, streaming, response intelligence, skills + packs, web search, voice, image generation, multi-agent teams, learning mode, response quality, analytics, knowledge graph, agents, artifacts, automations, and the Phase 6 additions (teams SSE streaming, graph provenance, model compare/Arena, fallback chain).
+Tests cover authentication, document processing + RAG, model discovery, streaming, response intelligence, skills + packs, web search, voice, image generation, multi-agent teams, learning mode, response quality, analytics, knowledge graph, agents, artifacts, automations, and the Phase 6 additions (teams SSE streaming, graph provenance, model compare/Arena, fallback chain). Run the suite locally rather than relying on historical pass counts.
 
-Playwright end-to-end tests (`tests/e2e/golden_paths.spec.ts`) cover 6 golden paths: first run, ask/refine, knowledge, create, agents, settings.
+Playwright end-to-end tests (`tests/e2e/`) cover smoke boot, authentication, composer popovers, Settings, chat, knowledge, and responsive layout flows. They require a test-mode backend and a browser-capable environment.
 
 Frontend modules are validated with:
 
 ```bash
 node --experimental-vm-modules scripts/check_frontend_modules.mjs
 ```
-(all 47 ES modules parse + link)
+(all frontend ES modules should parse and link; the exact count changes as modules are added or removed)
 
 ---
 

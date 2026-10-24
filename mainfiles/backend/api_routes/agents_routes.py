@@ -21,6 +21,9 @@ from .common import router
 ALL_TOOLS = sorted(set(CHAT_AGENT_TOOLS) | set(CODE_AGENT_TOOLS))
 
 
+APPROVAL_POLICIES = {"default", "automatic", "always_ask"}
+
+
 class AgentIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=500)
@@ -28,6 +31,9 @@ class AgentIn(BaseModel):
     model_id: str | None = Field(default=None, max_length=128)
     tool_names: list[str] | None = None
     max_steps: int = Field(default=8, ge=1, le=25)
+    approval_policy: str = Field(default="default", max_length=20)
+    # 0 = no cap; otherwise a rough USD budget applied to each run
+    cost_budget: float = Field(default=0.0, ge=0, le=100)
 
 
 class AgentRunIn(BaseModel):
@@ -47,9 +53,26 @@ def _out(agent: CustomAgent) -> dict:
         "model_id": agent.model_id,
         "tool_names": tools,
         "max_steps": agent.max_steps,
+        "approval_policy": agent.approval_policy or "default",
+        "cost_budget": float(agent.cost_budget or 0.0),
         "created_at": agent.created_at.isoformat() if agent.created_at else None,
         "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
     }
+
+
+def _policy_to_require_approval(policy: str, tool_names: list[str]) -> list[str] | None:
+    """Map a saved approval policy to the engine's require_approval argument.
+
+    - 'default'    -> None (engine gates its sensitive default tools)
+    - 'automatic'  -> [] (no tool requires approval)
+    - 'always_ask' -> the agent's own tool list (every call asks)
+    """
+    p = (policy or "default").strip().lower()
+    if p in ("automatic", "auto", "never"):
+        return []
+    if p in ("always_ask", "ask_all", "always"):
+        return tool_names or list(CHAT_AGENT_TOOLS)
+    return None
 
 
 async def _get_owned(agent_id: str, user_id: str, db: AsyncSession) -> CustomAgent:
@@ -74,6 +97,10 @@ async def list_agents(db: AsyncSession = Depends(get_db),
 async def create_agent(payload: AgentIn, db: AsyncSession = Depends(get_db),
                        current_user=Depends(get_current_user)):
     """Create a custom agent."""
+    policy = (payload.approval_policy or "default").strip().lower()
+    if policy not in APPROVAL_POLICIES:
+        raise HTTPException(status_code=422,
+                            detail=f"approval_policy must be one of {sorted(APPROVAL_POLICIES)}")
     tools = [t for t in (payload.tool_names or []) if t in ALL_TOOLS]
     agent = CustomAgent(
         user_id=current_user.id,
@@ -83,6 +110,8 @@ async def create_agent(payload: AgentIn, db: AsyncSession = Depends(get_db),
         model_id=(payload.model_id or "").strip() or None,
         tool_names=json.dumps(tools),
         max_steps=payload.max_steps,
+        approval_policy=policy,
+        cost_budget=payload.cost_budget,
     )
     db.add(agent)
     await db.commit()
@@ -107,6 +136,12 @@ async def update_agent(agent_id: str, payload: AgentIn, db: AsyncSession = Depen
     agent.model_id = (payload.model_id or "").strip() or None
     agent.tool_names = json.dumps(tools)
     agent.max_steps = payload.max_steps
+    policy = (payload.approval_policy or "default").strip().lower()
+    if policy not in APPROVAL_POLICIES:
+        raise HTTPException(status_code=422,
+                            detail=f"approval_policy must be one of {sorted(APPROVAL_POLICIES)}")
+    agent.approval_policy = policy
+    agent.cost_budget = payload.cost_budget
     await db.commit()
     await db.refresh(agent)
     return _out(agent)
@@ -145,6 +180,10 @@ async def run_custom_agent(agent_id: str, payload: AgentRunIn,
         kwargs = {}
         if agent.system_prompt and agent.system_prompt.strip():
             kwargs["system_prompt"] = agent.system_prompt.strip()
+        # Approval policy + cost budget come from the saved agent config.
+        kwargs["require_approval"] = _policy_to_require_approval(
+            agent.approval_policy, tool_names)
+        kwargs["max_cost_usd"] = float(agent.cost_budget or 0.0)
         async for step in run_agent(task, model_id, db,
                                     tool_names=tool_names,
                                     max_iterations=max_steps,

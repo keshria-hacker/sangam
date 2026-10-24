@@ -12,6 +12,7 @@ import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { PROVIDER_COLORS } from '../../shared/constants.js';
 import { loadProvidersAndModels } from '../models/models.js';
+import { getSetting } from '../../shared/settings_store.js';
 
 console.log('[Module] settings/sections.js loaded');
 
@@ -129,6 +130,56 @@ export async function renderProviderKeysSection(container) {
         btn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
       }
     });
+  });
+}
+
+export function renderWebSearchSection(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-custom-section';
+  wrap.innerHTML = `
+    <h3 class="sp-section-title"><i class="fa-solid fa-globe"></i> Test web search</h3>
+    <div class="sp-section-body">
+      <p class="settings-hint">Try the live search connection without leaving Settings. Results are not saved.</p>
+      <form class="settings-search-test" data-search-form>
+        <input class="provider-key-input" data-search-query type="search"
+          placeholder="Try a current topic…" aria-label="Web search test query">
+        <button class="btn-secondary btn-sm" type="submit" data-search-submit>
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Search
+        </button>
+      </form>
+      <div class="settings-search-results" data-search-results aria-live="polite"></div>
+    </div>`;
+  container.appendChild(wrap);
+
+  const form = wrap.querySelector('[data-search-form]');
+  const input = wrap.querySelector('[data-search-query]');
+  const submit = wrap.querySelector('[data-search-submit]');
+  const results = wrap.querySelector('[data-search-results]');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const query = input.value.trim();
+    if (!query) {
+      input.focus();
+      return;
+    }
+    submit.disabled = true;
+    submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching';
+    results.innerHTML = '<p class="settings-hint">Searching…</p>';
+    try {
+      const response = await apiFetch(`/websearch?q=${encodeURIComponent(query)}&max_results=${getSetting('webSearchMaxResults')}`);
+      const data = await response.json();
+      results.innerHTML = (data.results || []).map((result) => `
+        <a class="settings-search-result" href="${escapeHtml(result.url)}" target="_blank" rel="noopener noreferrer">
+          <strong>${escapeHtml(result.title)}</strong>
+          <span>${escapeHtml(result.snippet || result.url)}</span>
+        </a>`).join('') || '<p class="settings-hint">No results found.</p>';
+    } catch (error) {
+      results.innerHTML = `<p class="settings-hint settings-error-hint">${escapeHtml(error?.message || 'Search failed.')}</p>`;
+    } finally {
+      submit.disabled = false;
+      submit.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i> Search';
+    }
   });
 }
 

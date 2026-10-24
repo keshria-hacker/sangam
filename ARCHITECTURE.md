@@ -38,7 +38,7 @@
 - Extensible Skills system + skill packs
 - Local authentication (scrypt password hashing, login lockout, forgot/reset flow)
 - Ollama auto-detection and auto-start (Sangam launches `ollama serve` in the background if installed but not running)
-- **Studio shell**: intent-grouped rail, browser-style tabs, Inspector panel, Activity Tray
+- **Studio shell**: chat-focused sidebar, browser-style tabs, Inspector panel, Activity Tray
 - **Knowledge graph**: unified graph of memories, docs, code, chats with provenance
 - **Agent Hub**: custom agents with tools, approval policies, cost budgets, run history
 - **Multi-agent Teams**: fan-out/fan-in with SSE streaming per specialist
@@ -156,7 +156,7 @@
 │   ├── history/                # SQLite database (sangam.db)
 │   ├── uploads/                # Uploaded file storage
 │   └── logs/                   # Rotating application logs (loguru)
-├── tests/                      # Unified test tree (60 files: unit, integration/, e2e/, manual/)
+├── tests/                      # Unified test tree (71 source files: unit, integration/, e2e/, manual/)
 │   ├── conftest.py             # Shared fixtures
 │   ├── integration/            # HTTP-level API tests
 │   ├── e2e/                    # Playwright golden paths
@@ -294,23 +294,22 @@ The frontend is a vanilla JS SPA served as static files. There is no build step,
 └──────┴───────────────────────────────────────────────────┘
 ```
 
-The **intent-grouped rail** (left) organizes features by user intent: Home, Chat,
-Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings. The main
-chat tab is pinned and never closes. Tool tabs open side-by-side for stateful
-work. The Inspector (right panel) shows contextual details. The Activity Tray
-(bottom) tracks background jobs.
+The **chat-focused sidebar** (left) provides searchable history, New Chat, profile
+actions, and compact collapsed behavior. The main chat tab is pinned and never
+closes. Tool tabs open side-by-side for stateful work. The Inspector (right panel)
+shows contextual details. The Activity Tray (bottom) tracks background jobs.
 
 ### 4.3 Module Organization
 
 The frontend uses a **feature-based module structure** under `frontend/js/` — each
-feature owns its own DOM, state, and logic. 47 modules total (verified by
+feature owns its own DOM, state, and logic. 49 modules total (verified by
 `scripts/check_frontend_modules.mjs`).
 
 **Core** (`js/core/`):
 | Module | Responsibility |
 |--------|----------------|
 | `state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings, etc. Also `createComputed` / `createSyncedSignal` helpers |
-| `nav.js` | Intent-grouped rail navigation (Home, Chat, Agents, Knowledge, Create, Code, Learn, Library, Insights, Settings) |
+| `nav.js` | Compatibility hook for future tool navigation; the current UI keeps the sidebar focused on chat history |
 | `jobs.js` | Background job tracking for the Activity Tray |
 
 **Shared** (`js/shared/`):
@@ -1001,11 +1000,11 @@ Representative modules:
 | Phase 6: Graph provenance | `test_graph_provenance.py` | Edge provenance, memory wings |
 | Phase 6: Compare + Arena | `test_compare_arena.py` | Parallel compare, leaderboard |
 | Phase 6: Fallback chain | `test_fallback_chain.py` | Circuit breakers, quotas, fallback |
-| E2E (Playwright) | `tests/e2e/golden_paths.spec.ts` | 6 golden paths: first run, ask/refine, knowledge, create, agents, settings |
+| E2E (Playwright) | `tests/e2e/` | Smoke boot, authentication, composer popovers, Settings, chat, knowledge, and responsive layout flows |
 | Other | `test_startup.py`, `test_schemas.py`, `test_skill_registry.py`, `test_skills.py`, `test_executor_coverage.py`, `test_context_manager.py`, `test_prompt_injection_new.py`, `test_ratelimit_redis.py`, `test_main.py`, `test_e2e.py` | Launcher, validation, skills, context truncation, injection detection, Redis limiter |
 
 **Frontend module validation:** `scripts/check_frontend_modules.mjs` parses and links
-all 47 ES modules through V8 (`node --experimental-vm-modules`). This catches
+all 49 ES modules through V8 (`node --experimental-vm-modules`). This catches
 import/export errors that `node --check` misses.
 
 ### 12.2 Running Tests

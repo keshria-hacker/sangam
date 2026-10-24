@@ -85,6 +85,7 @@ async function loadMine(bodyEl) {
         <div class="hub-card-head"><i class="fa-solid fa-robot"></i><strong>${escapeHtml(a.name)}</strong></div>
         <p>${escapeHtml(a.description || 'No description.')}</p>
         <div class="hub-tools">${(a.tool_names || []).map((t) => `<code>${escapeHtml(t)}</code>`).join(' ') || '<span class="settings-hint">no tools</span>'}</div>
+        <div class="settings-hint">${escapeHtml(a.approval_policy || 'default')}${a.cost_budget ? ` · ${Number(a.cost_budget).toFixed(2)} USD budget` : ''}</div>
         <div class="hub-actions">
           <button class="btn-primary btn-sm" data-act="run"><i class="fa-solid fa-play"></i> Run</button>
           <button class="btn-secondary btn-sm" data-act="edit"><i class="fa-solid fa-pen"></i> Edit</button>
@@ -119,7 +120,6 @@ async function loadMine(bodyEl) {
 
 async function openForm(bodyEl, agent) {
   const wrap = bodyEl.querySelector('#hubFormWrap');
-  const models = await getModels();
   const isEdit = !!agent;
   wrap.innerHTML = `
     <form class="hub-form" id="hubForm">
@@ -129,18 +129,33 @@ async function openForm(bodyEl, agent) {
       <label>System prompt<textarea name="system_prompt" rows="4" class="provider-key-input" placeholder="You are a helpful assistant…">${escapeHtml(agent?.system_prompt || '')}</textarea></label>
       <label>Model<select name="model_id" class="provider-key-input">
         <option value="">Default model</option>
-        ${models.map((m) => `<option value="${escapeHtml(m.id)}"${agent?.model_id === m.id ? ' selected' : ''}>${escapeHtml(m.name || m.id)}</option>`).join('')}
       </select></label>
       <fieldset class="hub-tools-field"><legend>Tools</legend>
         ${ALL_TOOLS.map((t) => `
           <label class="popover-check"><input type="checkbox" name="tool" value="${t}"${(agent?.tool_names || []).includes(t) ? ' checked' : ''}> <span>${escapeHtml(t)}</span></label>`).join('')}
       </fieldset>
       <label>Max steps<input type="number" name="max_steps" min="1" max="25" value="${agent?.max_steps || 8}" class="provider-key-input"></label>
+      <label>Approval policy<select name="approval_policy" class="provider-key-input">
+        <option value="default"${agent?.approval_policy === 'default' || !agent ? ' selected' : ''}>Default (ask before file writes / commands)</option>
+        <option value="automatic"${agent?.approval_policy === 'automatic' ? ' selected' : ''}>Automatic (never ask)</option>
+        <option value="always_ask"${agent?.approval_policy === 'always_ask' ? ' selected' : ''}>Always ask (approve every tool)</option>
+      </select></label>
+      <label>Cost budget (USD, 0 = no limit)<input type="number" name="cost_budget" min="0" max="100" step="0.01" value="${agent?.cost_budget || 0}" class="provider-key-input"></label>
       <div class="hub-form-actions">
         <button type="submit" class="btn-primary btn-sm">${isEdit ? 'Save' : 'Create'}</button>
         <button type="button" class="btn-secondary btn-sm" id="hubFormCancel">Cancel</button>
       </div>
     </form>`;
+  // Fill the model list after the form is visible — discovery can be slow or
+  // blocked, and the form must never wait on it to appear.
+  const modelSelect = wrap.querySelector('select[name="model_id"]');
+  getModels().then((models) => {
+    if (!modelSelect?.isConnected || !models.length) return;
+    const current = modelSelect.value || agent?.model_id || '';
+    modelSelect.innerHTML = '<option value="">Default model</option>' + models.map((m) =>
+      `<option value="${escapeHtml(m.id)}"${current === m.id ? ' selected' : ''}>${escapeHtml(m.name || m.id)}</option>`).join('');
+  }).catch(() => { /* keep Default model only */ });
+
   wrap.querySelector('#hubFormCancel')?.addEventListener('click', () => { wrap.innerHTML = ''; });
   wrap.querySelector('#hubForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -152,6 +167,8 @@ async function openForm(bodyEl, agent) {
       model_id: fd.get('model_id') || null,
       tool_names: fd.getAll('tool'),
       max_steps: parseInt(fd.get('max_steps'), 10) || 8,
+      approval_policy: fd.get('approval_policy') || 'default',
+      cost_budget: parseFloat(fd.get('cost_budget')) || 0,
     };
     try {
       if (isEdit) {

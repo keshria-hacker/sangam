@@ -19,6 +19,7 @@ import {
   resetChatState
 } from '../../core/state.js';
 import { FILE_ICON_MAP } from '../../shared/constants.js';
+import { getSetting } from '../../shared/settings_store.js';
 import {
   buildMessageNode,
   getProviderInfo,
@@ -398,6 +399,7 @@ export async function runGeneration({ content, fileIds, mediaIds, regenerate }) 
     reasoning_effort: getReasoningEffort() === 'none' ? null : getReasoningEffort(),
     regenerate,
     web_search: getWebSearchEnabled(),
+    web_search_max_results: getSetting('webSearchMaxResults'),
   };
 
   let collected = '';

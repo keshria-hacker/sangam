@@ -37,6 +37,44 @@ export function registerTabRenderer(tool, fn) {
 
 function $(sel) { return document.querySelector(sel); }
 
+function closeTabPicker() {
+  const picker = $('#tabPicker');
+  const addButton = $('#tabAdd');
+  picker?.remove();
+  addButton?.setAttribute('aria-expanded', 'false');
+}
+
+function openTabPicker() {
+  const addButton = $('#tabAdd');
+  if (!addButton) return;
+  if ($('#tabPicker')) {
+    closeTabPicker();
+    return;
+  }
+
+  const picker = document.createElement('div');
+  picker.id = 'tabPicker';
+  picker.className = 'tool-picker-menu tab-picker-menu';
+  picker.setAttribute('role', 'menu');
+  picker.innerHTML = Object.entries(TOOL_DEFS).map(([tool, def]) => `
+    <button type="button" role="menuitem" data-tab-tool="${tool}">
+      <i class="fa-solid ${def.icon}" aria-hidden="true"></i><span>${def.title}</span>
+    </button>
+  `).join('');
+
+  document.body.appendChild(picker);
+  const buttonRect = addButton.getBoundingClientRect();
+  picker.style.top = `${buttonRect.bottom + 6}px`;
+  picker.style.left = `${Math.max(12, buttonRect.right - 190)}px`;
+  addButton.setAttribute('aria-expanded', 'true');
+  picker.querySelectorAll('[data-tab-tool]').forEach((button) => {
+    button.addEventListener('click', () => {
+      openToolTab(button.dataset.tabTool, { newTab: true });
+      closeTabPicker();
+    });
+  });
+}
+
 async function getFeatures() {
   if (featureCache) return featureCache;
   try {
@@ -109,17 +147,13 @@ function initTabKeyboard() {
 }
 
 /** Open (or focus) a tool tab. Returns the tab id. */
-export function openToolTab(tool) {
+export function openToolTab(tool, { newTab = false } = {}) {
   const def = TOOL_DEFS[tool];
   if (!def) return null;
-  // Phase 8 B6: cap explicit split-view tabs at 2 (plus pinned main).
-  if (openTabs.length >= 2 && !openTabs.some((t) => t.tool === tool)) {
-    const oldest = openTabs[0];
-    closeTab(oldest.id);
-  }
-  let tab = openTabs.find((t) => t.tool === tool);
+  let tab = newTab ? null : openTabs.find((t) => t.tool === tool);
   if (!tab) {
-    tab = { id: `tool-${tool}`, tool, title: def.title, icon: def.icon, mounted: false };
+    const suffix = newTab ? `-${Date.now()}-${openTabs.length}` : '';
+    tab = { id: `tool-${tool}${suffix}`, tool, title: def.title, icon: def.icon, mounted: false };
     openTabs.push(tab);
   }
   switchTab(tab.id);
@@ -258,6 +292,13 @@ export function initTabs() {
   mainTab?.addEventListener('click', () => switchTab('main'));
   if (mainTab && !mainTab.hasAttribute('tabindex')) mainTab.setAttribute('tabindex', '0');
   initTabKeyboard();
+  $('#tabAdd')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openTabPicker();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#tabAdd, #tabPicker')) closeTabPicker();
+  });
   $('#toolViewClose')?.addEventListener('click', () => {
     // Closing a rail view returns to chat; closing a strip tab closes it.
     if (activeViewTool) switchTab('main');
@@ -265,4 +306,3 @@ export function initTabs() {
   });
   renderTabStrip();
 }
-

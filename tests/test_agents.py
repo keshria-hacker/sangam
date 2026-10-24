@@ -146,6 +146,70 @@ def test_agent_run_validation(tmp_path, monkeypatch):
     assert r.status_code == 404
 
 
+def test_agent_approval_policy_and_budget(tmp_path, monkeypatch):
+    """Approval policy + cost budget persist, validate, and reach the engine."""
+    client = _api_client(tmp_path, monkeypatch)
+    h = _auth_headers(client)
+
+    r = client.post("/api/agents", json={
+        "name": "Gated",
+        "approval_policy": "always_ask",
+        "cost_budget": 0.5,
+    }, headers=h)
+    assert r.status_code == 200, r.text
+    agent = r.json()
+    assert agent["approval_policy"] == "always_ask"
+    assert agent["cost_budget"] == 0.5
+    aid = agent["id"]
+
+    # Invalid policy -> 422
+    r = client.put(f"/api/agents/{aid}", json={
+        "name": "Gated", "approval_policy": "chaos",
+    }, headers=h)
+    assert r.status_code == 422
+
+    # Update policy + budget
+    r = client.put(f"/api/agents/{aid}", json={
+        "name": "Gated", "approval_policy": "automatic", "cost_budget": 2.25,
+    }, headers=h)
+    assert r.status_code == 200
+    assert r.json()["approval_policy"] == "automatic"
+    assert r.json()["cost_budget"] == 2.25
+
+    # Run must pass policy + budget to run_agent
+    import backend.api_routes.agents_routes as ar
+
+    async def fake_run(task, model_id, db, **kwargs):
+        assert kwargs.get("require_approval") == []  # automatic -> no approvals
+        assert kwargs.get("max_cost_usd") == 2.25
+        from backend.code_agent import AgentStep
+        yield AgentStep(kind="done", content="ok")
+        yield AgentStep(kind="end", content="")
+
+    monkeypatch.setattr(ar, "run_agent", fake_run)
+    async def fake_default(db):
+        return "openai::gpt-4o"
+    import backend.llm as llm_mod
+    monkeypatch.setattr(llm_mod, "default_model_id", fake_default)
+
+    r = client.post(f"/api/agents/{aid}/run", json={"task": "go"}, headers=h)
+    assert r.status_code == 200
+    assert '"kind": "done"' in r.text
+
+
+def test_policy_mapping(tmp_path, monkeypatch):
+    """_policy_to_require_approval maps the three saved policies."""
+    from backend.api_routes.agents_routes import _policy_to_require_approval
+
+    assert _policy_to_require_approval("default", ["web_search"]) is None
+    assert _policy_to_require_approval("automatic", []) == []
+    assert _policy_to_require_approval("always_ask", ["web_search", "run_bash"]) == [
+        "web_search", "run_bash"]
+    # Unknown/legacy values fall back to engine defaults
+    assert _policy_to_require_approval("", []) is None
+    assert _policy_to_require_approval("weird", []) is None
+
+
 def test_agent_run_streams_sse(tmp_path, monkeypatch):
     """Run endpoint streams SSE with mocked run_agent."""
     import backend.api_routes.agents_routes as ar

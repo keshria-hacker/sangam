@@ -63,6 +63,7 @@ class ChatStreamRequest(BaseModel):
     max_tokens: int | None = Field(default=None, gt=0, le=128_000, description="Max tokens to generate (1-128k); null = provider default")
     regenerate: bool = False                   # True => resend without re-persisting the user turn
     web_search: bool = False                   # True => augment the prompt with live web results
+    web_search_max_results: int = Field(default=5, ge=1, le=10)
     reasoning_effort: str | None = Field(default=None, description="Reasoning effort: low, medium, high, etc.")
     media_ids: list[str] = Field(default_factory=list, max_length=10, description="Media attachment IDs (image/audio)")
 

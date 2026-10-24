@@ -21,7 +21,7 @@ import { escapeHtml } from '../../shared/utils.js';
 import {
   renderProviderKeysSection, renderOmnirouteSection, renderFeatureTogglesSection,
   renderMemorySection, renderVoiceSection, renderRoutesSection, renderDoctorSection,
-  renderLearnSection, renderInsightsSection, renderQualityPreview, renderPresetsSection,
+  renderPresetsSection, renderWebSearchSection,
 } from './sections.js';
 
 console.log('[Module] settings_page.js loaded');
@@ -191,12 +191,12 @@ function settingRow(def, opts = {}) {
 function refreshRowControl(row, def) {
   const right = row.querySelector('.sp-setting-right');
   const resetBtn = right.querySelector('.sp-reset-btn');
+  const oldControl = right.firstChild;
   const ctrl = buildControl(def, () => {
     row.querySelector('.sp-changed-dot')?.classList.toggle('hidden', !isChanged(def));
   });
   right.insertBefore(ctrl, resetBtn);
-  // remove the old control (first child)
-  right.removeChild(right.firstChild);
+  oldControl?.remove();
 }
 
 /**
@@ -299,6 +299,10 @@ export function renderSettingsPage(bodyEl) {
       }
     } catch (err) {
       console.warn(`[settings] section "${label}" threw`, err);
+      const hint = document.createElement('p');
+      hint.className = 'settings-hint settings-error-hint';
+      hint.textContent = `Couldn't load the ${label} section. ${err?.message || err}`;
+      list.appendChild(hint);
     }
   }
 
@@ -310,16 +314,12 @@ export function renderSettingsPage(bodyEl) {
       safeRender(renderDoctorSection, list, 'doctor');
     } else if (category === 'knowledge') {
       safeRender(renderMemorySection, list, 'memory');
-    } else if (category === 'voice') {
+    } else if (category === 'voice_output') {
       safeRender(renderVoiceSection, list, 'voice');
-    } else if (category === 'workspace') {
+    } else if (category === 'agents') {
       safeRender(renderFeatureTogglesSection, list, 'features');
-    } else if (category === 'learn') {
-      safeRender(renderLearnSection, list, 'learn');
-    } else if (category === 'insights') {
-      safeRender(renderInsightsSection, list, 'insights');
-    } else if (category === 'output') {
-      safeRender(renderQualityPreview, list, 'quality');
+    } else if (category === 'research') {
+      safeRender(renderWebSearchSection, list, 'web search');
     } else if (category === 'general') {
       safeRender(renderPresetsSection, list, 'presets');
     }

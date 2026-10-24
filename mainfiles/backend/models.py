@@ -242,6 +242,12 @@ class CustomAgent(Base):
     model_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     tool_names: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
     max_steps: Mapped[int] = mapped_column(default=8)
+    # 'default'     -> engine default gates (sensitive tools ask)
+    # 'automatic'   -> never ask for approval
+    # 'always_ask'  -> approve every tool call
+    approval_policy: Mapped[str] = mapped_column(String(20), default="default")
+    # 0 = no limit; otherwise a rough USD budget for each run of this agent
+    cost_budget: Mapped[float] = mapped_column(default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC)

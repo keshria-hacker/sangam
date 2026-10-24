@@ -284,7 +284,10 @@ def create_app() -> FastAPI:
 
     # Foundation F6: versioned API aliases. /api/v1/* mirrors /api/* so future
     # breaking changes can ship under /api/v2 while clients migrate.
-    api_v1 = f"/api/{settings.API_VERSION}"
+    # Mock-safe: when settings is a test double (MagicMock), degrade to the
+    # default version instead of leaking mock objects into route prefixes.
+    _api_version = getattr(settings, "API_VERSION", "v1")
+    api_v1 = f"/api/{_api_version if isinstance(_api_version, str) and _api_version.strip() and not _api_version.startswith('<') else 'v1'}"
     app.include_router(public_router, prefix=api_v1)
     app.include_router(auth_router, prefix=api_v1)
     app.include_router(api_router, prefix=api_v1, dependencies=[Depends(get_current_user)])
