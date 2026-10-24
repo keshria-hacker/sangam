@@ -76,7 +76,7 @@ Augment conversations with live web results using the built-in DuckDuckGo integr
 
 ### 🧩 Skills
 
-Reusable AI workflows for tasks such as debugging, API design, coding review, and web-assisted research.
+Reusable AI workflows for tasks such as debugging, API design, coding review, and web-assisted research. Skills auto-fire inside the agent loop by trigger matching (no model call), and skill scripts run sandboxed behind the same approval gate as the code agent. Installs are SHA-256-verified with a lockfile (a mismatch blocks execution), a server-side scan flags supply-chain and prompt-injection risks, and per-skill checks validate frontmatter, links, script syntax, and deterministic evals. Stack-aware recommendations scan your workspace (package.json, pyproject.toml, Cargo.toml, and friends) and suggest the skills that fit.
 
 ### 💬 Persistent Conversations
 
@@ -92,7 +92,7 @@ Local authentication, encrypted provider keys, secure password hashing, and loca
 
 ### 🧠 Memory++
 
-Typed long-term memory (episodic, semantic, procedural) with importance-ranked recall, automatic extraction from conversations, and consolidation — managed from Settings.
+Typed long-term memory (episodic, semantic, procedural) with importance-ranked recall, automatic extraction from conversations, and consolidation — managed from Knowledge and Settings. See Memory V2 below for entities, timelines, transcripts, and notebooks.
 
 ### 🎙️ Voice
 
@@ -100,11 +100,11 @@ Local-first text-to-speech and speech-to-text with pluggable engines (Kokoro, fa
 
 ### 🎨 Image Generation
 
-Fooocus-inspired style presets with pluggable engines (OpenAI-compatible image APIs, experimental local Fooocus). Generate images from the composer and attach them to chats.
+Fooocus-inspired style presets with pluggable engines (OpenAI-compatible image APIs, experimental local Fooocus). Generate images from the composer and attach them to chats. Image Operations below adds vary, upscale, inpaint/outpaint, image-prompt, and describe.
 
 ### 📦 Skill Packs
 
-Curated skill bundles — spec-driven development workflows, Mermaid architecture diagramming, science research essentials, and agent-loop discipline. Enable/disable packs from the Skills browser.
+Curated skill bundles — spec-driven development workflows, Mermaid architecture diagramming, science research essentials, agent-loop discipline, plus an engineering pack (grill, to-spec, to-tickets, implement, TDD, code-review, handoff, retro) and a document-creation pack (docx, pdf, pptx, xlsx via deterministic stdlib scripts). Enable/disable packs from the Skills browser; packs can be version-pinned, and installs offer a dry-run preview that writes nothing.
 
 ### 👥 Multi-Agent Teams
 
@@ -116,7 +116,7 @@ Interactive classroom: a teacher agent delivers structured, research-first lesso
 
 ### ✨ Response Quality
 
-Optional AI-slop cleanup and ADHD-friendly formatting (answer-first, scannable) applied safely at persistence time.
+One writing pipeline with three independent controls: an offline grammar/spell/repetition lint (deterministic rules, never silent autocorrect), AI-slop cleanup in two modes — Detect (names the pattern and quotes the line, text unchanged) and Edit (minimum edit plus a "What changed" list, 30+ patterns) — and ADHD-friendly post-processing that strips throat-clearing openers, reflows long paragraphs, and caps lists at 5 items with a "+N more" note. The ADHD prompt-level style (action-first, numbered steps, single next step, minute estimates) is available as a style block, not yet wired into live chat. Quality transforms run at persistence time, never on the live stream.
 
 ### 📊 Usage Analytics
 
@@ -126,9 +126,9 @@ Opt-in, local-first analytics dashboard — your usage stays on your server, nev
 
 Press Ctrl+P for a quick launcher: new chat, skills, teams, export, theme, and more. Export any chat as Markdown.
 
-### 🏢 AI Studio Shell
+### 🏢 Consolidated Workspace
 
-Chat-focused sidebar with searchable history, compact collapse behavior, browser-style tabs for side-by-side work, and typed settings with search. Studio tools remain available through tabs and the command palette instead of duplicating them in the sidebar. Right Inspector panel (Ctrl+Shift+I) and Activity Tray support background work.
+One pinned Chat tab (the only chat, never closing) plus six destinations in the sidebar: **Home** (status, setup, doctor), **Work** (agents, code, workflows, activity feed, security, engineering pipeline), **Create** (documents, diagrams, images, media jobs, voice, design), **Knowledge** (documents, memory, study, notebooks, graph), **Library** (skills, packs, documents), and **Settings** at the bottom. Older tool tabs resolve as sections inside these destinations, so nothing is orphaned and nothing is duplicated. Every empty view carries exactly one clear next action. A guided first-run setup in Chat walks through a cloud key, local Ollama, or look-around-first, and tests the key before the first chat.
 
 ### 🧠 Knowledge Graph
 
@@ -161,6 +161,38 @@ OpenHands-style agentic coding: write_file, edit_file, run_bash tools, SSE strea
 ### 🎨 Design Studio
 
 Generate UI prototypes from prompts. Sandboxed iframe preview, refine iteratively, download as HTML.
+
+### 🛡️ Security Workspace (own systems only)
+
+Guardrails first: a target allowlist, per-run approval naming target, scope, and tool class, Docker-isolated execution where available (with an explicit workspace-confinement warning where Docker is absent, never silent), and a full audit log mirrored to the Runs store. The workspace runs Recon → Vuln-hunter → Validator → Reporter, stores CVSS findings, supports patch-diff review, and gates reports on every included finding being validated PASS. A curated tool catalog is data-only (pinned, SHA-256-verified installers; high-risk tools disabled by default) — nothing installs or runs a catalog tool automatically, and v1 execution is passive recon only. A browser agent runs in two separately gated modes (automation vs security-test) with an isolated profile and action/screenshot logging. No DDoS, RAT, phishing, brute-force, wireless, session-hijack, backdoor, WAF/CAPTCHA-bypass, or third-party-target tooling — ever.
+
+### 🔀 Workflow Canvas
+
+Visual DAG canvas on the existing workflow engine (cycle detection, timeouts, retries, dead letters, idempotency, replay). Nodes include LLM, agent, tool (read-only web_search/code_map only), restricted code expressions (no imports, no attribute access, no arbitrary execution), condition, loop, crawl (same-host, SSRF-guarded), schema-extract, and prompt-transform, plus run-if gating. Nodes drag, connect, save, and colour by last-run result.
+
+### 🧠 Memory V2 + Research Notebooks
+
+Beyond typed memories: LLM fact extraction (defensive parsing — unparseable output yields nothing, never invented facts), an entity + temporal graph with validity windows (a new value for the same subject/predicate closes the old row instead of overwriting it), verbatim transcript storage with no length cap, a memory-update API, and a reflect operation that synthesizes observations with evidence IDs and stores them as semantic memories. Notebooks group sources (files, URLs, notes, chats) with per-source context control (excluded / summary / full), saved transformations, notes-from-chat, and [[wiki-links]] with backlinks. LLM extraction is endpoint-only in v1, not wired into the chat loop; summary fallbacks are labelled extractive.
+
+### 🏗️ Engineering Pipeline
+
+An enforced grill → brainstorm → design → plan → subagent → review-spec → review-quality → finish pipeline. Stages advance only in order, reviews must reference their prerequisite artifacts, and finishing requires both reviews to pass. The subagent stage runs a linked team run when a model is configured, otherwise records a marked handoff brief — never fabricated output.
+
+### 📱 LAN Pairing
+
+Stay single-user and still use Sangam from your phone over Wi-Fi. Settings → Devices → Pair shows a QR code or 6-digit code (5-minute, single-use, rate-limited) plus mandatory host approval — the code alone is never enough. Each device gets its own Bearer token (SHA-256-hashed server-side, 90-day expiry, revocable per device, revoke-all). TLS with a host-generated self-signed certificate is the default (fingerprint shown next to the QR for manual comparison on first connect); plain HTTP is an explicitly warned opt-in fallback. LAN mode is opt-in and off by default, the server must run with `--host 0.0.0.0`, and the Devices screen states the threat model plainly: what is protected (code guessing/replay, same-Wi-Fi strangers, passive eavesdropping in TLS mode, stolen-phone revocation, hashed token storage) and what is not (physical access to the unlocked laptop, a compromised laptop, an approved compromised phone, the HTTP fallback, internet exposure via port-forwarding).
+
+### 🖥️ Model Fit Advisor
+
+Hardware detection (CPU/RAM, VRAM via nvidia-smi or honestly "unknown"), quantization-aware memory maths (GGUF/AWQ/GPTQ/EXL2 weights + KV-cache + overhead), a catalogue of open models with fit scoring and ranked use-case recommendations that label what does not fit on your machine, real tok/s + TTFT benchmarking through the provider stream (local models by default; cloud only with an explicit flag; provider usage when available, otherwise labelled word-count estimates), and Ollama pull/delete management in Settings → Providers.
+
+### 📊 Diagram Catalogue
+
+Thirteen Mermaid templates (flowchart, sequence, class, ER, state, gantt, pie, journey, mindmap, git graph, quadrant, timeline, sankey) with a style guide (one accent color, hairlines, 4px grid) enforced by a lint that checks only what is statically checkable, brand profiles that substitute accent/font, best-effort draw.io and Excalidraw import (unsupported elements become warnings, never invented nodes), and frontend SVG/PNG export.
+
+### 🖼️ Image Operations
+
+Beyond generation: vary, upscale (engine-native, else a labelled local Pillow resize — not AI upscaling), inpaint/outpaint, image-prompt (img2img), and describe (via a vision-capable chat model) on the existing engine abstraction. Unsupported engine operations return a plain error, never a fake image. FaceSwap is excluded.
 
 ---
 
@@ -379,6 +411,7 @@ Security features include:
 - 🛡️ CSRF protection
 - 🚫 Debug mode disabled by default
 - 💾 Local conversation storage
+- 📱 Opt-in LAN pairing with host approval and revocable per-device tokens (SHA-256-hashed server-side); see LAN Pairing above
 
 > **Important:** Sangam is not currently intended to be exposed directly to the public internet without additional production security configuration.
 

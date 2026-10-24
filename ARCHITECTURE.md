@@ -1081,6 +1081,7 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/models/{provider}` | Yes | Per-provider model listing |
 | POST | `/api/models/inaccessible/clear` | Yes | Reset inaccessible-model markers |
 | GET | `/api/analytics/stats` | Yes | Aggregate usage stats (opt-in) |
+| GET | `/api/analytics/summary` | Yes | Quota-view summary: messages (14-day DB count) + tokens/cost (process-lifetime telemetry ledger) |
 | GET | `/api/providers` | Yes | Provider status |
 | GET | `/api/providers/status` | Yes | Circuit breaker + quota states (Phase 6.4d) |
 | GET | `/api/omniroute/status` | Yes | OmniRoute gateway status |
