@@ -1,0 +1,1 @@
+{"script": "scripts/verify_citations.py", "args": [], "expected": "summary: unresolved=0"}

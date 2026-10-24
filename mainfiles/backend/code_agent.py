@@ -423,12 +423,31 @@ async def run_agent(task: str, model_id: str, db: Any,
         logger.warning("skill auto-invocation failed: %s", exc)
         fired_skills = []
     if fired_skills:
-        chunks = []
-        for skill in fired_skills:
-            prompt = _skill_field(skill, "prompt_template", "") or ""
-            chunks.append(f"## {_skill_field(skill, 'name', 'skill')}\n{prompt[:2000]}")
-        system += ("\nAuto-invoked skills (follow when relevant):\n"
-                   + "\n\n".join(chunks))
+        # Deep-read Wave 2 (skills): progressive disclosure under a
+        # per-run budget — descriptions for every fired skill, the body
+        # of only the top-ranked (invoked) skill, lazy references named
+        # but never loaded, and skill scripts NEVER pasted into context
+        # (scripts run only via the approval-gated path; their stdout
+        # returns as a tool observation). User-only skills
+        # (model_invocation=False / invocation=user) never auto-fire.
+        # This block is the ONLY code_agent.py section this wave owns.
+        try:
+            from .skills.registry import (
+                is_model_callable,
+                progressive_injection,
+            )
+            fired_skills = [s for s in fired_skills if is_model_callable(s)]
+            injection = progressive_injection(fired_skills)
+            system += ("\nAuto-invoked skills (follow when relevant):\n"
+                       + injection["text"])
+        except Exception as exc:  # noqa: BLE001 — injection never breaks a run
+            logger.warning("skill injection failed, using descriptions only: %s", exc)
+            chunks = []
+            for skill in fired_skills:
+                desc = _skill_field(skill, "description", "") or ""
+                chunks.append(f"## {_skill_field(skill, 'name', 'skill')}\n{desc[:300]}")
+            system += ("\nAuto-invoked skills (follow when relevant):\n"
+                       + "\n\n".join(chunks))
     if extra_system:
         system += "\n" + extra_system
     messages = [

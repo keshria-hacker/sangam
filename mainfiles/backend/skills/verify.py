@@ -44,6 +44,29 @@ MAX_NAME_LEN = 64
 MAX_DESC_LEN = 1024
 _EVAL_TIMEOUT_S = 15
 
+# ---------------------------------------------------------------------------
+# Deep-read Wave 2: skill authoring contract (anthropics format +
+# mattpocock invocation contract, enforced in code, not prose).
+# ---------------------------------------------------------------------------
+# Closed frontmatter: only these keys may appear in SKILL.md frontmatter.
+# Unknown keys fail the "frontmatter-keys" check (registry tolerance for
+# unknown keys stays — tolerance at load, strictness at authoring).
+ALLOWED_FRONTMATTER_KEYS = {
+    "id", "name", "description", "category", "invocation",
+    "model_invocation", "disable_model_invocation",
+    "parameters", "tags", "triggers", "dependencies",
+    "source_repo", "version", "license", "compatibility", "argument-hint",
+}
+# Anthropic guidance: SKILL.md under 500 lines; deeper material goes to
+# references/ and is lazy-loaded, never pasted into the body.
+MAX_SKILL_MD_LINES = 500
+# AST-banned calls in skill scripts: code execution / unsafe
+# deserialization primitives that must never ship in a skill script.
+_BANNED_BUILTINS = {"eval", "exec"}
+_BANNED_ATTRS = {("os", "system"), ("os", "popen"),
+                 ("pickle", "load"), ("pickle", "loads"),
+                 ("marshal", "loads")}
+
 
 # ------------------------------------------------------------------ lookup
 def _frontmatter_id_name(skill_md: Path) -> tuple[str | None, str | None]:
@@ -310,7 +333,12 @@ def run_skill_checks(skill_dir: Path) -> dict:
     # Script parse checks (no execution).
     scripts_dir = skill_dir / "scripts"
     script_files = sorted(scripts_dir.rglob("*")) if scripts_dir.exists() else []
-    script_files = [p for p in script_files if p.is_file()]
+    # Compiled bytecode is a build artifact, not a script: py_compile
+    # creates scripts/__pycache__/ on the parse check itself, so it must
+    # be excluded or every second check run fails spuriously.
+    script_files = [p for p in script_files
+                    if p.is_file() and "__pycache__" not in p.parts
+                    and p.suffix != ".pyc"]
     if not script_files:
         add("scripts-parse", "skipped", "no scripts/ dir")
     else:
@@ -359,8 +387,134 @@ def run_skill_checks(skill_dir: Path) -> dict:
             except (ValueError, KeyError, subprocess.TimeoutExpired) as exc:
                 add(f"eval:{case_file.stem}", "failed", str(exc))
 
+    # -- Deep-read Wave 2 authoring contract checks -------------------
+    # Closed frontmatter.
+    unknown = sorted(set(data) - ALLOWED_FRONTMATTER_KEYS)
+    if unknown:
+        add("frontmatter-keys", "failed",
+            "unknown frontmatter keys: " + ", ".join(unknown))
+    else:
+        add("frontmatter-keys", "passed")
+    # 500-line SKILL.md cap (total file lines, frontmatter included).
+    try:
+        total_lines = len(parsed["text"].splitlines())
+    except (OSError, AttributeError):
+        total_lines = 0
+    if total_lines > MAX_SKILL_MD_LINES:
+        add("skill-md-lines", "failed",
+            f"SKILL.md is {total_lines} lines (max {MAX_SKILL_MD_LINES}); "
+            "move depth to references/ and lazy-load it")
+    else:
+        add("skill-md-lines", "passed")
+    # Path-existence: bare references/scripts/assets mentions in the
+    # body (outside markdown links, which the links check covers) must
+    # resolve inside the skill dir.
+    missing_paths = []
+    for target in re.findall(r"(?:references|scripts|assets)/[^\s)'\"`]+", body):
+        target = target.rstrip(".,;:")
+        resolved = (skill_dir / target).resolve()
+        root = skill_dir.resolve()
+        if root not in resolved.parents and resolved != root:
+            missing_paths.append(f"{target} (escapes skill dir)")
+        elif not resolved.exists():
+            missing_paths.append(target)
+    if missing_paths:
+        add("referenced-paths", "failed",
+            "missing paths: " + ", ".join(sorted(set(missing_paths))))
+    else:
+        add("referenced-paths", "passed")
+    # Banned-call AST scan over .py scripts.
+    banned = scan_banned_calls(skill_dir)
+    if banned:
+        add("banned-calls", "failed",
+            "; ".join(f"{b['file']}:{b['line']} {b['call']}" for b in banned))
+    else:
+        add("banned-calls", "passed")
+    # Scripts-must-have-tests: every script must be covered by at least
+    # one evals/*.json case (script field) or a tests/ file naming it.
+    scripts_dir = skill_dir / "scripts"
+    script_files = sorted(scripts_dir.rglob("*")) if scripts_dir.exists() else []
+    # Compiled bytecode is a build artifact, not a script: py_compile
+    # creates scripts/__pycache__/ on the parse check itself, so it must
+    # be excluded or every second check run fails spuriously.
+    script_files = [p for p in script_files
+                    if p.is_file() and "__pycache__" not in p.parts
+                    and p.suffix != ".pyc"]
+    if not script_files:
+        add("scripts-tests", "skipped", "no scripts/ dir")
+    else:
+        covered: set[str] = set()
+        evals_dir = skill_dir / "evals"
+        if evals_dir.exists():
+            for case_file in evals_dir.glob("*.json"):
+                try:
+                    case = json.loads(case_file.read_text(encoding="utf-8"))
+                    covered.add(Path(str(case.get("script", ""))).name)
+                except (OSError, ValueError):
+                    continue
+        tests_dir = skill_dir / "tests"
+        if tests_dir.exists():
+            test_text = ""
+            for t in tests_dir.rglob("*"):
+                if t.is_file():
+                    try:
+                        test_text += t.read_text(encoding="utf-8", errors="ignore")
+                    except OSError:
+                        continue
+            for p in script_files:
+                if p.name in test_text:
+                    covered.add(p.name)
+        uncovered = [p.name for p in script_files if p.name not in covered]
+        if uncovered:
+            add("scripts-tests", "failed",
+                "scripts without eval/test coverage: " + ", ".join(uncovered))
+        else:
+            add("scripts-tests", "passed")
+
     passed = sum(1 for c in checks if c["status"] == "passed")
     failed = sum(1 for c in checks if c["status"] == "failed")
     skipped = sum(1 for c in checks if c["status"] == "skipped")
     return {"skill": skill_dir.name, "checks": checks,
             "passed": passed, "failed": failed, "skipped": skipped}
+
+
+def scan_banned_calls(skill_dir: Path) -> list[dict]:
+    """AST scan of .py scripts for banned calls.
+
+    Flags eval/exec, os.system/os.popen, pickle/marshal loads, and any
+    subprocess call with shell=True. Returns [{file, line, call}].
+    Unparsable files are left to the scripts-parse check.
+    """
+    import ast
+
+    findings: list[dict] = []
+    scripts_dir = Path(skill_dir) / "scripts"
+    if not scripts_dir.exists():
+        return findings
+    for path in sorted(scripts_dir.rglob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                call_name = ""
+                if isinstance(func, ast.Name):
+                    call_name = func.id
+                    if call_name in _BANNED_BUILTINS:
+                        findings.append({"file": path.name, "line": node.lineno,
+                                         "call": call_name})
+                elif isinstance(func, ast.Attribute):
+                    base = func.value
+                    base_name = base.id if isinstance(base, ast.Name) else ""
+                    call_name = f"{base_name}.{func.attr}"
+                    if (base_name, func.attr) in _BANNED_ATTRS:
+                        findings.append({"file": path.name, "line": node.lineno,
+                                         "call": call_name})
+                    elif base_name == "subprocess" and any(
+                            kw.arg == "shell" and getattr(kw.value, "value", None) is True
+                            for kw in node.keywords):
+                        findings.append({"file": path.name, "line": node.lineno,
+                                         "call": "subprocess shell=True"})
+    return findings

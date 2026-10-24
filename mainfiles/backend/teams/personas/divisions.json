@@ -1,0 +1,32 @@
+{
+  "engineering": {
+    "label": "Engineering",
+    "icon": "\ud83d\udee0\ufe0f",
+    "color": "#3b82f6"
+  },
+  "research": {
+    "label": "Research",
+    "icon": "\ud83d\udd0e",
+    "color": "#10b981"
+  },
+  "writing": {
+    "label": "Writing",
+    "icon": "\u270d\ufe0f",
+    "color": "#f59e0b"
+  },
+  "product": {
+    "label": "Product",
+    "icon": "\ud83e\udded",
+    "color": "#8b5cf6"
+  },
+  "design": {
+    "label": "Design",
+    "icon": "\ud83c\udfa8",
+    "color": "#ec4899"
+  },
+  "data": {
+    "label": "Data",
+    "icon": "\ud83d\udcca",
+    "color": "#06b6d4"
+  }
+}
