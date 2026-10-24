@@ -302,7 +302,7 @@ shows contextual details. The Activity Tray (bottom) tracks background jobs.
 ### 4.3 Module Organization
 
 The frontend uses a **feature-based module structure** under `frontend/js/` — each
-feature owns its own DOM, state, and logic. 49 modules total (verified by
+feature owns its own DOM, state, and logic. 50 modules total (verified by
 `scripts/check_frontend_modules.mjs`).
 
 **Core** (`js/core/`):
@@ -1004,7 +1004,7 @@ Representative modules:
 | Other | `test_startup.py`, `test_schemas.py`, `test_skill_registry.py`, `test_skills.py`, `test_executor_coverage.py`, `test_context_manager.py`, `test_prompt_injection_new.py`, `test_ratelimit_redis.py`, `test_main.py`, `test_e2e.py` | Launcher, validation, skills, context truncation, injection detection, Redis limiter |
 
 **Frontend module validation:** `scripts/check_frontend_modules.mjs` parses and links
-all 49 ES modules through V8 (`node --experimental-vm-modules`). This catches
+all 50 ES modules through V8 (`node --experimental-vm-modules`). This catches
 import/export errors that `node --check` misses.
 
 ### 12.2 Running Tests
@@ -1132,6 +1132,7 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/teams/stop-agent` | Yes | Stop one specialist mid-stream |
 | GET | `/api/runs` | Yes | Agent run history |
 | POST | `/api/runs` | Yes | Record a completed agent run |
+| GET | `/api/runs/live` | Yes | Live run plane (Phase 1 Runs centre) |
 | GET | `/api/runs/{run_id}` | Yes | Run detail with steps |
 | GET | `/api/artifacts` | Yes | List artifacts (Phase 4) |
 | POST | `/api/artifacts` | Yes | Create artifact |
@@ -1139,6 +1140,9 @@ WEB_SEARCH_MAX_RESULTS=5
 | PUT | `/api/artifacts/{id}` | Yes | Update artifact (new version) |
 | DELETE | `/api/artifacts/{id}` | Yes | Delete artifact |
 | GET | `/api/artifacts/{id}/versions` | Yes | Version history |
+| POST | `/api/artifacts/{id}/signed-url` | Yes | Signed download URL, 15 min (Phase 1) |
+| GET | `/api/artifacts/download` | No | Signed-token download, no session (Phase 1) |
+| POST | `/api/artifacts/retention/prune` | Yes | Delete stale artifacts, explicit only (Phase 1) |
 | POST | `/api/spec/build` | Yes | Build spec from prompt (Phase 4) |
 | POST | `/api/spec/to-task` | Yes | Convert spec to task |
 | POST | `/api/quality/preview` | Yes | Preview quality cleanup diff |

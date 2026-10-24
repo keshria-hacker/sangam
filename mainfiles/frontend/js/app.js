@@ -469,6 +469,10 @@ async function init() {
     const { renderCodePage } = await import('./features/code-agent/code-agent.js');
     renderCodePage(bodyEl);
   });
+  registerTabRenderer('runs', async (bodyEl) => {
+    const { renderRunsTab } = await import('./features/runs/runs.js');
+    renderRunsTab(bodyEl);
+  });
 
 
   // Initialize auth flow (this will call startApplication on success)

@@ -101,6 +101,22 @@ async def list_runs(db: AsyncSession = Depends(get_db),
     return {"runs": items, "pagination": paginate(items, total, params)["pagination"]}
 
 
+@router.get("/runs/live")
+async def list_live_runs(user=Depends(get_current_user),
+                         limit: int = 50):
+    """Phase 1 Runs centre: live run plane for the caller.
+
+    Returns RunStore records (in-flight + mirrored completed runs)
+    for this owner, newest first, with a pagination block. This route
+    must stay above /runs/{run_id} or "live" would match as a run id.
+    """
+    params = PaginationParams(limit=limit, offset=0)
+    records = sorted(run_store.list_for_owner(user.id),
+                     key=lambda r: r.updated_at, reverse=True)
+    items = [r.to_dict() for r in records[:params.limit]]
+    return {"runs": items, "pagination": paginate(items, len(records), params)["pagination"]}
+
+
 @router.get("/runs/{run_id}")
 async def get_run(run_id: str, db: AsyncSession = Depends(get_db),
                   user=Depends(get_current_user)):

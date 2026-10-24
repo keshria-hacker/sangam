@@ -53,6 +53,10 @@ function buildActions() {
     id: 'compare', label: 'Compare models',
     run: () => import('../tabs/tabs.js').then((m) => m.showToolSub('agents', 'data-agentsub', 'compare')),
   });
+  actions.push({
+    id: 'runs', label: 'Open Runs centre',
+    run: () => import('../tabs/tabs.js').then((m) => m.showTool('runs')),
+  });
   if (flags.learning) {
     actions.push({
       id: 'learn', label: 'Open Learn mode',

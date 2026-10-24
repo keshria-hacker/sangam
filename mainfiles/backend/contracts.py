@@ -452,3 +452,53 @@ class LocalArtifactStore(ArtifactStore):
 
 def utcnow_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+# --------------------------------------------- signed artifact downloads
+# Phase 1: a signed URL lets an artifact be downloaded through a single
+# bearer token (no session needed) for a short window. The token binds
+# artifact id + owner id + expiry and is HMAC-signed; verification is
+# constant-time and rejects expired or tampered tokens. The signing
+# secret is MASTER_KEY when set, otherwise a process-local secret
+# (tokens then invalidate on restart — acceptable for 15-minute URLs).
+
+import base64
+import hashlib
+import hmac as _hmac
+import json as _json
+import secrets as _secrets
+
+_FALLBACK_SIGNING_SECRET = _secrets.token_hex(32)
+
+
+def signing_secret(master_key: str | None) -> str:
+    return master_key or _FALLBACK_SIGNING_SECRET
+
+
+def sign_artifact_token(artifact_id: str, owner_id: str, secret: str,
+                        expires_in_seconds: int = 900) -> str:
+    payload = {
+        "artifact_id": artifact_id,
+        "owner_id": owner_id,
+        "exp": int(time.time()) + int(expires_in_seconds),
+    }
+    body = base64.urlsafe_b64encode(_json.dumps(payload, sort_keys=True).encode()).decode().rstrip("=")
+    sig = _hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
+
+
+def verify_artifact_token(token: str, secret: str) -> dict[str, Any] | None:
+    """Return the token payload if valid and unexpired, else None."""
+    try:
+        body, sig = token.rsplit(".", 1)
+        expected = _hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
+        if not _hmac.compare_digest(expected, sig):
+            return None
+        payload = _json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+        if int(payload["exp"]) < int(time.time()):
+            return None
+        if not payload.get("artifact_id") or not payload.get("owner_id"):
+            return None
+        return payload
+    except Exception:
+        return None
