@@ -67,3 +67,30 @@ def extract_from_turn_background(
     except RuntimeError:
         return
     loop.create_task(extract_from_turn(user_text, chat_id=chat_id, user_id=user_id))
+
+
+def extract_from_turn_llm_background(
+    messages: list, assistant_text: str = "", chat_id: str = "", user_id: str = ""
+) -> None:
+    """Fire-and-forget LLM extraction for the chat pipeline.
+
+    Deep-memory wiring: runs AFTER the response has streamed (the
+    caller invokes this post-response), in background, gated by the
+    same ``memoryAutoExtract`` setting as the heuristic path. The
+    coroutine opens its own DB session, so it never depends on the
+    chat stream's session still being alive. Returns immediately —
+    the LLM call happens on the task, never on the reply path. If no
+    model is configured the task saves nothing and the heuristic
+    extraction (run alongside) stays the fallback.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    from .extract_llm import extract_chat_memories_llm
+
+    loop.create_task(
+        extract_chat_memories_llm(
+            messages, assistant_text=assistant_text, chat_id=chat_id, user_id=user_id
+        )
+    )

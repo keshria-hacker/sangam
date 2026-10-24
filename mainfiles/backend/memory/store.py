@@ -49,6 +49,7 @@ async def save_memory(
     importance: float | None = None,
     room: str = "default",
     drawer: str = "general",
+    linked_memory_ids: list[str] | None = None,
 ) -> MemoryRecord | None:
     """Persist one memory record. Returns the record, or None on failure."""
     try:
@@ -66,6 +67,7 @@ async def save_memory(
             importance=importance if importance is not None else 0.4,
             room=room,
             drawer=drawer,
+            linked_memory_ids=list(linked_memory_ids or []),
         )
         col = _get_collection()
         col.add(

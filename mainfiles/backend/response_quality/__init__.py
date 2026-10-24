@@ -7,7 +7,12 @@ alongside the confidence hedge in response_postprocessor.
 """
 from __future__ import annotations
 
-from .adhd import adhd_format, adhd_style_text
+from .adhd import (
+    adhd_format,
+    adhd_style_enabled,
+    adhd_style_text,
+    apply_adhd_style_to_messages,
+)
 from .slop import detect_slop, remove_slop, remove_slop_with_changes
 
 
@@ -48,7 +53,9 @@ def register_quality_extension() -> bool:
 
 __all__ = [
     "adhd_format",
+    "adhd_style_enabled",
     "adhd_style_text",
+    "apply_adhd_style_to_messages",
     "apply_quality",
     "detect_slop",
     "register_quality_extension",

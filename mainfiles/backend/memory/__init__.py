@@ -12,9 +12,18 @@ Public surface (all never-raise by contract):
 from __future__ import annotations
 
 from .consolidation import consolidate
-from .extract import extract_from_turn, extract_from_turn_background
+from .extract import (
+    extract_from_turn,
+    extract_from_turn_background,
+    extract_from_turn_llm_background,
+)
+from .extract_llm import (
+    build_additive_prompt,
+    extract_chat_memories_llm,
+    parse_additive_extraction,
+)
 from .models import MemoryKind, MemoryRecord
-from .retrieval import find_near_duplicate, recall, retrieve_memories
+from .retrieval import entity_boosts, find_near_duplicate, graph_entity_names, recall, retrieve_memories
 from .scoring import rank_score
 from .store import (
     COLLECTION_NAME,
@@ -55,10 +64,16 @@ __all__ = [
     "COLLECTION_NAME",
     "MemoryKind",
     "MemoryRecord",
+    "build_additive_prompt",
     "consolidate",
     "delete_memory",
+    "entity_boosts",
+    "extract_chat_memories_llm",
     "extract_from_turn",
     "extract_from_turn_background",
+    "extract_from_turn_llm_background",
+    "graph_entity_names",
+    "parse_additive_extraction",
     "find_near_duplicate",
     "get_memory",
     "list_memories",

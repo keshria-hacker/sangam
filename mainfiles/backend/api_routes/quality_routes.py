@@ -11,10 +11,11 @@ existing callers do not break:
 POST /quality/lint — offline deterministic lint (writing_lint.py);
   returns {issues} and never rewrites.
 GET /quality/adhd-style — the prompt-level ADHD style block. Honest
-  status: wired=false. Wiring it into chat's system-prompt assembly
-  would mean editing chat_stream_routes.py, which this batch does not
-  touch; the endpoint + documentation are the deliverable, the wiring
-  is deferred. Never claim otherwise.
+  status (deep-memory wiring): wired=true — chat_stream_routes.py
+  injects this block into the chat system prompt when the user's
+  ``adhdFriendly`` setting is on, and leaves the prompt unchanged
+  when it is off. The post-hoc adhdFriendly formatting toggle is
+  separate and also works.
 """
 import difflib
 
@@ -87,12 +88,13 @@ async def get_adhd_style(user=Depends(get_current_user)):
     """Prompt-level ADHD style block + honest wiring status."""
     return {
         "style": adhd_style_text(),
-        "wired_into_chat": False,
+        "wired_into_chat": True,
+        "wired_behind_setting": "adhdFriendly",
         "note": (
-            "Prompt-level style only: this text is NOT yet injected into "
-            "chat system prompts. Wiring it would require editing the chat "
-            "stream pipeline (chat_stream_routes.py) and is deferred. The "
+            "Wired into chat: chat_stream_routes.py prepends this style "
+            "block to the chat system prompt when the user's adhdFriendly "
+            "setting is on; when off, the prompt path is unchanged. The "
             "post-hoc adhdFriendly toggle (opener-strip + reflow + list "
-            "cap) is separate and works today."
+            "cap) is separate and also works."
         ),
     }

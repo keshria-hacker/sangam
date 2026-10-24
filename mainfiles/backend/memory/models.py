@@ -33,6 +33,10 @@ class MemoryRecord:
     # Phase 7: rooms/drawers for browsable hierarchy
     room: str = "default"            # Top-level container (e.g. "work", "personal")
     drawer: str = "general"          # Sub-container within a room
+    # Deep-memory: mem0-style additive extraction links a new memory to
+    # the existing memories it extends (real ids; the extractor prompt
+    # only ever sees small remapped ints, never these ids).
+    linked_memory_ids: list[str] = field(default_factory=list)
     # Retrieval-time only (not persisted):
     similarity: float = 0.0
     score: float = 0.0
@@ -49,6 +53,8 @@ class MemoryRecord:
             "access_count": int(self.access_count),
             "room": self.room,
             "drawer": self.drawer,
+            # Chroma metadata must be scalar: ids ride as a comma string.
+            "linked_memory_ids": ",".join(self.linked_memory_ids)[:1000],
         }
 
     @classmethod
@@ -87,6 +93,10 @@ class MemoryRecord:
             access_count=int(meta.get("access_count", 0) or 0),
             room=str(meta.get("room", "default")),
             drawer=str(meta.get("drawer", "general")),
+            linked_memory_ids=[
+                p.strip() for p in str(meta.get("linked_memory_ids", "")).split(",")
+                if p.strip()
+            ],
         )
         if distance is not None:
             # ChromaDB default space is squared L2; map to a 0..1 similarity.

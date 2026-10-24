@@ -13,8 +13,10 @@ What it does NOT do: it never reorders content, never numbers steps,
 never makes the answer first, never adds time estimates, and never
 restates per-turn state. Those prompt-level behaviours live in
 adhd_style_text() — a system-prompt style block, not a text transform.
-Wiring that block into chat's system prompt is a separate, deferred
-step (see GET /api/quality/adhd-style); do not claim it is wired.
+Deep-memory wiring: that block IS now injected into the chat prompt
+path (chat_stream_routes.py, after memory injection, before context
+truncation) when the user's ``adhdFriendly`` setting is on, via
+``adhd_style_enabled`` + ``apply_adhd_style_to_messages`` below.
 
 Returns (formatted_text, change_count).
 """
@@ -138,14 +140,41 @@ def adhd_format(text: str) -> tuple[str, int]:
     return text, changes
 
 
+def adhd_style_enabled(settings_json: str | None) -> bool:
+    """Is the prompt-level ADHD style on for this user?
+
+    Reads the same ``adhdFriendly`` flag the post-hoc formatting
+    toggle already uses (stored in UserPreference.settings_json).
+    Invalid / missing JSON -> False: when off, nothing changes.
+    """
+    if not settings_json:
+        return False
+    try:
+        import json as _json
+
+        settings = _json.loads(settings_json)
+    except (ValueError, TypeError):
+        return False
+    return bool(settings.get("adhdFriendly", False)) if isinstance(settings, dict) else False
+
+
+def apply_adhd_style_to_messages(messages: list) -> list:
+    """Prepend the ADHD style block as a system message (deep-memory wiring).
+
+    Returns a NEW list; the input is never mutated. Callers insert
+    this into the chat prompt path only when ``adhd_style_enabled``
+    is True — when off, the prompt path is byte-for-byte unchanged.
+    """
+    return [{"role": "system", "content": adhd_style_text()}, *list(messages)]
+
+
 def adhd_style_text() -> str:
     """Prompt-level ADHD style block (ayghri/i-have-adhd, 10 rules).
 
     This is TEXT for a system prompt, not a transform: it tells the model
-    how to write. It is served at GET /api/quality/adhd-style. Wiring it
-    into chat's system-prompt assembly is deferred — the chat stream
-    pipeline lives in chat_stream_routes.py, which this batch does not
-    edit, so nothing here claims the wiring exists.
+    how to write. It is served at GET /api/quality/adhd-style and,
+    when the user's ``adhdFriendly`` setting is on, injected into the
+    chat system prompt by chat_stream_routes.py (deep-memory wiring).
     """
     return (
         "ADHD-friendly style — follow these rules for this reply:\n"

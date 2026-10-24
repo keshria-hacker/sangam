@@ -21,7 +21,11 @@ from ..context_manager import create_context_manager
 from ..database import AsyncSessionLocal, get_db
 from ..domain import ChatMessage
 from ..graph_provenance import clear_current_provenance, get_current_provenance
-from ..memory import extract_from_turn_background, recall
+from ..memory import (
+    extract_from_turn_background,
+    extract_from_turn_llm_background,
+    recall,
+)
 from ..models import Chat, Message, UploadedFile, UserPreference
 from ..rag import TOP_K as RAG_TOP_K
 from ..rag import retrieve_relevant_chunks
@@ -284,7 +288,13 @@ async def chat_stream(  # noqa: PLR0912
     if not payload.regenerate:
         try:
             last_user_content = payload.messages[-1].content
-            records = await recall(last_user_content, top_k=3, exclude_chat_id=chat.id)
+            # Deep-memory: hybrid rerank + entity-graph boost. db /
+            # graph_user_id feed ONLY the boost — they never filter
+            # memories (chat-saved memories carry no user_id).
+            records = await recall(
+                last_user_content, top_k=3, exclude_chat_id=chat.id,
+                db=db, graph_user_id=str(current_user.id),
+            )
             if records:
                 memory_context = "\n".join(f"- {r.content}" for r in records)
                 messages.insert(0, {
@@ -303,6 +313,25 @@ async def chat_stream(  # noqa: PLR0912
                     )
         except Exception as exc:  # noqa: BLE001 — memory must never break chat
             logger.warning("Memory retrieval failed: %s", exc)
+
+    # --- Deep-memory: ADHD prompt style (opt-in) ---
+    # When the user's adhdFriendly setting is on, prepend the ADHD
+    # style block as a system message so the model writes in that
+    # style for this reply. When off, the prompt path is unchanged.
+    # Placed after memory injection and before context truncation so
+    # the block is counted by the token budget like any system msg.
+    try:
+        from ..response_quality.adhd import (
+            adhd_style_enabled,
+            apply_adhd_style_to_messages,
+        )
+
+        _adhd_pref = await db.get(UserPreference, current_user.id)
+        _adhd_settings = _adhd_pref.settings_json if _adhd_pref else None
+        if adhd_style_enabled(_adhd_settings):
+            messages = apply_adhd_style_to_messages(messages)
+    except Exception as exc:  # noqa: BLE001 — style must never break chat
+        logger.warning("ADHD style injection failed: %s", exc)
 
     # --- Phase 9 P0: Safe Context Truncation ---
     # Apply token budgeting and safe context truncation after Phase 6 intelligence injection
@@ -464,10 +493,22 @@ async def chat_stream(  # noqa: PLR0912
                             extract_from_turn_background(
                                 payload.messages[-1].content, chat_id=chat.id
                             )
+                            # Deep-memory: LLM extraction runs in
+                            # background AFTER the response streamed
+                            # (this block runs post-commit, post-stream),
+                            # over both roles with recalled-memory
+                            # context. Heuristic stays the fallback
+                            # when no model is configured.
+                            extract_from_turn_llm_background(
+                                messages, collected, chat_id=chat.id
+                            )
                     except Exception:
                         # On any error, fall back to extracting (conservative).
                         extract_from_turn_background(
                             payload.messages[-1].content, chat_id=chat.id
+                        )
+                        extract_from_turn_llm_background(
+                            messages, collected, chat_id=chat.id
                         )
 
                 # Phase 5: fire-and-forget rolling summarization. Checked every
