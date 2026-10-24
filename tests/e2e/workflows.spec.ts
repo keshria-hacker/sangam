@@ -103,6 +103,13 @@ test('Workflows: create, run, inspect nodes', async ({ page }) => {
   await expect(page.locator('#wfRuns')).toContainText('greet: succeeded', { timeout: 20000 });
   await expect(page.locator('#wfRuns')).toContainText('shout: succeeded', { timeout: 20000 });
 
+  // Batch 3: canvas opens for the same workflow, shows both nodes, saves.
+  await row.locator('.wf-canvas-btn').click();
+  await expect(page.locator('#wfCanvasArea [data-node="greet"]')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('#wfCanvasArea [data-node="shout"]')).toBeVisible();
+  await page.locator('#wfCanvasSaveBtn').click();
+  await expect(page.locator('#wfCanvasStatus')).toContainText('Saved', { timeout: 20000 });
+
   expect(ctx.badResponses, `HTTP >= 400: ${JSON.stringify(ctx.badResponses)}`).toEqual([]);
   expect(ctx.consoleErrors, `console.error: ${JSON.stringify(ctx.consoleErrors)}`).toEqual([]);
   expect(ctx.pageErrors, `pageerror: ${JSON.stringify(ctx.pageErrors)}`).toEqual([]);

@@ -16,6 +16,15 @@ third-party code execution); the closed node set is:
   (kind from config, default semantic).
 * ``http_fetch`` — fetch a public URL (SSRF-guarded, same guard as
   URL ingestion) and return its stripped text (truncated to 4000 chars).
+* Batch 3 nodes: ``llm`` (model call via the provider stream),
+  ``agent`` (a team run), ``tool`` (read-only web_search/code_map only),
+  ``code`` (restricted expression evaluator — NOT arbitrary code),
+  ``condition`` (branch true/false for downstream ``run_if`` gates),
+  ``loop`` (render a template per list item), ``crawl`` (same-host BFS,
+  SSRF-guarded, capped pages/depth), ``extract`` (regex named groups or
+  JSON path), ``prompt_transform`` (render system/user prompt parts).
+  Any node may carry ``run_if``: a template that must render truthy or
+  the node records ``skipped`` (reason run_if false) without failing.
 
 Guarantees, all unit-tested:
 * Validation: unique node ids, known types, edges only between known
@@ -48,8 +57,19 @@ import uuid
 from datetime import datetime, UTC
 from typing import Any
 
-NODE_TYPES = {"text", "transform", "retrieve", "memory_save", "http_fetch"}
+NODE_TYPES = {"text", "transform", "retrieve", "memory_save", "http_fetch",
+              # Batch 3 node library (engine unchanged: same validation,
+              # timeouts, retries, dead letters, idempotency, replay).
+              "llm", "agent", "tool", "code", "condition", "loop",
+              "crawl", "extract", "prompt_transform"}
 TRANSFORM_OPS = {"upper", "lower", "reverse", "trim", "title"}
+# Tool node allowlist: read-only tools only. Write/execute tools are
+# excluded from workflows by design — a non-interactive run must never
+# silently write files or run shell commands.
+TOOL_NODE_TOOLS = {"web_search", "code_map"}
+CONDITION_OPS = {"==", "!=", ">", "<", ">=", "<=", "contains"}
+SAFE_BUILTINS = {"len": len, "str": str, "int": int, "float": float,
+                 "abs": abs, "min": min, "max": max, "sorted": sorted}
 DEFAULT_TIMEOUT_SECONDS = 30
 MAX_RETRIES = 2
 
@@ -92,6 +112,7 @@ def validate_definition(definition: dict) -> list[str]:
             raise WorkflowError(f"node {node['id']}: timeout_seconds must be 1..300")
         if node["type"] == "transform" and node.get("config", {}).get("op") not in TRANSFORM_OPS:
             raise WorkflowError(f"node {node['id']}: transform op must be one of {sorted(TRANSFORM_OPS)}")
+        _validate_new_node(node)
         seen.add(node["id"])
         by_id[node["id"]] = node
     indegree: dict[str, int] = {nid: 0 for nid in seen}
@@ -130,24 +151,143 @@ def _lookup(path: str, context: dict) -> Any:
     return cur
 
 
-def render_template(template: str, run_input: dict, node_outputs: dict) -> str:
-    """Render ``{{input.x}}`` / ``{{nodes.<id>}}`` placeholders."""
+def render_template(template: str, run_input: dict, node_outputs: dict,
+                    extra: dict | None = None) -> str:
+    """Render ``{{input.x}}`` / ``{{nodes.<id>}}`` placeholders.
+
+    ``extra`` adds top-level names (used by the loop node for
+    ``{{item}}`` / ``{{item_index}}``).
+    """
+    context = {"input": run_input, "nodes": node_outputs, **(extra or {})}
+
     def _replace(match: re.Match) -> str:
-        path = match.group(1)
-        if path.startswith("input."):
-            value = _lookup(path[len("input."):], run_input)
-        elif path.startswith("nodes."):
-            value = _lookup(path[len("nodes."):], node_outputs)
-        else:
-            return ""
+        value = _lookup(match.group(1), context)
         if isinstance(value, (dict, list)):
             return json.dumps(value)
         return str(value) if value is not None else ""
     return _TEMPLATE_RE.sub(_replace, template or "")
 
 
-async def _run_node(node: dict, run_input: dict, node_outputs: dict) -> Any:
-    """Execute one node (no retries/timeout here — the caller wraps)."""
+def _validate_new_node(node: dict) -> None:
+    """Per-type config validation for Batch 3 node types."""
+    ntype, config, nid = node["type"], node.get("config") or {}, node["id"]
+    if ntype == "llm" and not config.get("prompt"):
+        raise WorkflowError(f"node {nid}: llm needs config.prompt")
+    if ntype == "agent" and not config.get("team"):
+        raise WorkflowError(f"node {nid}: agent needs config.team (a team id)")
+    if ntype == "tool" and config.get("tool") not in TOOL_NODE_TOOLS:
+        raise WorkflowError(f"node {nid}: tool must be one of {sorted(TOOL_NODE_TOOLS)}")
+    if ntype == "code" and not config.get("expression"):
+        raise WorkflowError(f"node {nid}: code needs config.expression")
+    if ntype == "condition":
+        if config.get("op") not in CONDITION_OPS:
+            raise WorkflowError(f"node {nid}: condition op must be one of {sorted(CONDITION_OPS)}")
+        if "left" not in config or "right" not in config:
+            raise WorkflowError(f"node {nid}: condition needs left and right")
+    if ntype == "loop" and (not config.get("items") or not config.get("item_template")):
+        raise WorkflowError(f"node {nid}: loop needs items and item_template")
+    if ntype == "crawl":
+        if not config.get("url"):
+            raise WorkflowError(f"node {nid}: crawl needs config.url")
+        if not 1 <= int(config.get("max_pages", 5)) <= 20:
+            raise WorkflowError(f"node {nid}: crawl max_pages must be 1..20")
+        if not 0 <= int(config.get("max_depth", 1)) <= 2:
+            raise WorkflowError(f"node {nid}: crawl max_depth must be 0..2")
+    if ntype == "extract" and not (config.get("pattern") or config.get("json_path")):
+        raise WorkflowError(f"node {nid}: extract needs pattern or json_path")
+
+
+def _truthy(text: str) -> bool:
+    return text.strip().lower() not in ("", "false", "0", "no", "none", "null")
+
+
+# --- Restricted expression evaluator for the ``code`` node -----------------
+# No imports, no attribute access, no function calls except a small safe
+# set. This is deliberately NOT arbitrary code execution: a workflow run
+# is non-interactive, so it must never run unchecked code. Full code
+# execution stays in the Code Agent tab behind its approval gate.
+
+import ast as _ast
+
+
+def _eval_expr(tree: _ast.AST, variables: dict) -> Any:
+    if isinstance(tree, _ast.Expression):
+        return _eval_expr(tree.body, variables)
+    if isinstance(tree, _ast.Constant):
+        return tree.value
+    if isinstance(tree, _ast.Name):
+        if tree.id in variables:
+            return variables[tree.id]
+        raise WorkflowError(f"code node: unknown name {tree.id!r}")
+    if isinstance(tree, _ast.BinOp):
+        left, right = _eval_expr(tree.left, variables), _eval_expr(tree.right, variables)
+        if isinstance(tree.op, _ast.Add):
+            return left + right
+        if isinstance(tree.op, _ast.Sub):
+            return left - right
+        if isinstance(tree.op, _ast.Mult):
+            return left * right
+        if isinstance(tree.op, _ast.Div):
+            return left / right
+        if isinstance(tree.op, _ast.Mod):
+            return left % right
+        if isinstance(tree.op, _ast.FloorDiv):
+            return left // right
+        raise WorkflowError("code node: operator not allowed")
+    if isinstance(tree, _ast.UnaryOp) and isinstance(tree.op, _ast.USub):
+        return -_eval_expr(tree.operand, variables)
+    if isinstance(tree, _ast.Compare) and len(tree.ops) == 1 and len(tree.comparators) == 1:
+        left, right = _eval_expr(tree.left, variables), _eval_expr(tree.comparators[0], variables)
+        op = tree.ops[0]
+        if isinstance(op, _ast.Eq):
+            return left == right
+        if isinstance(op, _ast.NotEq):
+            return left != right
+        if isinstance(op, _ast.Gt):
+            return left > right
+        if isinstance(op, _ast.Lt):
+            return left < right
+        if isinstance(op, _ast.GtE):
+            return left >= right
+        if isinstance(op, _ast.LtE):
+            return left <= right
+        if isinstance(op, _ast.In):
+            return left in right
+        raise WorkflowError("code node: comparison not allowed")
+    if isinstance(tree, _ast.BoolOp):
+        values = [_eval_expr(v, variables) for v in tree.values]
+        return all(values) if isinstance(tree.op, _ast.And) else any(values)
+    if isinstance(tree, _ast.IfExp):
+        return _eval_expr(tree.body, variables) if _eval_expr(tree.test, variables) else _eval_expr(tree.orelse, variables)
+    if isinstance(tree, ( _ast.List, _ast.Tuple)):
+        return [_eval_expr(e, variables) for e in tree.elts]
+    if isinstance(tree, _ast.Dict):
+        return {_eval_expr(k, variables): _eval_expr(v, variables)
+                for k, v in zip(tree.keys, tree.values) if k is not None}
+    if isinstance(tree, _ast.Subscript):
+        return _eval_expr(tree.value, variables)[_eval_expr(tree.slice, variables)]
+    if isinstance(tree, _ast.Call) and isinstance(tree.func, _ast.Name) and tree.func.id in SAFE_BUILTINS:
+        return SAFE_BUILTINS[tree.func.id](*[_eval_expr(a, variables) for a in tree.args])
+    raise WorkflowError("code node: expression form not allowed")
+
+
+def eval_code_expression(expression: str, variables: dict) -> Any:
+    """Evaluate a restricted expression. Raises WorkflowError on anything else."""
+    try:
+        tree = _ast.parse(expression, mode="eval")
+    except SyntaxError as exc:
+        raise WorkflowError(f"code node: invalid expression: {exc}") from exc
+    return _eval_expr(tree, variables)
+
+
+async def _run_node(node: dict, run_input: dict, node_outputs: dict, db: Any = None) -> Any:
+    """Execute one node (no retries/timeout here — the caller wraps).
+
+    ``db`` is required by the llm/agent/tool nodes (provider keys, team
+    runs); it is threaded through from run_workflow_row. Direct
+    execute_definition callers without a db get a clear error from
+    those node types instead of a silent failure.
+    """
     ntype = node["type"]
     config = node.get("config") or {}
     if ntype == "text":
@@ -200,6 +340,164 @@ async def _run_node(node: dict, run_input: dict, node_outputs: dict) -> Any:
         if resp.status_code != 200:
             raise WorkflowError(f"http_fetch returned HTTP {resp.status_code}")
         return html_to_text(resp.content.decode("utf-8", errors="replace"))[:4000]
+    if ntype == "llm":
+        if db is None:
+            raise WorkflowError("llm node needs a database session (provider keys)")
+        from .llm import default_model_id, stream_completion
+
+        prompt = render_template(config.get("prompt", ""), run_input, node_outputs)
+        system = render_template(config.get("system", ""), run_input, node_outputs)
+        model = config.get("model") or await default_model_id(db)
+        if not model:
+            raise WorkflowError("llm node: no model configured")
+        messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+        parts: list[str] = []
+        async for chunk in stream_completion(model, messages, db,
+                                             temperature=float(config.get("temperature", 0.7))):
+            parts.append(chunk if isinstance(chunk, str) else (getattr(chunk, "text", None) or ""))
+        return "".join(parts)
+    if ntype == "agent":
+        if db is None:
+            raise WorkflowError("agent node needs a database session")
+        from .llm import default_model_id
+        from .teams.runner import run_team
+
+        task = render_template(config.get("task", ""), run_input, node_outputs)
+        model = config.get("model") or await default_model_id(db)
+        result = await run_team(config["team"], task, model, db)
+        return {"team": config["team"], "output": result.output if hasattr(result, "output") else str(result)}
+    if ntype == "tool":
+        from .tools.builtin import code_map_handler, web_search_handler
+
+        args = {}
+        for key, value in (config.get("args") or {}).items():
+            args[key] = render_template(str(value), run_input, node_outputs) if isinstance(value, str) else value
+        if config["tool"] == "web_search":
+            return await web_search_handler(args.get("query", ""), int(args.get("max_results", 5) or 5))
+        return await code_map_handler(args.get("query", ""), args.get("target", ""))
+    if ntype == "code":
+        expression = render_template(config.get("expression", ""), run_input, node_outputs)
+        variables = {"input": run_input, "nodes": node_outputs}
+        for key, value in (config.get("variables") or {}).items():
+            rendered = render_template(str(value), run_input, node_outputs) if isinstance(value, str) else value
+            try:
+                variables[key] = json.loads(rendered) if isinstance(rendered, str) and rendered[:1] in "[{" else rendered
+            except (ValueError, TypeError):
+                variables[key] = rendered
+        return eval_code_expression(expression, variables)
+    if ntype == "condition":
+        left = render_template(str(config["left"]), run_input, node_outputs)
+        right = render_template(str(config["right"]), run_input, node_outputs)
+        op = config["op"]
+        try:
+            left_v: Any = json.loads(left)
+        except (ValueError, TypeError):
+            left_v = left
+        try:
+            right_v: Any = json.loads(right)
+        except (ValueError, TypeError):
+            right_v = right
+        if op == "==":
+            value = left_v == right_v
+        elif op == "!=":
+            value = left_v != right_v
+        elif op == "contains":
+            value = str(right) in str(left)
+        else:
+            try:
+                value = {"<": left_v < right_v, ">": left_v > right_v,
+                         "<=": left_v <= right_v, ">=": left_v >= right_v}[op]
+            except TypeError as exc:
+                raise WorkflowError(f"condition: cannot compare: {exc}") from exc
+        return {"branch": "true" if value else "false", "value": value}
+    if ntype == "loop":
+        raw_items = render_template(config.get("items", ""), run_input, node_outputs)
+        try:
+            items = json.loads(raw_items)
+        except (ValueError, TypeError):
+            items = [p.strip() for p in raw_items.split(",") if p.strip()]
+        if not isinstance(items, list):
+            items = [items]
+        out = []
+        for i, item in enumerate(items):
+            out.append(render_template(config["item_template"], run_input, node_outputs,
+                                       extra={"item": item, "item_index": i}))
+        return out
+    if ntype == "crawl":
+        import httpx
+        from urllib.parse import urljoin, urlparse
+
+        from .ingest_url import html_to_text, validate_url
+        from html.parser import HTMLParser
+
+        class _Links(HTMLParser):
+            def __init__(self) -> None:
+                super().__init__()
+                self.links: list[str] = []
+                self.title = ""
+
+            def handle_starttag(self, tag: str, attrs: list) -> None:
+                if tag == "a":
+                    href = dict(attrs).get("href")
+                    if href:
+                        self.links.append(href)
+
+        start = render_template(config["url"], run_input, node_outputs).strip()
+        max_pages = int(config.get("max_pages", 5))
+        max_depth = int(config.get("max_depth", 1))
+        host = urlparse(start).netloc
+        seen: set[str] = set()
+        queue: list[tuple[str, int]] = [(start, 0)]
+        pages: list[dict] = []
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=8.0), follow_redirects=False) as client:
+            while queue and len(pages) < max_pages:
+                url, depth = queue.pop(0)
+                if url in seen:
+                    continue
+                seen.add(url)
+                try:
+                    validate_url(url)
+                    resp = await client.get(url, headers={"User-Agent": "Sangam/1.0 (+local-first)"})
+                    if resp.status_code != 200:
+                        continue
+                    html = resp.content.decode("utf-8", errors="replace")
+                except Exception:
+                    continue
+                parser = _Links()
+                parser.feed(html)
+                pages.append({"url": url, "text": html_to_text(html)[:2000],
+                              "links": [l for l in parser.links if l.startswith("http")][:50]})
+                if depth < max_depth:
+                    for link in parser.links:
+                        absolute = urljoin(url, link)
+                        if urlparse(absolute).netloc == host and absolute not in seen:
+                            queue.append((absolute, depth + 1))
+        return pages
+    if ntype == "extract":
+        source = config.get("source")
+        if source:
+            text = str(_lookup(source, {"nodes": node_outputs, "input": run_input}) or "")
+        elif node_outputs:
+            text = str(list(node_outputs.values())[-1] or "")
+        else:
+            text = str(run_input.get("text", "") or "")
+        if config.get("pattern"):
+            matches = [m.groupdict() for m in re.finditer(config["pattern"], text)]
+            return matches if config.get("mode", "all") == "all" else (matches[0] if matches else {})
+        path = config["json_path"]
+        try:
+            data = json.loads(text)
+        except (ValueError, TypeError) as exc:
+            raise WorkflowError(f"extract: source is not JSON: {exc}") from exc
+        return _lookup(path, data if isinstance(data, dict) else {"value": data})
+    if ntype == "prompt_transform":
+        out = {}
+        for key in ("system", "user"):
+            if config.get(key):
+                out[key] = render_template(config[key], run_input, node_outputs)
+        if not out and config.get("template"):
+            return render_template(config["template"], run_input, node_outputs)
+        return out
     raise WorkflowError(f"unknown node type: {ntype}")
 
 
@@ -208,6 +506,7 @@ async def execute_definition(
     run_input: dict,
     *,
     on_node_done=None,
+    db: Any = None,
 ) -> tuple[dict, dict, str | None]:
     """Execute a validated definition.
 
@@ -227,6 +526,17 @@ async def execute_definition(
             node_results[nid] = {"status": "skipped", "output": None, "error": None, "attempts": 0}
             continue
         node = by_id[nid]
+        # Batch 3: run_if gates a node on a rendered condition (e.g. the
+        # output of a condition node: {{nodes.check.branch}} == 'true' is
+        # expressed as run_if "{{nodes.check.branch}}" — truthy runs).
+        if node.get("run_if") is not None:
+            rendered = render_template(str(node["run_if"]), run_input, node_outputs)
+            if not _truthy(rendered):
+                node_results[nid] = {"status": "skipped", "output": None,
+                                     "error": None, "attempts": 0, "reason": "run_if false"}
+                if on_node_done:
+                    on_node_done(nid, node_results[nid])
+                continue
         retries = node.get("retries", 0)
         timeout = node.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
         attempts = 0
@@ -236,7 +546,7 @@ async def execute_definition(
             attempts = attempt + 1
             try:
                 output = await asyncio.wait_for(
-                    _run_node(node, run_input, node_outputs), timeout=timeout
+                    _run_node(node, run_input, node_outputs, db=db), timeout=timeout
                 )
                 last_error = None
                 break
@@ -297,7 +607,7 @@ async def run_workflow_row(wf: Any, db: Any, run_input: dict,
     db.add(run)
     await db.flush()
     try:
-        outputs, results, error = await execute_definition(definition, run_input)
+        outputs, results, error = await execute_definition(definition, run_input, db=db)
     except WorkflowError as exc:
         outputs, results, error = {}, {}, str(exc)
     run.output_json = _json.dumps(outputs)
