@@ -106,6 +106,36 @@ test('Runs centre: tab, sections, labelled controls, screenshot', async ({ page 
   expect(unlabeled, `unlabeled buttons in Runs tab: ${JSON.stringify(unlabeled)}`).toEqual([]);
 
   await page.screenshot({ path: 'tests/e2e/screenshots/phase1-runs.png' });
+  // Phase 1 remainder, visual regression: Playwright's built-in
+  // screenshot comparison. The baseline lives in
+  // tests/e2e/runs.spec.ts-snapshots/ (committed) and is compared on
+  // every run; 2% pixel tolerance absorbs font anti-aliasing only.
+  // The Runs tab is deterministic on a fresh DB (empty states), so a
+  // diff here means the layout actually changed.
+  await expect(page).toHaveScreenshot('runs-centre.png', { maxDiffPixelRatio: 0.02 });
+  expect(ctx.badResponses, `HTTP >= 400: ${JSON.stringify(ctx.badResponses)}`).toEqual([]);
+  expect(ctx.consoleErrors, `console.error: ${JSON.stringify(ctx.consoleErrors)}`).toEqual([]);
+  expect(ctx.pageErrors, `pageerror: ${JSON.stringify(ctx.pageErrors)}`).toEqual([]);
+});
+
+test('Runs centre: mobile 390px via composer Runs button', async ({ page }) => {
+  test.setTimeout(180000);
+  ctx.badResponses = []; ctx.consoleErrors = []; ctx.pageErrors = [];
+  attachGuards(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await register(page);
+  // Phase 1 remainder composition: the composer Runs pill opens the
+  // Runs tab without the tab picker — the chat -> runs path.
+  await page.locator('#runsBtn').click();
+  await page.waitForTimeout(3000);
+  await expect(page.getByRole('heading', { name: 'Runs centre' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refresh runs and artifacts' })).toBeVisible();
+  // No horizontal overflow on a narrow viewport (responsive rule).
+  const overflow = await page.evaluate(() => {
+    const el = document.documentElement;
+    return el.scrollWidth - el.clientWidth;
+  });
+  expect(overflow, `horizontal overflow at 390px: ${overflow}px`).toBeLessThanOrEqual(1);
   expect(ctx.badResponses, `HTTP >= 400: ${JSON.stringify(ctx.badResponses)}`).toEqual([]);
   expect(ctx.consoleErrors, `console.error: ${JSON.stringify(ctx.consoleErrors)}`).toEqual([]);
   expect(ctx.pageErrors, `pageerror: ${JSON.stringify(ctx.pageErrors)}`).toEqual([]);

@@ -3109,3 +3109,24 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .sidebar-search input{font-size:13px;}
 .rail-nav{display:none;}
 .chat-history-label{padding-top:10px; padding-bottom:5px;}
+
+/* ---------- Phase 1 remainder: Runs centre responsive ---------- */
+/* Appended last so these win on narrow screens. Runs rows wrap instead
+   of overflowing, action buttons grow to touch targets, and artifact
+   previews scroll horizontally instead of crushing the layout. */
+@media (max-width: 900px) {
+  .library ul li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .library ul li .btn {
+    flex: 1 1 auto;
+    min-height: 36px;
+  }
+  .library pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}

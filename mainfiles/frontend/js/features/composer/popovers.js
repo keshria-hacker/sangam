@@ -83,6 +83,13 @@ function closeAllPopovers() {
 export function initPopovers() {
   renderModeButton();
   renderToolsButton();
+  // Phase 1 remainder: one click from chat to the Runs centre, so a
+  // user can start in chat, invoke a capability, and monitor its run
+  // without hunting through the tab picker.
+  document.getElementById('runsBtn')?.addEventListener('click', async () => {
+    const { openToolTab } = await import('../tabs/tabs.js');
+    openToolTab('runs');
+  });
   document.addEventListener('sangam:settings-changed', (event) => {
     if (event.detail?.key !== 'webSearchEnabled') return;
     const enabled = event.detail.value !== false;
