@@ -91,6 +91,34 @@ from .api_routes.security_routes import (  # noqa: F401
     set_catalog_enabled,
     validate_finding,
 )
+from .api_routes.memory_v2_routes import (  # noqa: F401
+    create_transcript,
+    extract_entities,
+    extract_memory_llm,
+    get_entity_timeline,
+    list_memory_entities,
+    list_transcript_rows,
+    reflect_memories,
+    update_memory_endpoint,
+)
+from .api_routes.notebooks_routes import (  # noqa: F401
+    add_notebook_source,
+    create_notebook,
+    create_notebook_note,
+    delete_notebook,
+    get_note_backlinks,
+    get_notebook,
+    get_notebook_note,
+    list_notebook_notes,
+    list_notebook_sources,
+    list_notebook_transforms,
+    list_notebooks,
+    note_from_chat,
+    retrieve_notebook,
+    run_notebook_transform,
+    set_source_context,
+    update_notebook,
+)
 from .api_routes.workflows_routes import (  # noqa: F401
     create_workflow,
     delete_workflow,

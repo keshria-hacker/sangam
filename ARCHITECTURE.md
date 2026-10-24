@@ -1113,6 +1113,30 @@ WEB_SEARCH_MAX_RESULTS=5
 | PUT | `/api/memory/{id}/move` | Yes | Move memory to room/drawer |
 | GET | `/api/memory/rooms` | Yes | Rooms/drawers hierarchy + counts |
 | GET | `/api/memory/rooms/{room}/{drawer}` | Yes | Memories in one room/drawer |
+| POST | `/api/memory/extract` | Yes | On-demand LLM fact extraction, saved as semantic memories (Batch 4) |
+| GET | `/api/memory/entities` | Yes | List memory entities (Batch 4) |
+| GET | `/api/memory/entities/{name}/timeline` | Yes | Entity timeline, open + closed relations (Batch 4) |
+| POST | `/api/memory/entities/extract` | Yes | LLM extraction + entity/relation upsert, heuristic fallback without a model (Batch 4) |
+| POST | `/api/memory/transcripts` | Yes | Store a verbatim transcript message, no cap (Batch 4) |
+| GET | `/api/memory/transcripts` | Yes | List transcripts, newest first (Batch 4) |
+| PUT | `/api/memory/{id}` | Yes | PATCH-style memory update, absent fields kept (Batch 4) |
+| POST | `/api/memory/reflect` | Yes | Reflect over recalled memories + timelines, stored as a semantic memory; 503 without a model (Batch 4) |
+| POST | `/api/notebooks` | Yes | Create a notebook (Batch 4) |
+| GET | `/api/notebooks` | Yes | List notebooks (Batch 4) |
+| GET | `/api/notebooks/{id}` | Yes | Get a notebook (Batch 4) |
+| PUT | `/api/notebooks/{id}` | Yes | Update a notebook (Batch 4) |
+| DELETE | `/api/notebooks/{id}` | Yes | Delete a notebook + children (Batch 4) |
+| POST | `/api/notebooks/{id}/sources` | Yes | Add a notebook source (file/url/note/chat) (Batch 4) |
+| GET | `/api/notebooks/{id}/sources` | Yes | List notebook sources (Batch 4) |
+| PUT | `/api/notebooks/{id}/sources/{source_id}/context` | Yes | Set a source context mode (Batch 4) |
+| GET | `/api/notebooks/{id}/retrieve` | Yes | Retrieve notebook context honouring context modes (Batch 4) |
+| POST | `/api/notebooks/{id}/notes` | Yes | Add a notebook note (Batch 4) |
+| GET | `/api/notebooks/{id}/notes` | Yes | List notebook notes with outgoing links (Batch 4) |
+| GET | `/api/notebooks/{id}/notes/{note_id}` | Yes | Get a note with outgoing wiki-links (Batch 4) |
+| POST | `/api/notebooks/{id}/notes/from-chat` | Yes | Save a chat message as a note; 404 if missing (Batch 4) |
+| GET | `/api/notebooks/{id}/notes/{note_id}/backlinks` | Yes | Notes linking [[this title]] (Batch 4) |
+| POST | `/api/notebooks/{id}/transforms` | Yes | Run a prompt over sources; stored as transform + note (Batch 4) |
+| GET | `/api/notebooks/{id}/transforms` | Yes | List notebook transforms (Batch 4) |
 | GET | `/api/settings/providers` | Yes | Provider key status |
 | PUT | `/api/settings/providers/{id}/key` | Yes | Save API key |
 | DELETE | `/api/settings/providers/{id}/key` | Yes | Remove API key |

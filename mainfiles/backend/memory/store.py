@@ -146,6 +146,43 @@ async def touch_memory(record: MemoryRecord) -> None:
         logger.debug("touch_memory failed: %s", exc)
 
 
+async def update_memory(
+    memory_id: str,
+    content: str | None = None,
+    importance: float | None = None,
+    room: str | None = None,
+    drawer: str | None = None,
+) -> MemoryRecord | None:
+    """Batch 4: PATCH-style update of a Chroma record.
+
+    Absent fields keep their old values. Returns the updated record,
+    or None when the memory does not exist or the update fails.
+    (ChromaDB update replaces the document + metadata wholesale, so
+    the old record's untouched metadata is carried over explicitly.)
+    """
+    try:
+        record = await get_memory(memory_id)
+        if record is None:
+            return None
+        if content is not None:
+            record.content = content.strip() or record.content
+        if importance is not None:
+            record.importance = max(0.0, min(1.0, importance))
+        if room is not None:
+            record.room = room
+        if drawer is not None:
+            record.drawer = drawer
+        _get_collection().update(
+            ids=[record.id],
+            documents=[record.content],
+            metadatas=[record.to_metadata()],
+        )
+        return record
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("update_memory failed: %s", exc)
+        return None
+
+
 async def update_importance(memory_id: str, importance: float) -> bool:
     try:
         record = await get_memory(memory_id)

@@ -99,6 +99,50 @@ export async function renderKnowledgeTab(bodyEl) {
         </div>
         <div id="knIngestStatus" class="settings-hint"></div>
       </section>
+      <section class="kn-section">
+        <h3><i class="fa-solid fa-book"></i> Notebooks</h3>
+        <p class="settings-hint">Group sources, notes, and transforms per project. Retrieval honours each source's context mode.</p>
+        <div class="kn-mem-controls">
+          <input type="text" id="nbName" class="provider-key-input" placeholder="Notebook name" aria-label="Notebook name">
+          <input type="text" id="nbDesc" class="provider-key-input" placeholder="Description (optional)" aria-label="Notebook description" style="flex:1">
+          <button class="btn-secondary" id="nbCreateBtn">Create notebook</button>
+        </div>
+        <div id="nbList" class="kn-mem-list"></div>
+        <div id="nbDetail"></div>
+      </section>
+      <section class="kn-section">
+        <h3><i class="fa-solid fa-brain"></i> Memory tools</h3>
+        <p class="settings-hint">On-demand LLM extraction, reflection over recalled memories, entity timelines, verbatim transcripts, and memory updates. LLM tools need a configured model.</p>
+        <div class="kn-mem-controls">
+          <textarea id="memv2ExtractText" class="provider-key-input" placeholder="Paste text to extract durable facts from…" aria-label="Text to extract facts from" style="flex:1"></textarea>
+          <button class="btn-secondary" id="memv2ExtractBtn">Extract facts</button>
+        </div>
+        <div id="memv2ExtractResults" class="kn-mem-list"></div>
+        <div class="kn-mem-controls">
+          <input type="text" id="memv2ReflectQ" class="provider-key-input" placeholder="Reflect on… e.g. what do I prefer?" aria-label="Reflect query" style="flex:1">
+          <button class="btn-secondary" id="memv2ReflectBtn">Reflect</button>
+        </div>
+        <div id="memv2ReflectResults" class="kn-mem-list"></div>
+        <div class="kn-mem-controls">
+          <input type="text" id="memv2EntityName" class="provider-key-input" placeholder="Entity name" aria-label="Entity name">
+          <button class="btn-secondary" id="memv2TimelineBtn">Show timeline</button>
+        </div>
+        <div id="memv2Timeline" class="kn-mem-list"></div>
+        <div class="kn-mem-controls">
+          <input type="text" id="memv2TranscriptChat" class="provider-key-input" placeholder="Chat id (blank = all)" aria-label="Transcript chat id" style="flex:1">
+          <button class="btn-secondary" id="memv2TranscriptBtn">List transcripts</button>
+        </div>
+        <div id="memv2TranscriptList" class="kn-mem-list"></div>
+        <div class="kn-mem-controls">
+          <input type="text" id="memv2UpdateId" class="provider-key-input" placeholder="Memory id" aria-label="Memory id to update">
+          <input type="text" id="memv2UpdateContent" class="provider-key-input" placeholder="New content (blank = keep)" aria-label="New memory content" style="flex:1">
+          <input type="text" id="memv2UpdateImportance" class="provider-key-input" placeholder="Importance 0–1" aria-label="New importance">
+          <input type="text" id="memv2UpdateRoom" class="provider-key-input" placeholder="Room" aria-label="New room">
+          <input type="text" id="memv2UpdateDrawer" class="provider-key-input" placeholder="Drawer" aria-label="New drawer">
+          <button class="btn-secondary" id="memv2UpdateBtn">Update memory</button>
+        </div>
+        <div id="memv2UpdateStatus" class="settings-hint"></div>
+      </section>
     </div>`;
 
   // Batch 1: Study section (Learn) + section activator for palette/aliases.
@@ -116,6 +160,16 @@ export async function renderKnowledgeTab(bodyEl) {
   }).catch(() => {
     const studyBody = bodyEl.querySelector('#knStudyBody');
     if (studyBody) studyBody.innerHTML = '<p class="settings-hint">Study unavailable.</p>';
+  });
+
+  // Batch 4: Notebooks + Memory tools sections (same dynamic-import
+  // pattern as the Study section above).
+  import('./notebooks.js').then((m) => {
+    if (m.initNotebooks) m.initNotebooks(bodyEl);
+    if (m.initMemoryTools) m.initMemoryTools(bodyEl);
+  }).catch(() => {
+    const nbList = bodyEl.querySelector('#nbList');
+    if (nbList) nbList.innerHTML = '<p class="settings-hint">Notebooks unavailable.</p>';
   });
 
   // Wire search
