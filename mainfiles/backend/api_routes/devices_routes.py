@@ -46,6 +46,9 @@ from ..lan_pairing import (
     PAIRING_START_WINDOW_S,
     PAIRINGS,
     PairedDevice,
+    PendingPairing,
+    Pairing,
+    as_aware,
     cert_info,
     create_pairing,
     expire_all_pairings,
@@ -86,11 +89,102 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
-def _pairing_or_404(pairing_id: str, user_id: str):
-    pairing = PAIRINGS.get(pairing_id)
-    if pairing is None or pairing.user_id != user_id:
-        raise HTTPException(status_code=404, detail="Pairing not found")
+async def _persist_pairing(db: AsyncSession, pairing: Pairing) -> None:
+    """Write a pairing's status back to its DB row (upsert). A row is
+    only created when the code digits are known — a pairing hydrated
+    from the DB after a restart has code=None and its row already
+    exists, so only its status/expiry are updated."""
+    row = await db.get(PendingPairing, pairing.pairing_id)
+    if row is None:
+        if pairing.code is None:
+            return
+        row = PendingPairing(
+            pairing_id=pairing.pairing_id,
+            user_id=pairing.user_id,
+            device_name=pairing.device_name,
+            code_hash=_hash_token(pairing.code),
+            status=pairing.status,
+            created_at=pairing.created_at,
+            expires_at=pairing.expires_at,
+        )
+        db.add(row)
+    else:
+        row.status = pairing.status
+        row.device_name = pairing.device_name
+        row.expires_at = pairing.expires_at
+    await db.commit()
+
+
+async def _hydrate_pairing(db: AsyncSession, pairing_id: str, user_id: str) -> Pairing | None:
+    """Load one pairing from its DB row into the in-memory cache.
+    Returns None when there is no row or it belongs to another user.
+    The hydrated pairing has code=None (hash-only storage); it can
+    still be approved/denied, and a claim rehydrates it with the
+    presented code."""
+    row = await db.get(PendingPairing, pairing_id)
+    if row is None or row.user_id != user_id:
+        return None
+    pairing = Pairing.from_row(row)
     pairing.sweep()
+    if pairing.status != row.status:
+        row.status = pairing.status
+        await db.commit()
+    PAIRINGS[pairing.pairing_id] = pairing
+    return pairing
+
+
+async def _hydrate_pairings_for_user(db: AsyncSession, user_id: str) -> None:
+    """Hydrate every DB pairing for this user that is not already in
+    memory (the restart path). In-memory pairings are authoritative and
+    are never overwritten by their rows."""
+    result = await db.execute(
+        select(PendingPairing).where(PendingPairing.user_id == user_id)
+    )
+    for row in result.scalars().all():
+        if row.pairing_id in PAIRINGS:
+            continue
+        pairing = Pairing.from_row(row)
+        pairing.sweep()
+        if pairing.status != row.status:
+            row.status = pairing.status
+        PAIRINGS[pairing.pairing_id] = pairing
+    await db.commit()
+
+
+async def _get_pairing(db: AsyncSession, pairing_id: str, user_id: str) -> Pairing:
+    """Host lookup: in-memory first (authoritative while present), DB
+    hydration on a miss (the post-restart case)."""
+    pairing = PAIRINGS.get(pairing_id)
+    if pairing is not None:
+        if pairing.user_id != user_id:
+            raise HTTPException(status_code=404, detail="Pairing not found")
+        pairing.sweep()
+        if pairing.status == "expired":
+            await _persist_pairing(db, pairing)
+        return pairing
+    pairing = await _hydrate_pairing(db, pairing_id, user_id)
+    if pairing is None:
+        raise HTTPException(status_code=404, detail="Pairing not found")
+    return pairing
+
+
+async def _find_pairing_for_claim(db: AsyncSession, code: str) -> Pairing | None:
+    """Claim lookup: in-memory first (preserves live expiry/approval
+    state), then a DB lookup by code hash (the post-restart case, where
+    the presented code rehydrates the pairing with its digits)."""
+    pairing = find_pairing_by_code(code)
+    if pairing is not None:
+        return pairing
+    row = await db.scalar(
+        select(PendingPairing).where(PendingPairing.code_hash == _hash_token(code))
+    )
+    if row is None:
+        return None
+    pairing = Pairing.from_row(row, code=code)
+    pairing.sweep()
+    PAIRINGS[pairing.pairing_id] = pairing
+    if pairing.status == "expired":
+        await _persist_pairing(db, pairing)
     return pairing
 
 
@@ -132,6 +226,24 @@ async def start_pairing(
             detail="Too many pairings started. Try again in a few minutes.",
         )
     pairing = create_pairing(user.id, (payload.device_name or "Phone").strip() or "Phone")
+    # The in-memory uniqueness check in create_pairing cannot see codes
+    # created before a restart (in-memory cache empty, rows still live):
+    # regenerate while the new code's hash collides with a live DB row.
+    result = await db.execute(
+        select(PendingPairing).where(
+            PendingPairing.user_id == user.id,
+            PendingPairing.status.in_(["pending", "approved"]),
+        )
+    )
+    now = datetime.now(UTC)
+    live_hashes = {
+        row.code_hash
+        for row in result.scalars().all()
+        if as_aware(row.expires_at) is None or as_aware(row.expires_at) > now
+    }
+    while _hash_token(pairing.code) in live_hashes:
+        pairing.code = f"{secrets.randbelow(900000) + 100000:06d}"
+    await _persist_pairing(db, pairing)
     fingerprint = cert_info()["fingerprint_sha256"] or ""
     lan_url = _lan_url(request)
     qr_payload = json.dumps(
@@ -150,7 +262,12 @@ async def start_pairing(
 
 
 @router.get("/devices/pairing")
-async def list_pairings(user=Depends(get_current_user)):
+async def list_pairings(db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    # Hydrate first: after a restart the pending pairings live only in
+    # the DB until this call. Hydrated rows have code=None (hash-only
+    # storage) — the host sees the pairing and can approve it, but the
+    # digits are not recoverable from the DB.
+    await _hydrate_pairings_for_user(db, user.id)
     out = []
     for pairing in sorted(PAIRINGS.values(), key=lambda p: p.created_at, reverse=True):
         if pairing.user_id != user.id:
@@ -163,25 +280,27 @@ async def list_pairings(user=Depends(get_current_user)):
 
 
 @router.get("/devices/pairing/{pairing_id}")
-async def pairing_status(pairing_id: str, user=Depends(get_current_user)):
-    return _pairing_or_404(pairing_id, user.id).public()
+async def pairing_status(pairing_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    return (await _get_pairing(db, pairing_id, user.id)).public()
 
 
 @router.post("/devices/pairing/{pairing_id}/approve")
-async def approve_pairing(pairing_id: str, user=Depends(get_current_user)):
-    pairing = _pairing_or_404(pairing_id, user.id)
+async def approve_pairing(pairing_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    pairing = await _get_pairing(db, pairing_id, user.id)
     if pairing.status != "pending":
         raise HTTPException(status_code=409, detail=f"Pairing is no longer pending (status: {pairing.status})")
     pairing.status = "approved"
+    await _persist_pairing(db, pairing)
     return pairing.public()
 
 
 @router.post("/devices/pairing/{pairing_id}/deny")
-async def deny_pairing(pairing_id: str, user=Depends(get_current_user)):
-    pairing = _pairing_or_404(pairing_id, user.id)
+async def deny_pairing(pairing_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    pairing = await _get_pairing(db, pairing_id, user.id)
     if pairing.status != "pending":
         raise HTTPException(status_code=409, detail=f"Pairing is no longer pending (status: {pairing.status})")
     pairing.status = "denied"
+    await _persist_pairing(db, pairing)
     return pairing.public()
 
 
@@ -201,7 +320,7 @@ async def claim_pairing(payload: ClaimIn, request: Request, db: AsyncSession = D
             detail="Too many incorrect pairing codes. Try again later.",
         )
     code = (payload.code or "").strip()
-    pairing = find_pairing_by_code(code) if code else None
+    pairing = await _find_pairing_for_claim(db, code) if code else None
     if pairing is None:
         raise HTTPException(status_code=404, detail=_GENERIC_CLAIM_FAILURE)
     if pairing.status == "pending":
@@ -209,9 +328,13 @@ async def claim_pairing(payload: ClaimIn, request: Request, db: AsyncSession = D
         raise HTTPException(status_code=403, detail="waiting for host approval")
     if pairing.status != "approved":
         # denied / expired / claimed: same generic failure, no leak.
+        # Persist a sweep-to-expired so a restarted process agrees.
+        if pairing.status == "expired":
+            await _persist_pairing(db, pairing)
         raise HTTPException(status_code=404, detail=_GENERIC_CLAIM_FAILURE)
     # Approved + unclaimed + unexpired: consume exactly once.
     pairing.status = "claimed"
+    await _persist_pairing(db, pairing)
     token = _issue_token()
     now = datetime.now(UTC)
     device = PairedDevice(
@@ -327,7 +450,27 @@ async def regenerate_cert(db: AsyncSession = Depends(get_db), user=Depends(get_c
     for device in devices:
         device.revoked_at = now
     await db.commit()
+    # Expire pending pairings in memory AND in the DB. The in-memory
+    # count and the DB count must not double-count the same pairing
+    # (a live pairing exists in both): DB rows whose pairing_id was
+    # already expired in memory are updated but not counted again, so a
+    # later restart cannot resurrect them as pending.
+    live_ids = {
+        pid for pid, p in PAIRINGS.items()
+        if p.user_id == user.id and p.status in ("pending", "approved")
+    }
     pairings_expired = expire_all_pairings()
+    result = await db.execute(
+        select(PendingPairing).where(
+            PendingPairing.user_id == user.id,
+            PendingPairing.status.in_(["pending", "approved"]),
+        )
+    )
+    for row in result.scalars().all():
+        row.status = "expired"
+        if row.pairing_id not in live_ids:
+            pairings_expired += 1
+    await db.commit()
     return {
         **info,
         "devices_revoked": len(devices),

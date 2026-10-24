@@ -11,9 +11,18 @@ previous sessions for the user, which would log the laptop out when the
 phone pairs. Device tokens live in their own table and never touch the
 session table.
 
-Pending pairings (code + approval state, 5-minute lifetime) are kept in
-memory, not in the database: they are ephemeral by design, and a server
-restart simply means the host starts a fresh pairing. Paired devices are
+Pending pairings (code + approval state, 5-minute lifetime) are persisted
+in the ``pending_pairings`` table, NOT only in memory: a server restart
+used to drop every in-flight pairing. The in-memory ``PAIRINGS`` dict is
+now a cache — it is authoritative while present (so a live pairing's
+expiry/approval state is never clobbered by a stale row), and the DB row
+is the fallback a fresh process hydrates from. Only the SHA-256 hash of
+the 6-digit code is stored (same pattern as PairedDevice token hashes):
+after a restart the host can still list and approve the pairing by
+device name, and a phone holding the code from the QR can still claim
+it, but the code digits themselves are not recoverable from the DB.
+Status transitions (approve/deny/claim/expire) are written back to the
+row, so single-use and expiry survive a restart too. Paired devices are
 durable rows (see PairedDevice).
 
 TLS: the host can generate a self-signed certificate (``cryptography``
@@ -93,22 +102,82 @@ class PairedDevice(Base):
 
 
 # ---------------------------------------------------------------------------
-# Pending pairings (in-memory, ephemeral)
+# Pending pairings (durable rows + in-memory cache)
 # ---------------------------------------------------------------------------
+
+# Sentinel distinguishing "generate a fresh code" (Pairing default)
+# from "code unknown" (explicit None, DB-hydrated pairing).
+_SENTINEL = object()
+
+
+class PendingPairing(Base):
+    """Durable row for one in-flight pairing. ``code_hash`` is all the
+    server ever stores of the 6-digit code — the digits are shown to the
+    host once at start time and carried by the phone's QR, never written
+    to disk in the clear. A stolen DB therefore yields no claimable code
+    (and a code alone never suffices anyway: host approval is mandatory).
+    ``status`` mirrors Pairing.status; transitions are written back by
+    the devices routes so single-use + expiry survive a restart."""
+
+    __tablename__ = "pending_pairings"
+
+    pairing_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    device_name: Mapped[str] = mapped_column(String(200), default="Phone")
+    code_hash: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+
 
 class Pairing:
     """One in-flight pairing: code shown on the host, approval clicked on
-    the host, claimed once by the phone."""
+    the host, claimed once by the phone.
 
-    def __init__(self, user_id: str, device_name: str):
-        self.pairing_id = _new_id("pair")
-        # 6-digit code, unique among live pairings (checked by caller).
-        self.code = f"{secrets.randbelow(900000) + 100000:06d}"
+    ``code`` is None only for a pairing hydrated from its DB row after a
+    restart (the hash cannot be reversed into digits). Such a pairing
+    can still be approved/denied by pairing_id and claimed by a phone
+    that still holds the code — the claim path rehydrates it with the
+    presented code, which is then hash-checked against the row."""
+
+    def __init__(
+        self,
+        user_id: str,
+        device_name: str,
+        code: str | None = _SENTINEL,  # type: ignore[assignment]
+        pairing_id: str | None = None,
+        status: str = "pending",
+        created_at: datetime | None = None,
+        expires_at: datetime | None = None,
+    ):
+        self.pairing_id = pairing_id or _new_id("pair")
+        # _SENTINEL (the default) means "generate a fresh code"; an
+        # explicit None means "unknown" (DB-hydrated pairing — the hash
+        # cannot be reversed into digits). Conflating the two would
+        # silently invent a wrong code for a restarted pairing.
+        self.code = f"{secrets.randbelow(900000) + 100000:06d}" if code is _SENTINEL else code
         self.device_name = device_name or "Phone"
         self.user_id = user_id
-        self.status = "pending"  # pending | approved | denied | expired | claimed
-        self.created_at = _now()
-        self.expires_at = self.created_at + PAIRING_CODE_TTL
+        self.status = status
+        self.created_at = created_at or _now()
+        self.expires_at = expires_at or (self.created_at + PAIRING_CODE_TTL)
+
+    @classmethod
+    def from_row(cls, row: "PendingPairing", code: str | None = None) -> "Pairing":
+        """Materialize a Pairing from its DB row. SQLite returns naive
+        datetimes; normalize to aware so sweep() comparisons work."""
+        return cls(
+            user_id=row.user_id,
+            device_name=row.device_name,
+            code=code,
+            pairing_id=row.pairing_id,
+            status=row.status,
+            created_at=as_aware(row.created_at) or _now(),
+            expires_at=as_aware(row.expires_at) or _now(),
+        )
+
+    def code_hash(self) -> str | None:
+        return _hash_token(self.code) if self.code else None
 
     def sweep(self) -> None:
         if self.status in ("pending", "approved") and _now() >= self.expires_at:
@@ -125,7 +194,9 @@ class Pairing:
         }
 
 
-# pairing_id -> Pairing. Single-process server; see module docstring.
+# pairing_id -> Pairing. In-memory cache of the pending_pairings rows;
+# a fresh process starts empty and hydrates from the DB on first use
+# (see devices_routes._hydrate_*). In-memory state wins while present.
 PAIRINGS: dict[str, Pairing] = {}
 
 

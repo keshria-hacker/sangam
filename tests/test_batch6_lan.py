@@ -373,7 +373,136 @@ def test_lan_info(client):
     assert "loaded_via_loopback" in data
 
 
-def test_password_reset_revokes_paired_devices(client, fresh_client):
+def _set_lan(client, headers, value):
+    cur = client.get("/api/user/settings", headers=headers).json().get("settings", {})
+    r = client.put("/api/user/settings", json={"settings": {**cur, "LAN_ENABLED": value}}, headers=headers)
+    assert r.status_code == 200, r.text
+    return r
+
+
+def _restarted_client():
+    """Simulate a server restart: drop all in-memory pairing state and
+    build a fresh app against the SAME database (same tmp DB file, same
+    engine — the fresh_client pattern, plus a cleared PAIRINGS cache)."""
+    lan_pairing.PAIRINGS.clear()
+    return TestClient(create_app())
+
+
+def _expire_db_pairing(pairing_id):
+    async def _run():
+        from datetime import UTC, datetime, timedelta
+
+        from backend.lan_pairing import PendingPairing
+
+        async with AsyncSessionLocal() as session:
+            row = await session.get(PendingPairing, pairing_id)
+            assert row is not None
+            row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+            await session.commit()
+
+    asyncio.run(_run())
+
+
+# ------------------------------------------------------- restart persistence
+def test_pending_pairing_survives_restart(client, fresh_client):
+    headers = _auth_headers(client)
+    _enable_lan(client, headers)
+    pairing = _start(client, headers, "Phone")
+    # Restart: in-memory state is gone, the DB row remains.
+    restarted = _restarted_client()
+    assert pairing["pairing_id"] not in lan_pairing.PAIRINGS
+    # The host still sees the pending pairing on the restarted app and
+    # can approve it by device name...
+    listed = restarted.get("/api/devices/pairing", headers=headers).json()["pairings"]
+    match = [p for p in listed if p["pairing_id"] == pairing["pairing_id"]]
+    assert len(match) == 1 and match[0]["status"] == "pending"
+    # ...but the code digits are NOT recoverable from the DB: only its
+    # SHA-256 hash is stored (same pattern as device token hashes).
+    assert match[0]["code"] is None
+    r = restarted.post(f"/api/devices/pairing/{pairing['pairing_id']}/approve", json={}, headers=headers)
+    assert r.status_code == 200, r.text
+    # ...and the phone, which still holds the code from the QR, claims.
+    claim = _claim(fresh_client, pairing["code"])
+    assert claim.status_code == 200, claim.text
+    body = claim.json()
+    token_headers = {"Authorization": f"Bearer {body['token']}"}
+    assert fresh_client.get("/api/devices", headers=token_headers).status_code == 200
+
+
+def test_claim_before_approval_still_waits_after_restart(client, fresh_client):
+    headers = _auth_headers(client)
+    _enable_lan(client, headers)
+    pairing = _start(client, headers, "Phone")
+    _restarted_client()
+    # Correct code, host has not approved yet — even after a restart
+    # the phone must wait, not be granted and not be told the code is bad.
+    r = _claim(fresh_client, pairing["code"])
+    assert r.status_code == 403
+    assert r.json()["detail"] == "waiting for host approval"
+
+
+def test_expired_pending_pairing_still_fails_after_restart(client, fresh_client):
+    headers = _auth_headers(client)
+    _enable_lan(client, headers)
+    pairing = _start(client, headers, "Phone")
+    _expire_db_pairing(pairing["pairing_id"])
+    _restarted_client()
+    claim = _claim(fresh_client, pairing["code"])
+    assert claim.status_code == 404
+    assert claim.json()["detail"] == "invalid or expired code"
+
+
+def test_claim_single_use_survives_restart(client, fresh_client):
+    headers = _auth_headers(client)
+    _enable_lan(client, headers)
+    pairing = _start(client, headers, "Phone")
+    client.post(f"/api/devices/pairing/{pairing['pairing_id']}/approve", json={}, headers=headers)
+    _restarted_client()
+    first = _claim(fresh_client, pairing["code"])
+    assert first.status_code == 200, first.text
+    # Consumed once: a second claim fails, even after another restart
+    # (the claimed status was written back to the DB row).
+    _restarted_client()
+    again = _claim(fresh_client, pairing["code"])
+    assert again.status_code == 404
+    assert again.json()["detail"] == "invalid or expired code"
+
+
+# ------------------------------------------------------- LAN-off enforcement
+def test_device_token_rejected_when_lan_disabled(client, fresh_client):
+    headers = _auth_headers(client)
+    _enable_lan(client, headers)
+    _, body = _pair_device(client, headers, fresh_client)
+    token_headers = {"Authorization": f"Bearer {body['token']}"}
+    assert fresh_client.get("/api/devices", headers=token_headers).status_code == 200
+
+    # Toggle LAN off: the previously valid device token now 401s with a
+    # machine-readable detail the phone UI maps to plain language...
+    _set_lan(client, headers, False)
+    r = fresh_client.get("/api/devices", headers=token_headers)
+    assert r.status_code == 401
+    assert r.json()["detail"] == "lan_disabled"
+    # ...while the host's own session auth is unaffected.
+    assert client.get("/api/devices", headers=headers).status_code == 200
+
+    # Toggle back on: the token works again — LAN-off suspends devices,
+    # it does not revoke them, so no re-pairing is required.
+    _enable_lan(client, headers)
+    assert fresh_client.get("/api/devices", headers=token_headers).status_code == 200
+
+
+def test_revoked_beats_lan_disabled_detail(client, fresh_client):
+    """Precedence: a revoked token reports device_revoked even with LAN
+    off, so revocation (the explicit kill switch) is never masked."""
+    headers = _auth_headers(client)
+    _enable_lan(client, headers)
+    _, body = _pair_device(client, headers, fresh_client)
+    token_headers = {"Authorization": f"Bearer {body['token']}"}
+    client.delete(f"/api/devices/{body['device_id']}", headers=headers)
+    _set_lan(client, headers, False)
+    r = fresh_client.get("/api/devices", headers=token_headers)
+    assert r.status_code == 401
+    assert r.json()["detail"] == "device_revoked"
     # Parent fix: a password reset must kill paired-device tokens too,
     # or a stolen phone token survives the credential it was paired under.
     headers = _auth_headers(client)

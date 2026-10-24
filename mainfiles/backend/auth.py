@@ -199,6 +199,28 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="device_revoked")
     if as_aware(device.expires_at) is not None and as_aware(device.expires_at) <= datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="device_expired")
+    # LAN-off enforcement (device tokens only — the session branch above
+    # already returned, so the host's own login/cookie session is never
+    # affected by this check). A device token is usable only while the
+    # account owner has LAN mode on: toggling LAN_ENABLED off suspends
+    # every paired device, and toggling it back on restores them — no
+    # re-pairing is required, because revocation is a separate, explicit
+    # action. The detail is machine-readable on purpose: the phone UI
+    # maps lan_disabled to plain language ("LAN access is off on your
+    # laptop — turn it on in Settings → Devices").
+    import json  # local: keeps this branch self-contained
+
+    from .models import UserPreference  # local: mirrors the PairedDevice import below
+
+    pref = await db.get(UserPreference, device.user_id)
+    lan_on = False
+    if pref is not None and pref.settings_json:
+        try:
+            lan_on = bool(json.loads(pref.settings_json).get("LAN_ENABLED"))
+        except (ValueError, TypeError):
+            lan_on = False
+    if not lan_on:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="lan_disabled")
     try:
         device.last_used_at = datetime.now(UTC)
         await db.commit()
