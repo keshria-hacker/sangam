@@ -155,7 +155,12 @@ def test_adhd_style_endpoint_is_honest_about_wiring(client):
     r = client.get("/api/quality/adhd-style", headers=h)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["wired_into_chat"] is False
+    # Wave-2 merge fix: Wave 1 wired ADHD into chat by design, so the
+    # old wired_into_chat=false assertion is stale. The style block is
+    # injected into the chat system prompt when the user's adhdFriendly
+    # setting is on, and only then.
+    assert body["wired_into_chat"] is True
+    assert body["wired_behind_setting"] == "adhdFriendly"
     assert "Cap lists at 5" in body["style"]
     assert "Lead with the next action" in body["style"]
     assert adhd_style_text() == body["style"]

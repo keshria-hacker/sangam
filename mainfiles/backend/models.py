@@ -52,6 +52,13 @@ class Message(Base):
     # JSON list of MediaAttachment dicts (image/audio), foundation for
     # voice + image-generation integrations. NULL => text-only message.
     media_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Wave-2 message-evidence persistence: JSON lists of the evidence
+    # shown in-session (tool calls, citations, artifacts). Previously
+    # only role/content survived a reload, so the Inspector only worked
+    # in-session. NULL => no evidence recorded for this message.
+    tool_calls_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    citations_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    artifacts_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")

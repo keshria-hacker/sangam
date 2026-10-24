@@ -74,6 +74,24 @@ class ChatStreamRequest(BaseModel):
         return self
 
 
+def _parse_evidence_json(value: Any) -> list[dict]:
+    """Parse a Message evidence JSON column into a list of dicts.
+
+    Tolerates NULL, malformed JSON, and non-dict items (all degrade to
+    an empty list / dropped items, never a 500 on chat reload).
+    """
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, str) and value:
+        try:
+            parsed = json.loads(value)
+        except (ValueError, TypeError):
+            return []
+        if isinstance(parsed, list):
+            return [item for item in parsed if isinstance(item, dict)]
+    return []
+
+
 class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -88,11 +106,18 @@ class MessageOut(BaseModel):
     # Multimodal attachments (image/audio). Serialized from Message.media_json.
     media: list[MediaAttachment] = Field(default_factory=list)
     content_type: str = "text"           # "text" | "multimodal"
+    # Message evidence (Wave-2 persistence): serialized from the
+    # Message tool_calls_json / citations_json / artifacts_json
+    # columns, so a reloaded chat carries the same evidence the
+    # in-session message had (Inspector works after reload, too).
+    tool_calls: list[dict] = Field(default_factory=list)
+    citations: list[dict] = Field(default_factory=list)
+    artifacts: list[dict] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
     def _populate_media(cls, data: Any) -> Any:
-        """Hydrate `media`/`content_type` from the ORM Message.media_json column."""
+        """Hydrate `media`/`content_type`/evidence from the ORM Message columns."""
         if isinstance(data, dict):
             return data
         attachments: list[dict] = []
@@ -115,6 +140,9 @@ class MessageOut(BaseModel):
             "created_at": getattr(data, "created_at", None),
             "media": attachments,
             "content_type": "multimodal" if attachments else "text",
+            "tool_calls": _parse_evidence_json(getattr(data, "tool_calls_json", None)),
+            "citations": _parse_evidence_json(getattr(data, "citations_json", None)),
+            "artifacts": _parse_evidence_json(getattr(data, "artifacts_json", None)),
         }
 
 

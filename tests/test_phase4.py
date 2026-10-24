@@ -13,16 +13,23 @@ if str(_ROOT / "mainfiles") not in sys.path:
     sys.path.insert(0, str(_ROOT / "mainfiles"))
 
 
-def test_spec_wizard():
-    from backend.spec_wizard import build_spec, spec_to_agent_task
+def test_spec_chain_build_spec():
+    # Wave-2 merge fix: backend.spec_wizard was deleted by design in
+    # Wave 1 (replaced by the spec-kit chain in backend.spec_chain).
+    # Do NOT restore it. build_spec keeps the old input contract but
+    # renders a spec-kit spec: goals become P1 stories + FRs, tasks
+    # become the task-list seed. Whole-spec dispatch is retired
+    # (spec_to_agent_task raises NotImplementedError — covered by
+    # tests/test_deep_pipeline.py::test_whole_spec_dispatch_is_retired),
+    # so it is deliberately not called here.
+    from backend.spec_chain import build_spec
     spec = build_spec("Test", "Problem here", ["Goal 1"], ["Must be fast"],
                       ["Step 1"], ["Task 1"])
     assert "# Test" in spec
     assert "Problem here" in spec
-    assert "- Goal 1" in spec
-    assert "- [ ] Task 1" in spec
-    task = spec_to_agent_task(spec)
-    assert "Implement the following spec" in task
+    assert "Goal 1" in spec  # P1 story title + "Goal: Goal 1" FR
+    assert "FR-001" in spec
+    assert "- [ ] Task 1" in spec  # task-list seed
 
 
 def test_spec_endpoints_registered():

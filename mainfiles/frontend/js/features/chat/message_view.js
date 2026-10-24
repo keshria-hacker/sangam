@@ -394,27 +394,47 @@ export function buildMessageNode(msg) {
   node.style.setProperty('--provider-color', info.color);
 
     
+  // Wave-2 reload evidence: reloaded messages carry the same
+  // tool_calls / citations / artifacts the live message had, but in
+  // persisted shapes — tool arguments may be an object (provider
+  // arguments dict), citations may carry only text/label instead of
+  // a title. Normalize here so reload renders exactly like the live
+  // message instead of "[object Object]" or a blank "Source" row.
+  // (In-session messages already use these shapes, so this is a
+  // no-op for them.)
+  const reloadToolCalls = Array.isArray(msg.tool_calls) ? msg.tool_calls.map((tc) => ({
+    ...tc,
+    arguments: typeof tc.arguments === 'string' ? tc.arguments
+      : (tc.arguments == null ? '' : JSON.stringify(tc.arguments)),
+  })) : [];
+  const reloadCitations = Array.isArray(msg.citations) ? msg.citations.map((c) => ({
+    ...c,
+    title: c.title || c.label || c.filename
+      || (typeof c.text === 'string' && c.text ? c.text.slice(0, 80) : 'Source'),
+  })) : [];
+  const reloadArtifacts = Array.isArray(msg.artifacts) ? msg.artifacts : [];
+
   // Render tool calls if present
   let toolCallsHtml = "";
-  if (msg.tool_calls && msg.tool_calls.length > 0) {
+  if (reloadToolCalls.length > 0) {
     toolCallsHtml = '<div class="msg-tool-calls">' +
-      msg.tool_calls.map(tc => '<details open><summary><i class="fa-solid fa-wrench"></i> ' + escapeHtml(tc.name) + ' <span class="tool-call-status"> ✓</span></summary><div class="tool-call-args"><pre><code>' + escapeHtml(tc.arguments || "") + '</code></pre></div><div class="tool-call-result" style="display:block;"><pre><code>' + escapeHtml(tc.result || "") + '</code></pre></div></details>').join("") +
+      reloadToolCalls.map(tc => '<details open><summary><i class="fa-solid fa-wrench"></i> ' + escapeHtml(tc.name) + ' <span class="tool-call-status"> ✓</span></summary><div class="tool-call-args"><pre><code>' + escapeHtml(tc.arguments || "") + '</code></pre></div><div class="tool-call-result" style="display:block;"><pre><code>' + escapeHtml(tc.result || "") + '</code></pre></div></details>').join("") +
       '</div>';
   }
 
   // Render citations if present
   let citationsHtml = "";
-  if (msg.citations && msg.citations.length > 0) {
+  if (reloadCitations.length > 0) {
     citationsHtml = '<div class="msg-citations">' +
-      msg.citations.map((c, idx) => '<div class="citation-item" data-citation-index="' + (idx + 1) + '"><span class="citation-badge">[' + (idx + 1) + ']</span><span class="citation-title">' + escapeHtml(c.title || "Source") + '</span>' + (c.url ? '<a href="' + escapeHtml(c.url) + '" target="_blank" rel="noopener noreferrer" class="citation-link"><i class="fa-solid fa-external-link-alt"></i></a>' : '') + '</div>').join("") +
+      reloadCitations.map((c, idx) => '<div class="citation-item" data-citation-index="' + (idx + 1) + '"><span class="citation-badge">[' + (idx + 1) + ']</span><span class="citation-title">' + escapeHtml(c.title || "Source") + '</span>' + (c.url ? '<a href="' + escapeHtml(c.url) + '" target="_blank" rel="noopener noreferrer" class="citation-link"><i class="fa-solid fa-external-link-alt"></i></a>' : '') + '</div>').join("") +
       '</div>';
   }
 
   // Render artifacts if present
   let artifactsHtml = "";
-  if (msg.artifacts && msg.artifacts.length > 0) {
+  if (reloadArtifacts.length > 0) {
     artifactsHtml = '<div class="msg-artifacts">' +
-      msg.artifacts.map(a => {
+      reloadArtifacts.map(a => {
       let contentHtml = "";
       if (a.mime?.startsWith("text/") || a.type === "code") {
         contentHtml = '<pre><code>' + escapeHtml(a.content || "") + '</code></pre>';

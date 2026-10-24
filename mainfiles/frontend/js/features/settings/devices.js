@@ -227,7 +227,13 @@ export async function renderDevicesSection(container) {
     pairingsList.innerHTML = rows.map((p) => `
       <div class="device-row" data-pairing-row="${escapeHtml(p.pairing_id)}">
         <span><strong>${escapeHtml(p.device_name)}</strong>
-          <span class="settings-hint">code ${escapeHtml(p.code || '••••••')} · ${escapeHtml(p.status)} · expires ${escapeHtml(fmtTime(p.expires_at))}</span></span>
+          <span class="settings-hint">${p.code
+            ? `code ${escapeHtml(p.code)}`
+            // Restart-hydrated pairing: only the code hash survives, so
+            // the digits are unrecoverable by design. Never render a
+            // placeholder code (it looks like a hidden-but-real code);
+            // approval works by pairing_id, so approve by device name.
+            : 'code unavailable after restart — approve by device name'} · ${escapeHtml(p.status)} · expires ${escapeHtml(fmtTime(p.expires_at))}</span></span>
         <span>
           ${p.status === 'pending'
             ? `<button type="button" class="btn-secondary btn-sm" data-approve-pairing="${escapeHtml(p.pairing_id)}">Approve</button>

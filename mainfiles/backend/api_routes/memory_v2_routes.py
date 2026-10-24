@@ -15,8 +15,11 @@ Base.metadata):
   POST   /memory/reflect                  synthesize over recalled memories
 
 Honest limits (see also memory/extract_llm.py):
-- LLM extraction is endpoint-only: it is NOT wired into the chat loop.
-  Heuristic auto-extraction stays the chat-loop path.
+- LLM extraction IS wired into chat: after a streamed reply,
+  chat_stream_routes.py runs extract_from_turn_llm_background over
+  the turn (heuristic auto-extraction stays the fallback when no
+  model is configured). The on-demand endpoints below remain
+  available for explicit extraction.
 - Reflect / transforms return 503 when no model is configured — never
   a canned fake reflection.
 - The entities/extract heuristic fallback extracts Capitalized phrases

@@ -52,6 +52,74 @@ from .media_routes import media_content_parts, resolve_media_json
 # long-lived streaming connections during slow model generations.
 SSE_HEARTBEAT_INTERVAL = 15
 
+# --- Wave-2 message-evidence persistence ---------------------------------
+# The stream loop below collects tool calls / citations / artifacts from
+# the canonical response events and stores them on the assistant Message
+# at the persistence save point, so a reloaded chat returns the same
+# evidence the live message showed (previously only role/content
+# survived, and the Inspector only worked in-session). Caps keep one
+# pathological turn from bloating the messages table. This block only
+# reads the provenance tracker at save time; it does not change the
+# memory-recall or extraction paths.
+_EVIDENCE_TOOL_CALL_LIMIT = 50
+_EVIDENCE_CITATION_LIMIT = 100
+_EVIDENCE_ARTIFACT_LIMIT = 50
+
+
+def _evidence_json(items, limit):
+    """JSON-encode an evidence list for a Message column, or None if empty."""
+    if not items:
+        return None
+    try:
+        return json.dumps(list(items)[:limit])
+    except (TypeError, ValueError):
+        return None
+
+
+def _args_text(value):
+    """Normalize a tool-call arguments payload to the string the UI renders."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _event_tool_key(metadata):
+    """Tool identity across TOOL_START/DELTA/RESULT events.
+
+    The provider layer emits `tool_call_id`; the frontend controller
+    historically used `tool_id` — accept both so a result always lands
+    on its own call instead of spawning a duplicate entry.
+    """
+    meta = metadata if isinstance(metadata, dict) else {}
+    return meta.get("tool_call_id") or meta.get("tool_id") or meta.get("id")
+
+
+def _provenance_citations():
+    """Map the current answer's provenance nodes to citation dicts.
+
+    RAG/memory nodes are otherwise only emitted as a post-commit SSE
+    `provenance` event and lost on reload; as citations they survive
+    and render in the message + Inspector like provider citations.
+    """
+    try:
+        nodes = get_current_provenance().used_nodes
+    except Exception:  # noqa: BLE001 — provenance must never break persistence
+        return []
+    return [
+        {
+            "title": n.get("label") or n.get("id") or "Source",
+            "source_id": n.get("id"),
+            "source_type": n.get("type"),
+            "reason": n.get("reason") or "",
+        }
+        for n in nodes if isinstance(n, dict)
+    ]
+
 @router.post("/chat/stream")
 async def chat_stream(  # noqa: PLR0912
     payload: ChatStreamRequest,
@@ -359,6 +427,10 @@ async def chat_stream(  # noqa: PLR0912
         # concurrent requests — prevents race conditions with connection pool.
         async with AsyncSessionLocal() as stream_db:
             collected = ""
+            # Wave-2 evidence collectors (see module helpers above).
+            stream_tool_calls: dict[str, dict] = {}
+            stream_citations: list[dict] = []
+            stream_artifacts: list[dict] = []
             response_message_id = uuid.uuid4().hex[:12]
             # Use request ID from middleware for correlation (Phase 2)
             request_id = getattr(request.state, "request_id", uuid.uuid4().hex[:12])
@@ -403,6 +475,80 @@ async def chat_stream(  # noqa: PLR0912
                     elif event.type == ResponseEventType.REASONING_DELTA and event.content:
                         # Reasoning content is included in canonical event only
                         pass
+                    elif event.type == ResponseEventType.TOOL_START:
+                        # Wave-2 evidence: record the call; DELTA/RESULT
+                        # below fill in arguments/result by tool key.
+                        meta = event.metadata if isinstance(event.metadata, dict) else {}
+                        key = _event_tool_key(meta) or f"tool-{len(stream_tool_calls)}"
+                        stream_tool_calls[key] = {
+                            "id": key,
+                            "name": meta.get("name") or event.content or "tool",
+                            "arguments": _args_text(meta.get("arguments")),
+                            "status": "starting",
+                        }
+                    elif event.type == ResponseEventType.TOOL_INPUT_DELTA:
+                        meta = event.metadata if isinstance(event.metadata, dict) else {}
+                        tc = stream_tool_calls.get(_event_tool_key(meta) or "")
+                        if tc is not None:
+                            if event.content:
+                                tc["arguments"] = (tc.get("arguments") or "") + event.content
+                            if meta.get("arguments") is not None:
+                                # Provider-side accumulation is authoritative.
+                                tc["arguments"] = _args_text(meta.get("arguments"))
+                    elif event.type == ResponseEventType.TOOL_RESULT:
+                        meta = event.metadata if isinstance(event.metadata, dict) else {}
+                        key = _event_tool_key(meta)
+                        tc = stream_tool_calls.get(key or "") if key else None
+                        if tc is None:
+                            key = key or f"tool-{len(stream_tool_calls)}"
+                            tc = {"id": key, "name": meta.get("name") or "tool",
+                                  "arguments": "", "status": "completed"}
+                            stream_tool_calls[key] = tc
+                        tc["result"] = event.content or ""
+                        tc["status"] = "completed"
+                        if meta.get("error"):
+                            tc["error"] = meta["error"]
+                    elif event.type == ResponseEventType.CITATION:
+                        meta = event.metadata if isinstance(event.metadata, dict) else {}
+                        cite = dict(meta)
+                        if event.content:
+                            cite.setdefault("text", event.content)
+                        if not cite.get("title"):
+                            cite["title"] = (
+                                cite.get("label") or cite.get("filename")
+                                or (cite.get("text") or "")[:80] or "Source"
+                            )
+                        stream_citations.append(cite)
+                    elif event.type == ResponseEventType.ARTIFACT_START:
+                        meta = event.metadata if isinstance(event.metadata, dict) else {}
+                        art = dict(meta)
+                        if event.content:
+                            art["content"] = event.content
+                        stream_artifacts.append(art)
+                    elif event.type == ResponseEventType.ARTIFACT_DELTA:
+                        meta = event.metadata if isinstance(event.metadata, dict) else {}
+                        art = None
+                        if meta.get("id") is not None:
+                            art = next(
+                                (a for a in reversed(stream_artifacts)
+                                 if a.get("id") == meta.get("id")), None)
+                        if art is None and stream_artifacts:
+                            art = stream_artifacts[-1]
+                        if art is not None and event.content:
+                            art["content"] = (art.get("content") or "") + event.content
+                    elif event.type == ResponseEventType.ARTIFACT_END:
+                        meta = event.metadata if isinstance(event.metadata, dict) else {}
+                        art = None
+                        if meta.get("id") is not None:
+                            art = next(
+                                (a for a in reversed(stream_artifacts)
+                                 if a.get("id") == meta.get("id")), None)
+                        if art is None and stream_artifacts:
+                            art = stream_artifacts[-1]
+                        # END carries the final content; it wins over any
+                        # START + DELTA accumulation above.
+                        if art is not None and event.content:
+                            art["content"] = event.content
                     elif event.type == ResponseEventType.ERROR:
                         stream_had_error = True
                         message = event.error.message if event.error else "Provider request failed"
@@ -458,7 +604,17 @@ async def chat_stream(  # noqa: PLR0912
                                    file_ids=",".join(payload.file_ids) or None,
                                    media_json=user_media_json))
                 stream_db.add(Message(id=response_message_id, chat_id=chat.id, role="assistant", content=collected,
-                               model=payload.model, response_time=response_time))
+                               model=payload.model, response_time=response_time,
+                               # Wave-2 evidence persistence (save point):
+                               # provider citations first, then provenance
+                               # nodes (RAG/memory) as citations.
+                               tool_calls_json=_evidence_json(
+                                   list(stream_tool_calls.values()), _EVIDENCE_TOOL_CALL_LIMIT),
+                               citations_json=_evidence_json(
+                                   stream_citations + _provenance_citations(),
+                                   _EVIDENCE_CITATION_LIMIT),
+                               artifacts_json=_evidence_json(
+                                   stream_artifacts, _EVIDENCE_ARTIFACT_LIMIT)))
                 # Merge the chat into the new session so the model/updated_at
                 # changes are tracked and persisted on commit.
                 chat.model = payload.model

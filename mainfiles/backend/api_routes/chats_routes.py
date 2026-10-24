@@ -206,8 +206,25 @@ async def submit_feedback(
 # ---------------------------------------------------------------------------
 
 
+def _append_evidence_json(value):
+    """JSON-encode an optional evidence list from an append payload.
+
+    Wave-2 message-evidence persistence: the append endpoint previously
+    dropped tool_calls/citations/artifacts, so Agent-mode evidence was
+    lost on reload. Non-list values degrade to NULL, never a 500.
+    """
+    if not isinstance(value, list) or not value:
+        return None
+    import json as _json
+
+    try:
+        return _json.dumps([item for item in value if isinstance(item, dict)][:100])
+    except (TypeError, ValueError):
+        return None
+
+
 class AppendMessagesIn(BaseModel):
-    messages: list[dict]  # [{role, content}]
+    messages: list[dict]  # [{role, content, tool_calls?, citations?, artifacts?}]
 
 
 @router.post("/chats/{chat_id}/messages")
@@ -225,6 +242,9 @@ async def append_messages(chat_id: str, payload: AppendMessagesIn,
         if role not in ("user", "assistant") or not content:
             continue
         msg = Message(chat_id=chat_id, role=role, content=content,
+                      tool_calls_json=_append_evidence_json(m.get("tool_calls")),
+                      citations_json=_append_evidence_json(m.get("citations")),
+                      artifacts_json=_append_evidence_json(m.get("artifacts")),
                       created_at=datetime.now(UTC))
         db.add(msg)
         saved.append(role)
