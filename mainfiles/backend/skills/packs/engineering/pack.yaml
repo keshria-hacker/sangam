@@ -1,0 +1,13 @@
+name: engineering
+version: 1.0.0
+description: Enforced engineering workflow — grill, spec, tickets, implement, TDD, review, handoff, retro. Sangam-native methodology skills.
+source: sangam-native
+skills:
+  - grill
+  - to-spec
+  - to-tickets
+  - implement
+  - tdd
+  - code-review
+  - handoff
+  - retro

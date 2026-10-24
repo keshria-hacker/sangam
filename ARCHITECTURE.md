@@ -1246,6 +1246,24 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/skills/packs` | Yes | List skill packs |
 | POST | `/api/skills/packs/{name}/enable` | Yes | Enable pack |
 | POST | `/api/skills/packs/{name}/disable` | Yes | Disable pack |
+| GET | `/api/skills/checks` | Yes | Repo-wide skill checks (frontmatter, links, parse, eval) |
+| GET | `/api/skills/lock` | Yes | Skills lockfile verification status |
+| GET | `/api/skills/config-audit` | Yes | Config audit: secret-looking keys in skill configs (values redacted) |
+| GET | `/api/skills/{name}/checks` | Yes | Per-skill checks |
+| POST | `/api/skills/install` | Yes | Hash-verified skill install + auto-scan |
+| POST | `/api/skills/install/dry-run` | Yes | Install preview (files + hashes, writes nothing) |
+| POST | `/api/skills/verify` | Yes | Recompute lockfile hashes (OK/MISMATCH per skill) |
+| POST | `/api/skills/{name}/scan` | Yes | Server-side supply-chain / injection scan |
+| POST | `/api/skills/{name}/run` | Yes | Approval-gated skill script execution (202 approval_needed first) |
+| POST | `/api/skills/packs/{pack}/pin` | Yes | Pin a skill pack version (packs-lock.json) |
+| DELETE | `/api/skills/packs/{pack}/pin` | Yes | Unpin a skill pack |
+| POST | `/api/skills/recommend` | Yes | Stack-aware skill recommendations |
+| POST | `/api/skills/documents/generate` | Yes | Generate docx/pdf/pptx/xlsx (file download) |
+| POST | `/api/engineering` | Yes | Create engineering pipeline |
+| GET | `/api/engineering` | Yes | List engineering pipelines |
+| GET | `/api/engineering/{id}` | Yes | Get engineering pipeline + stages |
+| GET | `/api/engineering/{id}/stages` | Yes | List engineering pipeline stages |
+| POST | `/api/engineering/{id}/advance` | Yes | Advance pipeline stage (422 on out-of-order / missing prerequisite) |
 | GET | `/api/extensions` | Yes | List extensions |
 | POST | `/api/extensions/{name}/enable` | Yes | Enable extension |
 | POST | `/api/extensions/{name}/disable` | Yes | Disable extension |

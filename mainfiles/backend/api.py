@@ -228,6 +228,10 @@ from .api_routes.code_agent_routes import (  # noqa: F401
     chat_agent_run,
     code_agent_run,
 )
+# Batch 5: importing these modules registers their routes (engineering on
+# the shared router; skills v2 on the skills router) and pipeline tables.
+from .api_routes import engineering_routes  # noqa: F401
+from .api_routes import skills_v2_routes  # noqa: F401
 from .api_routes.routing_routes import evaluate_routing  # noqa: F401
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401

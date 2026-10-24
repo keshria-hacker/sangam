@@ -53,6 +53,8 @@ class SkillDefinition:
     prompt_template: str = ""
     dependencies: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    # Batch 5: declared trigger phrases for deterministic auto-invocation.
+    triggers: list[str] = field(default_factory=list)
     source_repo: str = ""
     version: str = "1.0.0"
 
@@ -121,6 +123,7 @@ class SkillRegistry:
                 prompt_template=body.strip(),
                 dependencies=metadata.get("dependencies", []),
                 tags=metadata.get("tags", []),
+                triggers=[str(t) for t in (metadata.get("triggers") or [])],
                 source_repo=skill_file.parent.name,
             )
         except (OSError, TypeError, ValueError, yaml.YAMLError):

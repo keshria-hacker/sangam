@@ -20,6 +20,7 @@ const SECTIONS = [
   { id: 'workflows', label: 'Workflows', desc: 'Build and run DAG workflows; replay and inspect nodes.' },
   { id: 'activity',  label: 'Activity',  desc: 'Live runs, run history, media jobs, workflow runs, artifacts.' },
   { id: 'security',  label: 'Security',  desc: 'Own-systems-only security testing: allowlist, runs, findings, reports.' },
+  { id: 'engineering', label: 'Engineering', desc: 'Enforced grill → design → plan → subagent → two-stage review → finish pipelines.' },
 ];
 
 const LOADERS = {
@@ -28,6 +29,7 @@ const LOADERS = {
   workflows: async () => (await import('../workflows/workflows.js')).renderWorkflowsTab,
   activity: async () => (await import('../runs/runs.js')).renderRunsTab,
   security: async () => (await import('../security/security.js')).renderSecurityPage,
+  engineering: async () => (await import('./engineering.js')).renderEngineeringPage,
 };
 
 export async function renderWorkPage(bodyEl) {

@@ -1,0 +1,9 @@
+name: document-creation
+version: 1.0.0
+description: Create docx, pdf, pptx and xlsx documents with deterministic stdlib-only scripts — no new dependencies.
+source: sangam-native
+skills:
+  - docx
+  - pdf
+  - pptx
+  - xlsx

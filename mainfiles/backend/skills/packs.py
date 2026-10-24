@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 PACKS_ROOT = Path(__file__).resolve().parent / "packs"
 SKILLS_CONFIG_ROOT = Path(__file__).resolve().parents[2] / "config" / "skills"
 PACK_STATE_FILE = SKILLS_CONFIG_ROOT / ".pack_state.json"
+# Batch 5: pack name -> pinned version (local only, never fetched).
+PACKS_LOCK_FILE = SKILLS_CONFIG_ROOT / "packs-lock.json"
 
 
 @dataclass
@@ -36,6 +38,7 @@ class SkillPack:
     source: str = ""  # upstream repo that inspired the pack
     skills: list[str] = field(default_factory=list)  # skill dir names
     enabled: bool = False
+    pinned_version: str | None = None  # Batch 5: version pinned in packs-lock.json
 
     @property
     def root(self) -> Path:
@@ -49,6 +52,9 @@ class SkillPack:
         return {
             "name": self.name,
             "version": self.version,
+            # Batch 5: available = on-disk pack.yaml version; pinned = packs-lock.
+            "available_version": self.version,
+            "pinned_version": self.pinned_version,
             "description": self.description,
             "source": self.source,
             "skills": self.skills,
@@ -101,9 +107,19 @@ def _write_enabled(enabled: set[str]) -> None:
         logger.warning("pack state write failed: %s", exc)
 
 
+def _read_packs_lock() -> dict:
+    """Batch 5: pack name -> pinned version (packs-lock.json, local only)."""
+    try:
+        data = json.loads(PACKS_LOCK_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def list_packs() -> list[SkillPack]:
     """All bundled packs with their enabled state."""
     enabled = _read_enabled()
+    pins = _read_packs_lock()
     packs: list[SkillPack] = []
     if not PACKS_ROOT.exists():
         return packs
@@ -111,6 +127,7 @@ def list_packs() -> list[SkillPack]:
         pack = _load_manifest(pack_dir)
         if pack is not None:
             pack.enabled = pack.name in enabled
+            pack.pinned_version = pins.get(pack.name)
             packs.append(pack)
     return packs
 

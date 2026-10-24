@@ -3161,3 +3161,11 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .nb-detail h5 { margin: 0 0 8px; }
 .nb-note-detail { border: 1px solid var(--border, #ddd); border-radius: 8px; padding: 12px; margin-top: 12px; background: var(--bg-secondary, #f8f8f8); }
 .nb-note-detail ul { margin: 6px 0 0 18px; }
+
+/* Batch 5 engineering pipeline + skills v2 */
+.eng-card { margin-bottom: 12px; }
+.eng-stages { margin-top: 8px; }
+.eng-stage { border-top: 1px solid var(--border, #ddd); padding: 8px 0; }
+.eng-stage pre { white-space: pre-wrap; word-break: break-word; }
+.eng-advance-form { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.eng-advance-form textarea { width: 100%; min-height: 70px; }

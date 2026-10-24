@@ -165,6 +165,63 @@ async def disable_skill_pack(name: str):
     return pack.to_dict()
 
 
+# Batch 5: these GET routes MUST stay above GET /{sid} — FastAPI matches
+# in registration order, and /{sid} would otherwise swallow them.
+@router.get("/checks")
+async def repo_wide_skill_checks():
+    """Repo-wide skill checks: one summary per skill dir on disk."""
+    from .packs import PACKS_ROOT
+    from .verify import USER_SKILLS_ROOT, run_skill_checks
+
+    dirs: list = []
+    if USER_SKILLS_ROOT.exists():
+        dirs.extend(p for p in USER_SKILLS_ROOT.iterdir() if p.is_dir())
+    if PACKS_ROOT.exists():
+        for pack_dir in PACKS_ROOT.iterdir():
+            skills_root = pack_dir / "skills"
+            if skills_root.exists():
+                dirs.extend(p for p in skills_root.iterdir() if p.is_dir())
+    seen: set[str] = set()
+    out = []
+    for d in sorted(dirs, key=lambda p: p.name):
+        if d.name in seen or not (d / "SKILL.md").exists():
+            continue
+        seen.add(d.name)
+        out.append(run_skill_checks(d))
+    return {"skills": out}
+
+
+@router.get("/lock")
+async def skills_lock_status():
+    """Lockfile status: recomputed hash verification for locked skills."""
+    from .verify import verify_lock
+
+    return {"skills": verify_lock()}
+
+
+@router.get("/config-audit")
+async def skills_config_audit():
+    """AgentShield-style config audit: flags plaintext-looking secrets in
+    skill configs. Returns key name + file ONLY — never secret values."""
+    from .packs import PACKS_ROOT
+    from .scan import audit_skill_configs
+    from .verify import USER_SKILLS_ROOT
+
+    dirs: list = []
+    if USER_SKILLS_ROOT.exists():
+        dirs.extend(p for p in USER_SKILLS_ROOT.iterdir() if p.is_dir())
+    if PACKS_ROOT.exists():
+        for pack_dir in PACKS_ROOT.iterdir():
+            skills_root = pack_dir / "skills"
+            if skills_root.exists():
+                dirs.extend(p for p in skills_root.iterdir() if p.is_dir())
+    findings = []
+    for d in sorted(dirs, key=lambda p: p.name):
+        for f in audit_skill_configs(d):
+            findings.append({"skill": d.name, **f})
+    return {"findings": findings}
+
+
 @router.get("/{sid}")
 async def get_skill(sid: str):
     """Return full detail for a single skill, excluding the full prompt template."""
