@@ -14,10 +14,20 @@ Enforcement is structural, not LLM judgement:
     the plan or subagent stage's artifact id.
   * finish requires BOTH reviews to carry verdict "pass".
 
-The "subagent" stage does NOT spawn a real agent process in v1: it
-runs a linked agent-team run when a model is configured, and otherwise
-records a handoff brief artifact (source="handoff", marked as such) so
-the pipeline never fabricates agent output.
+Wave-1 (deep-read refinement) additions, legacy behaviour preserved:
+  * The "subagent" stage can now run REAL per-task agent runs when the
+    pipeline has a spec-chain tasks artifact: one ``run_agent`` run per
+    task (see pipeline_agents), joined into a diff ledger. Without
+    chain tasks it keeps the v1 behaviour — a linked team run when a
+    model is configured, otherwise a marked handoff brief, never
+    fabricated output.
+  * The strict spec-kit chain (constitution -> ... -> converge, real
+    per-task runs with TDD ledger, two-stage review over a real
+    BASE/HEAD diff package, finish gated on package-referencing
+    verdicts) lives in spec_chain.py and is served by the chain routes
+    in engineering_routes.py. The legacy finish gate is kept for
+    backward compatibility and is superseded by chain finish for new
+    pipelines; see BUILD_LOG2-pipeline.md for the split.
 
 Tables live in this module and register on Base.metadata (Batch 2/4
 precedent); models.py is untouched.
@@ -147,22 +157,51 @@ async def advance_pipeline(db: AsyncSession, pipe: EngineeringPipeline,
 
 
 async def produce_subagent_output(goal: str, prior_text: str,
-                                  db: AsyncSession) -> tuple[str, str]:
-    """Subagent-stage output: linked team run, or a marked handoff brief.
+                                  db: AsyncSession,
+                                  tasks: list[dict] | None = None,
+                                  model_id: str | None = None) -> tuple[str, str]:
+    """Subagent-stage output.
 
-    Returns (artifact, source) where source is "team" or "handoff".
-    Never fabricates agent output: without a configured model the
-    artifact is explicitly a brief for a human/agent to pick up later.
+    With chain tasks (list of {task_id, brief, files}): one REAL agent
+    run per task via pipeline_agents.run_task_agent (the code agent's
+    own run function), joined into a per-task diff ledger; source is
+    "agent". Without tasks, the v1 behaviour is preserved: a linked
+    team run when a model is configured, otherwise a marked handoff
+    brief. Returns (artifact, source); source is "agent", "team", or
+    "handoff". Never fabricates agent output.
     """
+    if tasks:
+        if model_id is None:
+            try:
+                from . import llm
+                model_id = await llm.default_model_id(db)
+            except Exception:  # noqa: BLE001 — no model configured
+                model_id = None
+        if model_id:
+            from .pipeline_agents import run_task_agent
+            parts = []
+            ran_any = False
+            for t in tasks:
+                result = await run_task_agent(
+                    t.get("task_id", "?"), t.get("brief", ""),
+                    model_id, db, files=t.get("files") or [])
+                ran_any = True
+                parts.append(
+                    f"## Task {result.task_id}\n"
+                    f"error: {result.error or '(none)'}\n"
+                    f"diff:\n{result.diff or '(no file changes)'}\n"
+                    f"answer: {result.answer or '(none)'}")
+            if ran_any:
+                return "\n\n".join(parts), "agent"
     try:
         from . import llm
-        model_id = await llm.default_model_id(db)
+        resolved = model_id or await llm.default_model_id(db)
     except Exception:  # noqa: BLE001 — no model configured
-        model_id = None
-    if model_id:
+        resolved = None
+    if resolved:
         try:
             from .teams.runner import run_team
-            result = await run_team("research", goal, model_id, db)
+            result = await run_team("research", goal, resolved, db)
             if result.synthesis:
                 return result.synthesis, "team"
             if result.specialists:
