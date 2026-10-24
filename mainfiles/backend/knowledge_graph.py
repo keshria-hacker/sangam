@@ -76,13 +76,33 @@ def build_knowledge_graph(
         add_node(did, "document", d.get("filename", "document") or "document",
                  {"mime": d.get("mime_type"), "size": d.get("size")})
 
-    # Code symbols
+    # Code symbols — consumes the code graph's RESOLVED edge list.
+    # (Previously this branch read sym.get("calls")/sym.get("name"),
+    # which code_graph never emitted, so call edges never materialised
+    # — a dead branch. Symbols now carry "name"; edges carry resolved
+    # targets + confidence, so provenance is real, not a label mirage.)
     if code_graph:
         for sym_id, sym in list(code_graph.get("symbols", {}).items())[:max_nodes // 2]:
             nid = f"code:{sym_id}"
             if add_node(nid, "code", sym.get("name", sym_id),
-                        {"kind": sym.get("kind"), "file": sym.get("file")}):
-                # Call edges (EXTRACTED from AST)
+                        {"kind": sym.get("kind"), "file": sym.get("file"),
+                         "line": sym.get("line"),
+                         "signature": sym.get("signature")}):
+                pass
+        # Call edges from the resolved edge list (preferred path).
+        code_edges = [e for e in code_graph.get("edges", [])
+                      if e.get("type") == "calls"]
+        if code_edges:
+            for e in code_edges:
+                frm, to = f"code:{e['from']}", f"code:{e['to']}"
+                if frm in seen and to in seen:
+                    add_edge(frm, to, "calls",
+                             provenance=e.get("confidence", "INFERRED"),
+                             source="code_graph")
+        else:
+            # Legacy fallback: symbols carrying their own calls list.
+            for sym_id, sym in list(code_graph.get("symbols", {}).items()):
+                nid = f"code:{sym_id}"
                 for callee in sym.get("calls", [])[:10]:
                     cid = f"code:{callee}"
                     if cid in seen:
