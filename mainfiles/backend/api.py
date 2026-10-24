@@ -61,6 +61,11 @@ from .api_routes.automations_routes import (  # noqa: F401
     run_automation_now,
     update_automation,
 )
+from .api_routes.media_jobs_routes import (  # noqa: F401
+    create_media_job,
+    get_media_job,
+    list_media_jobs,
+)
 from .api_routes.workflows_routes import (  # noqa: F401
     create_workflow,
     delete_workflow,

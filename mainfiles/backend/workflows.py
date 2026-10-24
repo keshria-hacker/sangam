@@ -322,14 +322,14 @@ async def start_workflow_scheduler(app=None) -> None:
     from sqlalchemy import select
 
     from .automations import parse_schedule
-    from .database import get_session_factory
     from .models import Workflow
 
     while True:
         await asyncio.sleep(30)
         try:
-            factory = get_session_factory()
-            async with factory() as db:
+            from .database import AsyncSessionLocal
+
+            async with AsyncSessionLocal() as db:
                 now = datetime.now(UTC)
                 rows = (await db.execute(
                     select(Workflow).where(

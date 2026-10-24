@@ -19,6 +19,7 @@ const TOOL_DEFS = {
   code:      { title: 'Code',          icon: 'fa-code',                feature: null },
   runs:      { title: 'Runs',          icon: 'fa-list-check',          feature: null },
   workflows: { title: 'Workflows',     icon: 'fa-diagram-project',     feature: null },
+  media:     { title: 'Media',         icon: 'fa-photo-film',          feature: null },
   // Phase 8 B7: merged pages. The old separate tabs are gone:
   // - teams, compare -> Agents page sub-views
   // - skills, automations -> Library / Agents sub-views

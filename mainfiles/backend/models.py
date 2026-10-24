@@ -318,6 +318,29 @@ class WorkflowRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class MediaJob(Base):
+    """Observable media worker job (Phase 4).
+
+    kind: transcribe | tts | dub | image. result_json holds the
+    job-specific result (transcript text, audio media_id/url, or
+    image attachments). Jobs run as background tasks; status is
+    pollable via the API and mirrored onto the Phase 0 RunStore so
+    they also appear in the Runs centre.
+    """
+
+    __tablename__ = "media_jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending|running|succeeded|failed
+    input_json: Mapped[str] = mapped_column(Text, default="{}")
+    result_json: Mapped[str] = mapped_column(Text, default="{}")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+
 class ArenaResult(Base):
     """Arena vote: which model won a comparison (Phase 6.4c)."""
 

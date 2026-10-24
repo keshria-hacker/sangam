@@ -1130,6 +1130,9 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/workflows/{id}/runs` | Yes | List workflow runs (Phase 3) |
 | POST | `/api/workflows/{id}/runs/{run_id}/replay` | Yes | Replay a run with the same input (Phase 3) |
 | POST | `/api/workflows/{id}/webhook` | Yes | Webhook trigger, token-authenticated (Phase 3) |
+| POST | `/api/media-jobs` | Yes | Create a media worker job, runs in background (Phase 4) |
+| GET | `/api/media-jobs` | Yes | List media jobs (Phase 4) |
+| GET | `/api/media-jobs/{id}` | Yes | Poll one media job (Phase 4) |
 | GET | `/api/memory/export` | Yes | Export memories as JSON download (Phase 2) |
 | POST | `/api/memory/forget` | Yes | Bulk forget memories by filter, confirm required (Phase 2) |
 | GET | `/api/agents` | Yes | List custom agents (Phase 3) |

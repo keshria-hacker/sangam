@@ -477,6 +477,10 @@ async function init() {
     const { renderWorkflowsTab } = await import('./features/workflows/workflows.js');
     renderWorkflowsTab(bodyEl);
   });
+  registerTabRenderer('media', async (bodyEl) => {
+    const { renderMediaTab } = await import('./features/media/media.js');
+    renderMediaTab(bodyEl);
+  });
 
 
   // Initialize auth flow (this will call startApplication on success)
