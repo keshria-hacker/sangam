@@ -351,6 +351,24 @@ async def chat_stream(  # noqa: PLR0912
                 ):
                     yield sse_response_event(event)
 
+                    # Phase 0: provider telemetry ledger — USAGE events
+                    # carry token counts; record them (best-effort, never
+                    # break the stream) with latency since stream start.
+                    if event.type == ResponseEventType.USAGE and event.usage:
+                        try:
+                            from ..contracts import telemetry_ledger
+
+                            telemetry_ledger.record(
+                                provider=event.provider or "unknown",
+                                model=event.model or payload.model,
+                                latency_ms=(time.monotonic() - stream_started_at) * 1000.0,
+                                input_tokens=event.usage.input_tokens or 0,
+                                output_tokens=event.usage.output_tokens or 0,
+                                correlation_id=request_id,
+                            )
+                        except Exception:
+                            pass
+
                     if event.type == ResponseEventType.TEXT_DELTA and event.content:
                         collected += event.content
                     elif event.type == ResponseEventType.REASONING_DELTA and event.content:

@@ -73,9 +73,19 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 request_id=request_id,
                 duration_ms=process_time * 1000,
             )
+            # Phase 0: error envelope alongside the legacy "detail"
+            # body so existing clients keep working while new clients
+            # can rely on error.code + correlation_id.
+            from .contracts import error_envelope
+
             return JSONResponse(
                 status_code=500,
-                content={"detail": "Internal server error", "request_id": request_id},
+                content={
+                    "detail": "Internal server error",
+                    "request_id": request_id,
+                    **error_envelope("internal_error", "Internal server error",
+                                     correlation_id=request_id),
+                },
             )
 
         process_time = time.perf_counter() - start_time

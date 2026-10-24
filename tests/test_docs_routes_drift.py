@@ -27,30 +27,40 @@ def _norm(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "{}", path) or "/"
 
 
-def _walk(routes):
+def _walk(routes, prefix=""):
+    # Phase 0 fix: FastAPI include_router() wraps routers as
+    # _IncludedRouter objects whose inner routes carry NO prefix — the
+    # prefix lives on include_context.prefix. The old walk ignored that,
+    # so every /api route came out bare, was filtered out by
+    # _live_routes(), and the test saw 0 live routes. Apply the prefix
+    # as we recurse so the walked paths are the real served paths.
     seen: set[tuple[str, str]] = set()
     for route in routes:
-        # Recurse into mounted routers (FastAPI wraps them as Mounts).
         orig = getattr(route, "original_router", None)
         if orig is not None and getattr(orig, "routes", None):
-            yield from _walk(orig.routes)
+            ctx = getattr(route, "include_context", None)
+            route_prefix = getattr(ctx, "prefix", "") or ""
+            yield from _walk(orig.routes, prefix + route_prefix)
             continue
         sub = getattr(route, "routes", None)
         if sub:
-            yield from _walk(sub)
+            # Mounts carry their own path prefix.
+            mount_prefix = getattr(route, "path", "") or ""
+            yield from _walk(sub, prefix + mount_prefix)
             continue
         endpoint = getattr(route, "endpoint", None)
         methods = getattr(route, "methods", None) or set()
         path = getattr(route, "path", "")
         if endpoint is None or not methods:
             continue
-        if path in ("/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"):
+        full_path = prefix + path
+        if full_path in ("/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"):
             continue
-        key = (path, endpoint.__name__)
+        key = (full_path, endpoint.__name__)
         if key in seen:
             continue
         seen.add(key)
-        yield path, methods
+        yield full_path, methods
 
 
 def _live_routes(app):

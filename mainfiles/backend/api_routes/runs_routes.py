@@ -13,6 +13,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import get_current_user
+from ..contracts import PaginationParams, RunState, paginate, run_store
 from ..database import get_db
 from ..models import AgentRun
 from .common import router
@@ -48,6 +49,22 @@ async def record_run(payload: RunIn, db: AsyncSession = Depends(get_db),
     )
     db.add(run)
     await db.commit()
+    # Phase 0: mirror the completed run onto the live run plane so the
+    # durable history and the live RunStore agree on id/kind/state.
+    # "done" maps to SUCCEEDED; anything else with an error maps to
+    # FAILED. This never fails the recording itself.
+    try:
+        record = run_store.create(kind=payload.kind, owner_id=user.id,
+                                  title=payload.title[:200], run_id=run.id)
+        record.transition(RunState.RUNNING, progress=1.0)
+        record.transition(
+            RunState.SUCCEEDED if payload.status == "done" else RunState.FAILED,
+            error=payload.error,
+        )
+        record.tokens = payload.tokens
+        record.cost_usd = payload.cost_usd
+    except Exception:
+        pass
     return {"id": run.id}
 
 
@@ -56,21 +73,32 @@ async def list_runs(db: AsyncSession = Depends(get_db),
                     user=Depends(get_current_user),
                     q: str | None = None,
                     kind: str | None = None,
-                    limit: int = 50):
-    """List run history, newest first. Optional search."""
-    stmt = select(AgentRun).where(AgentRun.user_id == user.id)
+                    limit: int = 50, offset: int = 0):
+    """List run history, newest first. Optional search.
+
+    Phase 0: pagination contract — the ``runs`` list shape is unchanged
+    (existing clients keep working); a ``pagination`` block is added
+    alongside it.
+    """
+    from sqlalchemy import func
+
+    params = PaginationParams(limit=limit, offset=offset)
+    base = select(AgentRun).where(AgentRun.user_id == user.id)
     if kind:
-        stmt = stmt.where(AgentRun.kind == kind)
+        base = base.where(AgentRun.kind == kind)
     if q:
-        stmt = stmt.where(AgentRun.title.ilike(f"%{q}%"))
-    stmt = stmt.order_by(desc(AgentRun.created_at)).limit(min(limit, 200))
+        base = base.where(AgentRun.title.ilike(f"%{q}%"))
+    total = (await db.execute(
+        select(func.count()).select_from(base.subquery()))).scalar() or 0
+    stmt = base.order_by(desc(AgentRun.created_at)).limit(params.limit).offset(params.offset)
     runs = (await db.execute(stmt)).scalars().all()
-    return {"runs": [
+    items = [
         {"id": r.id, "kind": r.kind, "title": r.title, "model": r.model,
          "status": r.status, "tokens": r.tokens, "cost_usd": r.cost_usd,
          "error": r.error, "created_at": r.created_at.isoformat() if r.created_at else None}
         for r in runs
-    ]}
+    ]
+    return {"runs": items, "pagination": paginate(items, total, params)["pagination"]}
 
 
 @router.get("/runs/{run_id}")
