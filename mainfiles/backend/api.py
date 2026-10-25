@@ -137,6 +137,8 @@ from .api_routes.workflows_routes import (  # noqa: F401
     run_workflow,
     webhook_run,
 )
+# Batch 12: importing the module registers all /devqa/* endpoints.
+from .api_routes import devqa_routes  # noqa: F401
 from .api_routes.compare_routes import (  # noqa: F401
     arena_leaderboard,
     arena_vote,

@@ -268,3 +268,57 @@ deep-read brief could not read (their clones were absent then).
 - Design systems are file-backed JSON under uploads/design-systems (per-user filename prefix), not DB rows — no migration, but also no DB querying; acceptable for single-user.
 - Frontend Studio section is module-link-checked (64/64 modules), not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
 - Physical phone QR scan, real-LAN/mDNS, Docker isolation and real-driver browser runs remain unverified live, as before.
+
+### Batch 12 — Dev / QA / Security / Platform (2026-10-26, branch integration/full-program)
+
+One QA system, one workflow-depth layer, one guarded security layer, one
+platform/health layer, one chat-parity layer — not 23 buttons. Backend:
+`backend/qa/devqa.py` (pure helpers) + `backend/api_routes/devqa_routes.py`
+(all `/api/devqa/*` endpoints, authenticated) + a real `human_input` node
+in `workflows.py` (pause with status `awaiting_input`, exactly-once resume
+that replays from the original input). Persistence for services / health
+history / notifications / folders / presets is a SQLite sidecar
+(`uploads/devqa.db`, `SANGAM_DEVQA_DB` override for tests) — deliberately
+kept out of shared `models.py` so parallel batches sharing that file are
+untouched. Frontend: a "Dev & QA" section inside the existing Work
+destination (`features/work/devqa.js`, wired into `work.js`); no new
+destination, no perfect-flow/tabs restoration. Writing-lint gains are wired
+into the existing `/quality/lint` route, not a second linter. All 23 repos
+below were read from source in `~/workspace/projects/research-repos/` for
+this batch, including the 5 the earlier deep-read brief could not read
+(their clones were absent then; they exist now and were spot-checked).
+
+| # | Repo | Status | Evidence |
+|---|------|--------|----------|
+| 1 | github/spec-kit | Done | Constitution parsing + plan gate (`POST /devqa/spec/constitution/check`, keyword-overlap heuristic labelled as such, not semantic proof) and P1-only MVP ordering with dependency/cycle errors (`POST /devqa/spec/mvp-order`). Existing spec_chain (spec/plan/tasks/coverage) unchanged. Clarify-before-spec gate and checklist artifacts NOT built |
+| 2 | unclecode/crawl4ai | Partial (helpers + API) | Frontier ordering bfs/dfs/best_first, composite scorer (keyword + depth + freshness + caller-supplied authority, never invented), FilterChain (content_type/domain/keyword), markdown chunking (paragraph/heading/fixed), link-graph output — all as `/devqa/crawl/*` helpers. NOT yet threaded into `crawl_job.run_crawl` or the workflow `crawl` node, which remain BFS-only; that threading is future work, not claimed |
+| 3 | langflow-ai/langflow | Done (catalogue) | Typed node catalogue (`GET /devqa/node-catalogue`) covering exactly the engine's closed node set (15 existing + `human_input`) with declared inputs/outputs. No new executable types invented: fan-out is DAG edges, sub-flow is a workflow run by id — both documented in the catalogue, not fake nodes. No React rewrite, no multi-tenancy |
+| 4 | langgenius/dify | Done | `human_input` node (validation + pause + exactly-once resume endpoint, replay-from-start limitation stated), variable-pool validation (`POST /devqa/workflows/validate`: input/nodes.<known>/system/env scopes, unknown node references rejected), and 3 starter graphs (chatbot/agent/workflow) as Work templates. Trigger-as-node and workflow-as-chat-app publish mode NOT built |
+| 5 | browser-use/browser-use | Not built in this batch | DOM snapshot action, judge verification step, and session/watchdog recovery were NOT added here; the existing two-mode browser agent (automation vs security-test, allowlisted, per-mode approval) is unchanged. Snapshot/judge belong to a browser-focused batch; no claim of browser-use parity |
+| 6 | ChrisTitusTech/winutil | Done (safe half) | Health-action catalogue (`GET /devqa/platform/health-actions`: every action declares risk + reversibility) + Windows check/tweak catalogue (`GET /devqa/platform/winutil-catalog`: read-only checks + documented-only tweaks). NOTHING is executed by the server; the user runs checks on their own Windows machine. Registry/debloat/AppX/winget execution excluded |
+| 7 | affaan-m/ECC | Not built in this batch | Hook matchers with allow/deny/annotate outcomes, the reviewer-agent library, and skill-health scoring were NOT wired into `permission_policy.py` or the skills system here. No claim; the QA lint rules in this batch are JS/writing rules, not ECC's hook semantics |
+| 8 | H-mmer/pentest-agents | Done (guardrail half) | Scope-file import + hard check (wildcard domains, CIDR, excluded-wins), finding fingerprinting + dedup, CVSS-version guard, guided phase checklists (recon/hunt/triage/report). WAF-bypass protocol excluded in its entirety; bounty/third-party targeting excluded (own-systems-only) |
+| 9 | Z4nzu/hackingtool | Partial | Tool availability probing (binary + install hint, Sangam never installs) and wholesale rejection of excluded categories (`POST /devqa/security/categories/reject`). Install/update lifecycle and per-tool output parsers NOT built. Excluded categories: ddos, phishing, remote-admin, post-exploitation, exploit-frameworks, anonsurf, wireless, payload-creator-as-weaponizer |
+| 10 | usestrix/strix | Partial | Sandbox pre-flight gates failing closed (`docker_unavailable` when Docker is off and fallback disallowed) and a computed coverage ledger (undefined, never 100%, on zero discovered). Reusable labelled sandbox sessions with caps + guaranteed cleanup, proxy integration, and a scheduled CI passive-scan mode NOT built; existing Docker-or-workspace-fallback behaviour is unchanged |
+| 11 | keploy/keploy | Done (review-only) | Cassette → pytest generation (`POST /devqa/qa/cassette-to-test`) and replay diff with noise stripping (`POST /devqa/qa/replay-diff`). Generated code is RETURNED, never written to `tests/`; cassettes carrying auth/cookie/API-key headers are rejected at generation time. Live-traffic recording from Sangam sessions NOT built (cassettes are caller-supplied) |
+| 12 | tester-army/e2e | Partial | Budget/tag discipline via test tags + suite report (quarantined passes are not green) and the JS lint ruleset. The agent-driven "explore this destination" mode, budgeted QA runs with screenshots, and self-healing locators were NOT built (they need Playwright-harness work); existing Playwright specs are untouched |
+| 13 | goldbergyoni/javascript-testing-best-practices | Partial | Test tags (cold/live/quarantined), suite-report verdict, and a JS ruleset (no-console-in-prod, no-bare-specifier, testid-for-interactive) as findings-only checks. Per-route API contract (response-shape) tests NOT added; the drift test covers route presence, not schemas |
+| 14 | Automattic/harper | Done | Three Harper-shaped deterministic rules wired into the existing `writing_lint.lint_text` and `/quality/lint` route: a/an agreement (with hour/honest-type exceptions), double comparatives, common typos — each with span + suggestion, never auto-rewrite. User dictionary persistence and dialect (US/UK) setting NOT built |
+| 15 | quickemu-project/quickemu | Done (gates + profiles) | Pre-flight gates (see strix row) plus VM launch profiles (`GET /devqa/platform/vm-profiles`) as documented external-tool configs only. Sangam never launches a VM, never claims a hypervisor, never downloads or licenses an OS image. QEMU guest support excluded as a new product + attack surface |
+| 16 | coollabsio/coolify | Partial (hygiene only) | Service-health dashboard data (registered URLs, live probes with `trust_env=False`, SQLite uptime history), health-action catalogue, and analytics taxonomy/funnels. NOT a Coolify clone: no deployment engine, no deployment queue, no scheduled backup execution, no restore dry-run execution (verify_backup is a catalogue entry, not an executed restore) |
+| 17 | Openpanel-dev/openpanel | Partial | Declared event taxonomy with 422 on unknown events (`POST /devqa/platform/analytics/event`) and session funnels over supplied events (`POST /devqa/platform/analytics/funnel`). Events are validated, not persisted, by this endpoint; aggregate stats remain on the existing `/analytics/*` routes. No second tracker, no ClickHouse |
+| 18 | open-webui/open-webui | Partial | Pipe shape already existed as `prompt_transform`; this batch adds the typed catalogue entry and the starter-graph surface around it. An eval harness (eval sets runnable against any model) was NOT built. Multi-user RBAC, groups, shared chats, OAuth/SCIM excluded |
+| 19 | gotify/gotify | Done (native equivalent) | Webhook-in + in-app inbox (`/devqa/platform/notifications/*`): a secret must be configured (`SANGAM_DEVQA_WEBHOOK_SECRET`) and matched, otherwise webhooks are refused — no open inbox. No external push service (FCM/APNs/WebPush) is claimed, and no websocket stream is offered |
+| 20 | anything-llm | Partial (generic shapes) | Prompt-template library, chat folders, and shareable model presets (settings only — share payload states `shares_keys: false, shares_history: false`). Multi-user workspaces, invites, agent flows, and embed chats excluded; nothing here claims anything-llm parity beyond these generic chat shapes |
+| 21 | librechat | Partial (generic shapes) | Same generic shapes as row 20 (folders, prompt templates, model presets). Multi-user accounts, SSO/2FA, plugins, code environments, and shared conversations excluded |
+| 22 | pentagi/pentagi | Excluded (autonomous part) | PentAGI is autonomous multi-agent pentesting (including Metasploit-class tooling) — autonomous exploitation is excluded by the standing guardrail. Only the already-existing Sangam engagement shape (runs/phases/findings/report) plus this batch's guided checklists are used, always per-run-approved and own-systems-only |
+| 23 | heretic/heretic | Excluded entirely | Model censorship removal (directional ablation / abliteration) — a safety-bypass tool. Nothing built from it, no endpoint, no flag, no mention in any catalogue |
+
+### Batch 12 honest limits
+- Crawl strategy/filter/chunk/graph helpers are API-level; `crawl_job.run_crawl` and the workflow `crawl` node still run BFS with raw HTML→text only. Do not claim crawl4ai parity until those helpers are threaded into the fetcher.
+- Workflow resume replays from the original input: an `llm` node before the pause re-runs (and re-costs) on resume. Resume is exactly-once per paused run (a second resume is 422), but the paused run row itself stays `awaiting_input`.
+- Coverage is computed from caller-supplied discovered/probed counts; it is not yet wired into SecurityRun reports, so a security report does not yet show coverage automatically.
+- The notification inbox is in-app only; webhook-in needs the env secret, and there is no push to any device.
+- Health-action catalogue entries are declarations (risk + undo text); `verify_backup` and `prune_runs` are not executed by any Batch 12 endpoint — execution stays with the existing system routes.
+- Frontend Dev & QA section is module-link-checked (65/65 modules), not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
+- Docker isolation, real-driver browser runs, and physical phone QR scan remain unverified live, as before.

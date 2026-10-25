@@ -21,6 +21,7 @@ const SECTIONS = [
   { id: 'activity',  label: 'Activity',  desc: 'Live runs, run history, media jobs, workflow runs, artifacts.' },
   { id: 'security',  label: 'Security',  desc: 'Own-systems-only security testing: allowlist, runs, findings, reports.' },
   { id: 'engineering', label: 'Engineering', desc: 'Enforced grill → design → plan → subagent → two-stage review → finish pipelines.' },
+  { id: 'devqa', label: 'Dev & QA', desc: 'Workflow starters, writing checks, guarded security helpers, service health, chat organisation.' },
 ];
 
 const LOADERS = {
@@ -30,6 +31,7 @@ const LOADERS = {
   activity: async () => (await import('../runs/runs.js')).renderRunsTab,
   security: async () => (await import('../security/security.js')).renderSecurityPage,
   engineering: async () => (await import('./engineering.js')).renderEngineeringPage,
+  devqa: async () => (await import('./devqa.js')).renderDevQaPage,
 };
 
 export async function renderWorkPage(bodyEl) {

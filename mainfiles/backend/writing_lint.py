@@ -24,6 +24,14 @@ Rules:
   Capitalized words are skipped (assumed proper nouns) and words shorter
   than 4 letters are skipped, to keep false positives down. An
   unknown word is a candidate, not proof of a misspelling.
+Batch 12 (Harper-shaped additions, same issue shape, same route):
+- a-an-agreement: "a apple" / "an cat" (a small exception list covers
+  hour/honest/honour/honor/heir/herb, where spelling misleads).
+- double-comparative: "more better", "most fastest".
+- common-typo: a small deterministic typo map (teh, recieve, adress,
+  occured, seperate, definately, neccessary, accomodate, wich, thier,
+  untill, goverment, enviroment). These are candidates with a
+  suggestion, never auto-rewrites.
 
 Offsets are 0-based character offsets into the full text; line is
 1-based. quote is the offending word/line fragment.
@@ -180,5 +188,16 @@ def lint_text(text: str) -> list[dict]:
     if depth > 0 and first_open >= 0:
         issues.append(_issue("unbalanced-parens", first_open, "(",
                              "Opening parenthesis is never closed."))
+    # Batch 12: Harper-shaped deterministic rules (see qa/devqa.py
+    # extra_writing_issues for the rule bodies; the issue shape matches
+    # this function's _issue output so the route needs no change).
+    from .qa.devqa import extra_writing_issues
+
+    for extra in extra_writing_issues(text, _WORD_RE.finditer(text)):
+        d = {"rule": extra["rule"], "line": _line_of(offsets, extra["offset"]),
+             "offset": extra["offset"], "quote": extra["quote"]}
+        if extra.get("suggestion"):
+            d["suggestion"] = extra["suggestion"]
+        issues.append(d)
     issues.sort(key=lambda d: (d["offset"], d["rule"]))
     return issues

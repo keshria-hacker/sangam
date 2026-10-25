@@ -23,6 +23,12 @@ third-party code execution); the closed node set is:
   ``loop`` (render a template per list item), ``crawl`` (same-host BFS,
   SSRF-guarded, capped pages/depth), ``extract`` (regex named groups or
   JSON path), ``prompt_transform`` (render system/user prompt parts).
+* Batch 12 node: ``human_input`` — Dify-style human-in-the-loop. The
+  run pauses with status ``awaiting_input`` when it reaches this node
+  without a submitted value, and resumes via the resume endpoint with
+  ``human_input: {<node_id>: <value>}`` merged into the run input.
+  Resume replays the workflow from its original input (documented
+  limitation: non-idempotent nodes, e.g. llm, re-run on resume).
   Any node may carry ``run_if``: a template that must render truthy or
   the node records ``skipped`` (reason run_if false) without failing.
 
@@ -61,7 +67,22 @@ NODE_TYPES = {"text", "transform", "retrieve", "memory_save", "http_fetch",
               # Batch 3 node library (engine unchanged: same validation,
               # timeouts, retries, dead letters, idempotency, replay).
               "llm", "agent", "tool", "code", "condition", "loop",
-              "crawl", "extract", "prompt_transform"}
+              "crawl", "extract", "prompt_transform",
+              # Batch 12: human-in-the-loop pause node.
+              "human_input"}
+
+
+class HumanInputNeeded(Exception):
+    """Raised by a human_input node with no submitted value.
+
+    Carries the node id and prompt so the run layer can record the
+    pause (status awaiting_input) instead of a failure.
+    """
+
+    def __init__(self, node_id: str, prompt: str):
+        super().__init__(f"human input needed at node {node_id}")
+        self.node_id = node_id
+        self.prompt = prompt
 TRANSFORM_OPS = {"upper", "lower", "reverse", "trim", "title"}
 # Tool node allowlist: read-only tools only. Write/execute tools are
 # excluded from workflows by design — a non-interactive run must never
@@ -195,6 +216,8 @@ def _validate_new_node(node: dict) -> None:
             raise WorkflowError(f"node {nid}: crawl max_depth must be 0..2")
     if ntype == "extract" and not (config.get("pattern") or config.get("json_path")):
         raise WorkflowError(f"node {nid}: extract needs pattern or json_path")
+    if ntype == "human_input" and not config.get("prompt"):
+        raise WorkflowError(f"node {nid}: human_input needs config.prompt")
 
 
 def _truthy(text: str) -> bool:
@@ -498,6 +521,14 @@ async def _run_node(node: dict, run_input: dict, node_outputs: dict, db: Any = N
         if not out and config.get("template"):
             return render_template(config["template"], run_input, node_outputs)
         return out
+    if ntype == "human_input":
+        # Submitted values arrive under run_input["human_input"][node_id].
+        # Without one, pause the run (HumanInputNeeded) — never invent
+        # an approval or a form answer.
+        submitted = run_input.get("human_input") or {}
+        if isinstance(submitted, dict) and node["id"] in submitted:
+            return submitted[node["id"]]
+        raise HumanInputNeeded(node["id"], config.get("prompt", ""))
     raise WorkflowError(f"unknown node type: {ntype}")
 
 
@@ -521,7 +552,12 @@ async def execute_definition(
     node_results: dict[str, dict] = {}
     failed = False
     failure_error: str | None = None
+    awaiting_node: str | None = None
     for nid in order:
+        if awaiting_node is not None:
+            node_results[nid] = {"status": "skipped", "output": None, "error": None,
+                                 "attempts": 0, "reason": f"awaiting_input at {awaiting_node}"}
+            continue
         if failed:
             node_results[nid] = {"status": "skipped", "output": None, "error": None, "attempts": 0}
             continue
@@ -550,10 +586,21 @@ async def execute_definition(
                 )
                 last_error = None
                 break
+            except HumanInputNeeded as exc:
+                # A pause is not a failure and is never retried: record
+                # it and stop the run here; resume replays from input.
+                node_results[nid] = {"status": "awaiting_input", "output": None,
+                                     "error": None, "attempts": attempts,
+                                     "prompt": exc.prompt}
+                awaiting_node = nid
+                failure_error = f"awaiting_input:{nid}"
+                break
             except Exception as exc:  # noqa: BLE001 — recorded, then retried/failed
                 last_error = exc
                 if attempt < retries:
                     await asyncio.sleep(0.05 * (attempt + 1))
+        if awaiting_node is not None:
+            continue
         if last_error is not None:
             node_results[nid] = {
                 "status": "failed", "output": None,
@@ -612,9 +659,15 @@ async def run_workflow_row(wf: Any, db: Any, run_input: dict,
         outputs, results, error = {}, {}, str(exc)
     run.output_json = _json.dumps(outputs)
     run.node_results_json = _json.dumps(results)
-    run.error = error
-    run.status = "failed" if error else "succeeded"
-    run.finished_at = datetime.now(UTC)
+    if error and error.startswith("awaiting_input:"):
+        # Paused, not failed: the run stays open for resume.
+        run.error = None
+        run.status = "awaiting_input"
+        run.finished_at = None
+    else:
+        run.error = error
+        run.status = "failed" if error else "succeeded"
+        run.finished_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(run)
     return run

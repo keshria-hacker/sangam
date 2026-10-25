@@ -1449,6 +1449,50 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/skills/{name}/eval-blind` | Yes | Blind A/B gate scored from supplied outputs (Batch 10) |
 | POST | `/api/skills/{name}/bootstrap` | Yes | Approval-gated bootstrap skill body (Batch 10) |
 
+| GET | `/api/devqa/node-catalogue` | Yes | Typed workflow node catalogue (Batch 12) |
+| GET | `/api/devqa/workflow-templates` | Yes | Dify-style starter graphs: chatbot / agent / workflow (Batch 12) |
+| GET | `/api/devqa/workflow-templates/{name}` | Yes | One starter graph (Batch 12) |
+| POST | `/api/devqa/workflows/validate` | Yes | Strict workflow validation incl. variable-pool scoping (Batch 12) |
+| POST | `/api/devqa/workflows/{workflow_id}/runs/{run_id}/resume` | Yes | Resume an awaiting_input run, exactly once (Batch 12) |
+| POST | `/api/devqa/spec/constitution/check` | Yes | Spec-kit constitution gate (keyword-overlap heuristic) (Batch 12) |
+| POST | `/api/devqa/spec/mvp-order` | Yes | P1-only MVP task order with dependency checks (Batch 12) |
+| POST | `/api/devqa/crawl/order` | Yes | Crawl frontier order: bfs / dfs / best_first (Batch 12) |
+| POST | `/api/devqa/crawl/filter` | Yes | Crawl FilterChain: content_type / domain / keyword (Batch 12) |
+| POST | `/api/devqa/crawl/chunk` | Yes | Markdown chunking: paragraph / heading / fixed (Batch 12) |
+| POST | `/api/devqa/crawl/link-graph` | Yes | Link graph over crawled pages (Batch 12) |
+| POST | `/api/devqa/security/scope/validate` | Yes | Validate a scope file (domains / CIDRs / excluded) (Batch 12) |
+| POST | `/api/devqa/security/scope/check` | Yes | Hard scope check for a target (Batch 12) |
+| POST | `/api/devqa/security/findings/dedup` | Yes | Finding dedup by fingerprint (Batch 12) |
+| POST | `/api/devqa/security/findings/cvss-guard` | Yes | CVSS score + version guard before validation (Batch 12) |
+| POST | `/api/devqa/security/coverage` | Yes | Coverage ledger: probed vs discovered (Batch 12) |
+| POST | `/api/devqa/security/gates` | Yes | Sandbox pre-flight gates, failing closed (Batch 12) |
+| GET | `/api/devqa/security/checklist/{phase}` | Yes | Guided security phase checklist (Batch 12) |
+| POST | `/api/devqa/security/categories/reject` | Yes | Excluded-category import rejection, wholesale (Batch 12) |
+| POST | `/api/devqa/security/tools/availability` | Yes | Tool availability probing, never installs (Batch 12) |
+| POST | `/api/devqa/qa/cassette-to-test` | Yes | Generate a pytest case from a cassette, review-only (Batch 12) |
+| POST | `/api/devqa/qa/replay-diff` | Yes | Replay diff with noise stripping (Batch 12) |
+| POST | `/api/devqa/qa/js-lint` | Yes | JS best-practices lint findings, never rewrites (Batch 12) |
+| POST | `/api/devqa/qa/suite-report` | Yes | Suite report; quarantined passes are not green (Batch 12) |
+| GET | `/api/devqa/qa/test-tags` | Yes | Test tags: cold / live / quarantined (Batch 12) |
+| GET | `/api/devqa/platform/health-actions` | Yes | Sangam-side health action catalogue with risk + undo (Batch 12) |
+| POST | `/api/devqa/platform/services` | Yes | Register a local service URL for health checks (Batch 12) |
+| GET | `/api/devqa/platform/services` | Yes | List registered services (Batch 12) |
+| POST | `/api/devqa/platform/services/{service_id}/check` | Yes | Probe a service now, record in uptime history (Batch 12) |
+| GET | `/api/devqa/platform/services/{service_id}/uptime` | Yes | Uptime summary (unknown until checks exist) (Batch 12) |
+| POST | `/api/devqa/platform/notifications/webhook` | Yes | Gotify-shaped webhook-in (secret-gated inbox) (Batch 12) |
+| GET | `/api/devqa/platform/notifications` | Yes | In-app notification inbox (Batch 12) |
+| POST | `/api/devqa/platform/notifications/{note_id}/read` | Yes | Mark a notification read (Batch 12) |
+| GET | `/api/devqa/platform/vm-profiles` | Yes | Quickemu-style VM profiles, documented configs only (Batch 12) |
+| GET | `/api/devqa/platform/winutil-catalog` | Yes | Winutil safe half: read-only checks + documented tweaks (Batch 12) |
+| POST | `/api/devqa/platform/analytics/event` | Yes | Taxonomy-validated analytics event (Batch 12) |
+| POST | `/api/devqa/platform/analytics/funnel` | Yes | Simple session funnel over supplied events (Batch 12) |
+| GET | `/api/devqa/chat/prompt-templates` | Yes | Prompt template library (Batch 12) |
+| POST | `/api/devqa/chat/folders` | Yes | Create a chat folder (Batch 12) |
+| GET | `/api/devqa/chat/folders` | Yes | List chat folders (Batch 12) |
+| POST | `/api/devqa/chat/folders/{folder_id}/chats` | Yes | Add a chat to a folder (Batch 12) |
+| POST | `/api/devqa/chat/presets/share` | Yes | Share a model preset (settings only, never keys/history) (Batch 12) |
+| GET | `/api/devqa/chat/presets` | Yes | List model presets (Batch 12) |
+
 ### 13.3 Database Schema
 
 ┌───────────────────┐       ┌───────────────────┐
