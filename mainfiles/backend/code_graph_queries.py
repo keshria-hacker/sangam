@@ -344,3 +344,165 @@ function render(filter) {{
 document.getElementById('q').addEventListener('input', e => render(e.target.value.toLowerCase()));
 render('');
 </script></body></html>"""
+
+
+# ------------------------------------------------------------------ A5 additions
+# Call-path tracing already exists as ``trace_calls`` / ``find_path``
+# (in code_graph.py); the four functions below close the remaining
+# Cluster-G gaps without touching the existing tools: circular imports,
+# an architecture overview (directory + language + hubs), file/symbol
+# change impact, and code search v2 (grep speed + graph intelligence).
+
+def circular_imports(graph: dict) -> dict:
+    """Cycles in the file->file import graph (module: targets ignored).
+
+    Deterministic DFS; each cycle is reported once, in canonical
+    rotation (smallest file id first), sorted.
+    """
+    adj: dict[str, list[str]] = {}
+    for e in graph.get("edges") or []:
+        if e["type"] != "imports":
+            continue
+        src, dst = e["from"], e["to"]
+        if not dst.startswith("file:"):
+            continue
+        adj.setdefault(src, [])
+        if dst not in adj[src]:
+            adj[src].append(dst)
+    for k in adj:
+        adj[k].sort()
+    cycles: set[tuple[str, ...]] = set()
+    visited: set[str] = set()
+
+    def _dfs(node: str, stack: list[str]) -> None:
+        visited.add(node)
+        stack.append(node)
+        for nxt in adj.get(node, []):
+            if nxt in stack:
+                raw = stack[stack.index(nxt):]
+                rot = min(range(len(raw)),
+                          key=lambda i: raw[i:])
+                cyc = tuple(raw[rot:] + raw[:rot])
+                cycles.add(cyc)
+            elif nxt not in visited:
+                _dfs(nxt, stack)
+        stack.pop()
+
+    for start in sorted(adj):
+        if start not in visited:
+            _dfs(start, [])
+    out = [list(c) for c in sorted(cycles)]
+    return {"cycles": out, "count": len(out)}
+
+
+def architecture_overview(graph: dict) -> dict:
+    """Architecture overview: languages, directories, hubs, entry points.
+
+    Hubs are symbols ranked by caller count; entry points are exported
+    symbols with no callers (the public surface). No LLM, no guessing:
+    every number is counted from the graph.
+    """
+    from collections import Counter
+    callers: Counter = Counter()
+    for e in graph.get("edges") or []:
+        if e["type"] == "calls":
+            callers[e["to"]] += 1
+    syms = graph.get("symbols") or {}
+    hubs = [{"symbol": sid, "callers": callers[sid],
+             "kind": syms[sid]["kind"], "file": syms[sid]["file"]}
+            for sid in sorted(callers, key=lambda s: (-callers[s], s))[:10]]
+    entry = sorted(sid for sid, s in syms.items()
+                   if s.get("exported") and callers.get(sid, 0) == 0)
+    dirs: dict[str, dict] = {}
+    for node in graph.get("file_nodes") or []:
+        d = node["path"].rsplit("/", 1)[0] if "/" in node["path"] else "."
+        dirs.setdefault(d, {"files": 0, "language": node.get("language")})
+        dirs[d]["files"] += 1
+    return {
+        "files": graph.get("files", len(graph.get("file_nodes") or [])),
+        "symbols": len(syms),
+        "edges": len(graph.get("edges") or []),
+        "languages": (graph.get("stats") or {}).get("languages", {}),
+        "directories": dirs,
+        "hubs": hubs,
+        "entry_points": entry[:50],
+        "entry_point_count": len(entry),
+    }
+
+
+def change_impact(graph: dict, target: str) -> dict:
+    """Change impact for a symbol OR a whole file (``file:<relpath>``).
+
+    Symbol: ``affected`` (transitive callers + importers of its file).
+    File: every symbol defined in the file, their transitive callers,
+    and every file importing this file. Freshness is NOT re-checked
+    here; callers use ``ensure_fresh_graph`` first (routes do).
+    """
+    if target.startswith("file:"):
+        rel = target[5:]
+        syms = sorted(sid for sid, s in (graph.get("symbols") or {}).items()
+                      if s["file"] == rel)
+        callers: set[str] = set()
+        for sid in syms:
+            out = affected(graph, sid)
+            callers.update(out.get("callers_transitive", []))
+        importers = sorted({e["from"] for e in graph.get("edges") or []
+                            if e["type"] == "imports" and e["to"] == target})
+        return {"target": target, "symbols_in_file": syms,
+                "callers_transitive": sorted(callers),
+                "caller_count": len(callers),
+                "importers_of_file": importers}
+    out = affected(graph, target)
+    out["target"] = target
+    return out
+
+
+def search_code_v2(graph: dict, query: str, root: Path | None = None,
+                   regex: bool = False, top_k: int = 10) -> dict:
+    """Code search v2: grep speed + graph intelligence.
+
+    Grep scans file contents (substring, or regex when ``regex=True``);
+    the graph ranks symbols (``find_code``). ``merged`` ranks graph
+    symbols whose file also matched grep first, then remaining graph
+    results, then grep-only file hits — so a hit is never graph-only
+    guesswork and never grep-only noise. With ``root=None`` only the
+    graph half runs (grep needs a filesystem root) and that is stated
+    in the output instead of silently degrading.
+    """
+    graph_out = find_code(graph, query, top_k=top_k)
+    grep_hits: list[dict] = []
+    grep_files: set[str] = set()
+    if root is not None:
+        try:
+            rx = re.compile(query) if regex else None
+        except re.error as exc:
+            return {"query": query, "error": f"Invalid regex: {exc}",
+                    "graph": graph_out["results"], "grep": [], "merged": []}
+        needle = query.lower()
+        for node in graph.get("file_nodes") or []:
+            path = root / node["path"]
+            try:
+                lines = path.read_text(encoding="utf-8").split("\n")
+            except (OSError, UnicodeDecodeError):
+                continue
+            for i, line in enumerate(lines, 1):
+                hit = bool(rx.search(line)) if rx else needle in line.lower()
+                if hit:
+                    grep_hits.append({"file": node["path"], "line": i,
+                                      "text": line.strip()[:200]})
+                    grep_files.add(node["path"])
+    merged: list[dict] = []
+    for r in graph_out["results"]:
+        merged.append({**r, "source": "graph+grep"
+                       if r["file"] in grep_files else "graph"})
+    merged.sort(key=lambda r: (0 if r["source"] == "graph+grep" else 1,
+                               -r["score"]))
+    for h in grep_hits[:top_k]:
+        if not any(m.get("file") == h["file"] and m.get("line") == h["line"]
+                   for m in merged):
+            merged.append({**h, "source": "grep", "score": 0.0})
+    return {"query": query, "graph": graph_out["results"],
+            "grep": grep_hits[:top_k * 5],
+            "grep_file_count": len(grep_files),
+            "merged": merged[:top_k],
+            "grep_enabled": root is not None}
