@@ -137,3 +137,57 @@ def voice_status() -> dict:
             for e in engines
         ],
     }
+
+
+def synthesize_chunked(text: str, voice_id: str | None = None,
+                       max_chars: int = 800, gap_ms: int = 250) -> dict:
+    """Long-form TTS: chunk at sentence/clause boundaries, synthesise
+    each chunk, join same-format WAV chunks with silence gaps.
+
+    Returns {chunks, audio, mime} on success. Non-WAV engine output
+    raises VoiceError rather than producing a corrupt join.
+    """
+    from ..media_pipeline.audio import chunk_text, join_wav_bytes
+    cleaned = _clean_for_tts(text)
+    if not cleaned:
+        raise VoiceError("Nothing to speak: empty text.")
+    chunks = chunk_text(cleaned, max_chars=max_chars)
+    engine = _tts()
+    if engine is None:
+        raise VoiceError("No TTS engine available.")
+    parts, mime = [], None
+    for chunk in chunks:
+        audio, chunk_mime = engine.synthesize(chunk["text"], voice_id)  # type: ignore[union-attr]
+        parts.append(audio)
+        mime = chunk_mime
+    if mime and "wav" not in mime:
+        raise VoiceError(
+            f"Chunked TTS needs WAV output to join chunks safely; engine "
+            f"returned {mime}. Synthesise chunks individually instead.")
+    try:
+        joined = join_wav_bytes(parts, gap_ms=gap_ms) if len(parts) > 1 else parts[0]
+    except ValueError as exc:
+        raise VoiceError(str(exc)) from exc
+    return {"chunks": chunks, "audio": joined, "mime": mime or "audio/wav",
+            "gaps_ms": [gap_ms] * (len(parts) - 1)}
+
+
+def transcribe_segments(audio: bytes, filename: str = "audio.webm") -> list[dict]:
+    """Timed ASR segments, when the STT engine exposes them.
+
+    Sangam's current engines return plain text only, so this raises a
+    VoiceError saying timed segments are unavailable — callers (true
+    dubbing) must supply timed segments instead of receiving invented
+    timings. An engine that implements ``transcribe_segments`` is used
+    when present.
+    """
+    engine = _stt()
+    if engine is None:
+        raise VoiceError("No STT engine available.")
+    fn = getattr(engine, "transcribe_segments", None)
+    if fn is None:
+        raise VoiceError(
+            "The active STT engine returns plain text only, without timings. "
+            "True dubbing needs timed segments: supply segments explicitly "
+            "to /voice/dub, or use an STT engine that exposes segments.")
+    return fn(audio, filename)

@@ -85,7 +85,82 @@ STYLES: tuple[ImageStyle, ...] = (
         ),
         negative_suffix="blurry, low quality, modern, photograph",
     ),
+    # Batch 11: modest ORIGINAL expansion (8 -> 20). Fooocus ships 277
+    # styles across six sdxl_styles/*.json files, but that repo is
+    # GPL-3.0 and its style JSON is part of it, so the files are NOT
+    # imported as data here — these suffixes are Sangam's own wording,
+    # written to the same positive/negative-suffix semantics.
+    ImageStyle(id="watercolor", name="Watercolor",
+               prompt_suffix="watercolor painting, soft washes, paper texture, gentle colour bleed",
+               negative_suffix="photorealistic, harsh lines, blurry"),
+    ImageStyle(id="sketch", name="Pencil Sketch",
+               prompt_suffix="pencil sketch, fine graphite lines, crosshatching, sketchbook paper",
+               negative_suffix="colour, photograph, blurry"),
+    ImageStyle(id="blueprint", name="Blueprint",
+               prompt_suffix="technical blueprint, white line work on deep blue, precise drafting, grid",
+               negative_suffix="colour photograph, blurry, sketchy"),
+    ImageStyle(id="minimal", name="Minimal",
+               prompt_suffix="minimal composition, generous negative space, flat colour, clean shapes",
+               negative_suffix="cluttered, busy, blurry, text"),
+    ImageStyle(id="vintage", name="Vintage",
+               prompt_suffix="vintage photograph, film grain, muted tones, aged paper feel",
+               negative_suffix="modern, oversaturated, blurry"),
+    ImageStyle(id="cyberpunk", name="Cyberpunk",
+               prompt_suffix="cyberpunk scene, neon glow, rain-slick streets, high contrast, futuristic",
+               negative_suffix="daylight, muted, blurry"),
+    ImageStyle(id="isometric", name="Isometric",
+               prompt_suffix="isometric illustration, clean 3d angle, soft shadows, diorama feel",
+               negative_suffix="photograph, blurry, distorted perspective"),
+    ImageStyle(id="pixel-art", name="Pixel Art",
+               prompt_suffix="pixel art, crisp pixels, limited palette, retro game sprite style",
+               negative_suffix="smooth, photograph, blurry"),
+    ImageStyle(id="oil-painting", name="Oil Painting",
+               prompt_suffix="oil painting, visible brushstrokes, canvas texture, classical lighting",
+               negative_suffix="photograph, flat, blurry"),
+    ImageStyle(id="flat-illustration", name="Flat Illustration",
+               prompt_suffix="flat vector illustration, bold shapes, limited palette, editorial style",
+               negative_suffix="photograph, gradients, blurry, text"),
+    ImageStyle(id="neon", name="Neon",
+               prompt_suffix="neon light art, glowing lines on dark background, electric colour",
+               negative_suffix="daylight, muted, blurry"),
+    ImageStyle(id="editorial", name="Editorial",
+               prompt_suffix="editorial illustration, magazine cover composition, strong focal point",
+               negative_suffix="snapshot, cluttered, blurry, watermark"),
 )
+
+# Fooocus Performance presets (modules/flags.py): step-count bundles.
+# These are engine parameters, not quality claims — a preset only sets
+# steps (and, on the Fooocus engine, the matching performance LoRA).
+PERFORMANCE_PRESETS: dict[str, dict] = {
+    "quality": {"steps": 36, "note": "Fooocus Quality: 36 steps"},
+    "speed": {"steps": 18, "note": "Fooocus Speed: 18 steps"},
+    "extreme": {"steps": 8, "note": "Fooocus Extreme Speed: 8 steps"},
+    "lightning": {"steps": 4, "note": "Fooocus Lightning: 4 steps"},
+    "hyper": {"steps": 4, "note": "Fooocus Hyper-SD: 4 steps"},
+}
+
+
+def expand_prompt(prompt: str, style_id: str | None = None,
+                  wildcards_dir=None, seed: int | None = None,
+                  in_order: bool = False,
+                  wordlists: dict[str, list[str]] | None = None) -> dict:
+    """Prompt expansion as an EXPLICIT, shown step.
+
+    Runs the Fooocus-order pipeline (wildcards -> weights -> style
+    suffix) and returns original vs expanded side by side, so the user
+    sees exactly what was added. This is deterministic text expansion,
+    NOT Fooocus's LLM-based ``fooocus_expansion`` — no model is called
+    and no expansion is ever hidden inside a log line.
+    """
+    original = (prompt or "").strip()
+    expanded_raw, _plain, _segments = prepare_prompt(
+        original, wildcards_dir=wildcards_dir, seed=seed, in_order=in_order,
+        wordlists=wordlists)
+    positive, negative = enhance_prompt(expanded_raw, style_id)
+    return {"original": original, "expanded_raw": expanded_raw,
+            "expanded": positive, "negative": negative,
+            "style": (style_id or "none"),
+            "method": "deterministic wildcard+style expansion (not LLM expansion)"}
 
 _STYLE_MAP = {s.id: s for s in STYLES}
 

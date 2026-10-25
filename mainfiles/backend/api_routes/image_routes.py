@@ -55,6 +55,11 @@ class ImageGenIn(BaseModel):
     wildcard_words: dict[str, list[str]] | None = None
     wildcard_seed: int | None = None
     wildcard_in_order: bool = False
+    # Batch 11: Performance preset (quality/speed/extreme/lightning/hyper)
+    # as an engine-parameter bundle, and explicit prompt expansion.
+    performance: str | None = None
+    expand_prompt: bool = False
+    metadata: bool = False
 
 
 @router.get("/image/status")
@@ -85,12 +90,24 @@ async def generate_image_endpoint(
             embeddings=list(payload.embeddings),
         )
     try:
-        attachments = generate_images(
-            payload.prompt, style=payload.style, size=payload.size, n=payload.n,
-            controls=controls, wildcard_seed=payload.wildcard_seed,
-            wildcard_in_order=payload.wildcard_in_order,
-            wildcard_words=payload.wildcard_words,
-        )
+        from ..image_gen.service import generate_images_with_sidecar
+        if payload.metadata or payload.expand_prompt or payload.performance:
+            attachments, sidecar = generate_images_with_sidecar(
+                payload.prompt, style=payload.style, size=payload.size, n=payload.n,
+                controls=controls, performance=payload.performance,
+                expand_prompt=payload.expand_prompt,
+                wildcard_seed=payload.wildcard_seed,
+                wildcard_in_order=payload.wildcard_in_order,
+                wildcard_words=payload.wildcard_words,
+            )
+        else:
+            attachments = generate_images(
+                payload.prompt, style=payload.style, size=payload.size, n=payload.n,
+                controls=controls, wildcard_seed=payload.wildcard_seed,
+                wildcard_in_order=payload.wildcard_in_order,
+                wildcard_words=payload.wildcard_words,
+            )
+            sidecar = None
     except UnsupportedImageControl as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
@@ -102,7 +119,35 @@ async def generate_image_endpoint(
 
     await _record(db, await optional_user_id(request, db), _ae.IMAGE_GENERATED,
                   {"n": payload.n})
-    return {"images": [a.model_dump(mode="json") for a in attachments]}
+    out: dict = {"images": [a.model_dump(mode="json") for a in attachments]}
+    if sidecar is not None:
+        out["sidecar"] = sidecar
+    return out
+
+
+class MaskIn(BaseModel):
+    mask_b64: str = Field(min_length=1)
+    feather_radius: float = Field(default=2.0, ge=0.0, le=20.0)
+
+
+@router.post("/image/mask")
+async def build_mask_endpoint(payload: MaskIn):
+    """Mask handling is PNG in / PNG out only. The server never invents
+    a mask: the caller supplies brush strokes as a PNG (the Create
+    panel's canvas brush produces it client-side); this endpoint only
+    validates the PNG and optionally feathers its edges."""
+    _require_image_gen()
+    try:
+        raw = base64.b64decode(payload.mask_b64, validate=False)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail="mask_b64 is not valid base64") from exc
+    try:
+        from ..image_ops import UnsupportedOp, feather_mask
+        feathered = feather_mask(raw, radius=payload.feather_radius)
+    except UnsupportedOp as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"mask_b64": base64.b64encode(feathered).decode(),
+            "note": "Caller-supplied PNG mask, feathered at the edges only."}
 
 
 # ------------------------------------------------------------ Batch 7 ops

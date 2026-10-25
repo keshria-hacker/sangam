@@ -14,7 +14,9 @@ from .service import (
     list_voices,
     reset_voice_for_testing,
     synthesize,
+    synthesize_chunked,
     transcribe,
+    transcribe_segments,
     voice_status,
 )
 
@@ -48,6 +50,8 @@ __all__ = [
     "register_voice_extension",
     "reset_voice_for_testing",
     "synthesize",
+    "synthesize_chunked",
     "transcribe",
+    "transcribe_segments",
     "voice_status",
 ]

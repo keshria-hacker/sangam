@@ -23,7 +23,7 @@ export async function renderMediaTab(bodyEl) {
         <div class="kn-mem-controls">
           <select id="mjKind" class="provider-key-input" aria-label="Media job kind">
             <option value="tts">Text to speech</option>
-            <option value="dub">Dub a script</option>
+            <option value="dub">Voice a script (not dubbing — true dubbing is in Voice)</option>
             <option value="transcribe">Transcribe audio</option>
             <option value="image">Generate image</option>
           </select>

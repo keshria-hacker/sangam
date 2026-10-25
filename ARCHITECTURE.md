@@ -1161,6 +1161,22 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/media-jobs` | Yes | Create a media worker job, runs in background (Phase 4) |
 | GET | `/api/media-jobs` | Yes | List media jobs (Phase 4) |
 | GET | `/api/media-jobs/{id}` | Yes | Poll one media job (Phase 4) |
+| POST | `/api/media-jobs/{id}/approve` | Yes | Resume a checkpoint-paused pipeline job; revision cap enforced (Batch 11) |
+| POST | `/api/voice/dub` | Yes | True dubbing: timed segments -> fitted SRT/VTT/word-level ASS (Batch 11) |
+| POST | `/api/voice/tts/chunked` | Yes | Chunked long-form TTS, WAV join with silence gaps (Batch 11) |
+| POST | `/api/voice/audiobook` | Yes | Audiobook plan: chapters/spans/deterministic seeds + manifest (Batch 11) |
+| POST | `/api/diagrams/validate` | Yes | Typed-IR validation: architecture/erd/sequence/workflow/timeline (Batch 11) |
+| POST | `/api/diagrams/verify` | Yes | Layout verifier: 4px grid, single accent, budgets, overlap (Batch 11) |
+| POST | `/api/diagrams/export` | Yes | Standalone HTML+SVG diagram export (Batch 11) |
+| POST | `/api/design-systems` | Yes | Create a design-system contract (tokens + evidence + version) (Batch 11) |
+| GET | `/api/design-systems` | Yes | List design-system contracts (Batch 11) |
+| POST | `/api/design-systems/{id}/critique` | Yes | Measured prototype critique: contrast, hairline, shadow, type (Batch 11) |
+| POST | `/api/design-systems/{id}/transform` | Yes | bolder/quieter/distill as parameterised token operations (Batch 11) |
+| POST | `/api/media/graph/validate` | Yes | Node-graph validation: typed sockets, cycles, fixed registry (Batch 11) |
+| POST | `/api/media/graph/run` | Yes | Node-graph execution through existing engines only (Batch 11) |
+| POST | `/api/media/overlay` | Yes | Non-destructive SVG annotation overlay render (Batch 11) |
+| POST | `/api/media/storyboard` | Yes | Scene plan -> still-image prompts; no video rendered (Batch 11) |
+| POST | `/api/image/mask` | Yes | PNG mask in/out with edge feathering; server never invents a mask (Batch 11) |
 | GET | `/api/connectors` | Yes | List OAuth connectors + status (Phase 5) |
 | GET | `/api/connectors/{name}/authorize` | Yes | OAuth authorize URL (Phase 5) |
 | GET | `/api/connectors/{name}/callback` | Yes | OAuth callback, token stored encrypted (Phase 5) |

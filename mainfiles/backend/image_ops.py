@@ -151,3 +151,27 @@ def image_prompt(image_bytes: bytes, prompt: str, engine=None) -> tuple[list[Gen
     if fn is None:
         raise UnsupportedOp(f"Image-prompt is not supported by the {getattr(engine, 'name', 'current')} engine.")
     return fn(image_bytes, prompt, None), "engine edits with source image"
+
+
+def feather_mask(mask_bytes: bytes, radius: float = 2.0) -> bytes:
+    """Feather a caller-supplied PNG mask (Gaussian blur on alpha).
+
+    The server never invents a mask: input must be a PNG mask, and
+    feathering only softens its existing edges. Raises UnsupportedOp
+    without Pillow or on a bad image.
+    """
+    try:
+        from PIL import Image, ImageFilter
+    except Exception as exc:  # noqa: BLE001
+        raise UnsupportedOp("Pillow is not installed for mask feathering.") from exc
+    try:
+        img = Image.open(io.BytesIO(mask_bytes)).convert("RGBA")
+        alpha = img.getchannel("A").filter(ImageFilter.GaussianBlur(radius))
+        img.putalpha(alpha)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except UnsupportedOp:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise UnsupportedOp(f"Mask is not a readable PNG: {exc}") from exc

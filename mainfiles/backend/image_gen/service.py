@@ -54,6 +54,7 @@ def generate_images(
     size: str | None = None,
     n: int = 1,
     controls: FooocusControls | dict | None = None,
+    performance: str | None = None,
     wildcards_dir=None,
     wildcard_seed: int | None = None,
     wildcard_in_order: bool = False,
@@ -93,6 +94,17 @@ def generate_images(
                    for l in (controls.get("loras") or [])],
             embeddings=list(controls.get("embeddings") or []),
         )
+    if performance is not None:
+        from .styles import PERFORMANCE_PRESETS
+        if performance not in PERFORMANCE_PRESETS:
+            raise ImageGenError(
+                f"Unknown performance preset: {performance!r} "
+                f"(use one of {sorted(PERFORMANCE_PRESETS)}).")
+        if controls is None:
+            controls = FooocusControls(
+                steps=PERFORMANCE_PRESETS[performance]["steps"])
+        elif getattr(controls, "steps", None) is None:
+            controls.steps = PERFORMANCE_PRESETS[performance]["steps"]
     if controls is not None:
         controls.validate()
 
@@ -166,3 +178,42 @@ def image_status() -> dict:
         "max_images": settings.IMAGE_MAX_IMAGES,
         "fooocus_controls": describe_fooocus_controls(),
     }
+
+
+def generate_images_with_sidecar(prompt: str, style: str | None = None,
+                                 size: str | None = None, n: int = 1,
+                                 controls=None, performance: str | None = None,
+                                 expand_prompt: bool = False, **kwargs):
+    """Generate + a generation metadata sidecar stored alongside the
+    result (engine, sampler, scheduler, steps, CFG, seed, style,
+    original vs expanded prompt). The sidecar describes what was
+    requested and run; it is returned with the response and is also
+    what the media-pipeline stage panel shows per asset."""
+    from .styles import PERFORMANCE_PRESETS, expand_prompt as _expand
+    expansion = _expand(prompt, style) if expand_prompt else None
+    attachments = generate_images(prompt, style=style, size=size, n=n,
+                                  controls=controls, performance=performance,
+                                  **kwargs)
+    engine = _get_engine()
+    ctrl = controls
+    if isinstance(ctrl, dict):
+        steps = ctrl.get("steps")
+        if steps is None and performance in PERFORMANCE_PRESETS:
+            steps = PERFORMANCE_PRESETS[performance]["steps"]
+        sidecar_ctrl = {"sampler": ctrl.get("sampler"),
+                        "scheduler": ctrl.get("scheduler"), "steps": steps,
+                        "cfg": ctrl.get("cfg"), "seed": ctrl.get("seed"),
+                        "clip_skip": ctrl.get("clip_skip")}
+    elif ctrl is not None:
+        sidecar_ctrl = {"sampler": ctrl.sampler, "scheduler": ctrl.scheduler,
+                        "steps": ctrl.steps, "cfg": ctrl.cfg, "seed": ctrl.seed,
+                        "clip_skip": ctrl.clip_skip}
+    else:
+        sidecar_ctrl = {"sampler": None, "scheduler": None,
+                        "steps": PERFORMANCE_PRESETS[performance]["steps"]
+                        if performance in PERFORMANCE_PRESETS else None,
+                        "cfg": None, "seed": None, "clip_skip": None}
+    sidecar = {"engine": getattr(engine, "name", None),
+               "performance": performance, "style": style, **sidecar_ctrl,
+               "expansion": expansion}
+    return attachments, sidecar

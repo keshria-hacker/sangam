@@ -65,10 +65,13 @@ def validate_diagram(doc: dict) -> list[dict]:
         errs.append(_err("bad-schema-version",
                          f"schema_version must be {SCHEMA_VERSION}", "/schema_version",
                          f"Set schema_version to {SCHEMA_VERSION}."))
+    if doc.get("diagram_type") in _TYPED_DIAGRAM_TYPES:
+        return _validate_typed(doc)
     if doc.get("diagram_type") != DIAGRAM_TYPE:
         errs.append(_err("bad-diagram-type",
-                         f"diagram_type must be {DIAGRAM_TYPE!r}", "/diagram_type",
-                         f"Set diagram_type to {DIAGRAM_TYPE!r}."))
+                         f"diagram_type must be {DIAGRAM_TYPE!r} or one of "
+                         f"{sorted(_TYPED_DIAGRAM_TYPES)}", "/diagram_type",
+                         f"Set diagram_type to {DIAGRAM_TYPE!r} or a typed IR type."))
     meta = doc.get("meta")
     if not isinstance(meta, dict):
         errs.append(_err("missing-meta", "meta must be an object", "/meta",
@@ -332,3 +335,316 @@ def diagram_from_code_graph(graph: dict, repo_root: Path | str | None = None,
     if revision is None:
         doc["meta"].pop("repository")
     return doc
+
+
+# ================================================================ Batch 11
+# Typed IR family (archify salvage: 11 schema types -> Sangam's small
+# family). Architecture above is unchanged; these types share the same
+# contract shape: schema_version, diagram_type, meta (title + evidence),
+# then type-specific collections. Every type enforces the evidence rule
+# archify states: a diagram claiming "measured" without a pinned 40-hex
+# revision fails validation (fixable: pin it or relabel illustrative).
+# ================================================================
+
+_TYPED_DIAGRAM_TYPES = {"erd", "sequence", "workflow", "timeline"}
+
+_ERD_KEYS = {"name", "columns"}
+_COLUMN_KEYS = {"name", "type", "keys", "references"}
+_SEQ_PART_KEYS = {"id", "label"}
+_SEQ_MSG_KEYS = {"id", "from", "to", "label", "kind"}
+_WF_STEP_KEYS = {"id", "label", "kind"}
+_WF_TRANS_KEYS = {"id", "from", "to", "condition"}
+_TL_EVENT_KEYS = {"id", "label", "at"}
+
+
+def _validate_typed_meta(doc: dict, errs: list[dict]) -> None:
+    meta = doc.get("meta")
+    if not isinstance(meta, dict):
+        errs.append(_err("missing-meta", "meta must be an object", "/meta",
+                         "Add meta: {title, evidence}."))
+        return
+    for key in meta:
+        if key not in _META_KEYS:
+            errs.append(_err("additional-property", f"Unknown meta key: {key!r}",
+                             f"/meta/{key}", f"Remove {key!r} from meta."))
+    if not meta.get("title"):
+        errs.append(_err("missing-title", "meta.title is required", "/meta/title",
+                         "Add a non-empty meta.title."))
+    if meta.get("evidence") not in ("measured", "illustrative"):
+        errs.append(_err("bad-evidence",
+                         "meta.evidence must be 'measured' or 'illustrative'",
+                         "/meta/evidence",
+                         "Set evidence to 'measured' or 'illustrative'."))
+    elif meta.get("evidence") == "measured":
+        repo = meta.get("repository") or {}
+        if not _HEX40_RE.match(str(repo.get("revision", ""))):
+            errs.append(_err("unpinned-measured",
+                             "measured evidence requires a pinned 40-hex "
+                             "repository.revision",
+                             "/meta/repository/revision",
+                             "Pin revision to `git rev-parse HEAD`, or set "
+                             "evidence to 'illustrative'."))
+
+
+def _check_ids(items: list, path: str, errs: list[dict]) -> set[str]:
+    seen: set[str] = set()
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            errs.append(_err("bad-item", "item must be an object", f"{path}/{i}",
+                             "Replace it with an object with an id."))
+            continue
+        cid = item.get("id") or item.get("name")
+        if isinstance(cid, str):
+            if cid in seen:
+                errs.append(_err("duplicate-id", f"duplicate id: {cid!r}",
+                                 f"{path}/{i}", "Rename it to a unique id."))
+            seen.add(cid)
+    return seen
+
+
+def _validate_typed(doc: dict) -> list[dict]:
+    errs: list[dict] = []
+    if doc.get("schema_version") != SCHEMA_VERSION:
+        errs.append(_err("bad-schema-version",
+                         f"schema_version must be {SCHEMA_VERSION}", "/schema_version",
+                         f"Set schema_version to {SCHEMA_VERSION}."))
+    _validate_typed_meta(doc, errs)
+    dtype = doc.get("diagram_type")
+    if dtype == "erd":
+        tables = doc.get("tables")
+        if not isinstance(tables, list) or not tables:
+            errs.append(_err("bad-tables", "tables must be a non-empty list", "/tables",
+                             "Add at least one table with columns."))
+            return errs
+        table_names: set[str] = set()
+        for ti, table in enumerate(tables):
+            path = f"/tables/{ti}"
+            if not isinstance(table, dict):
+                errs.append(_err("bad-table", "table must be an object", path,
+                                 "Use {name, columns: [...]}."))
+                continue
+            name = table.get("name")
+            if not name:
+                errs.append(_err("missing-field", "table needs a name", f"{path}/name",
+                                 "Add the table name."))
+                continue
+            table_names.add(name)
+            columns = table.get("columns")
+            if not isinstance(columns, list) or not columns:
+                errs.append(_err("bad-columns", f"table {name!r} needs columns",
+                                 f"{path}/columns", "Add columns with SQL types."))
+                continue
+            for ci, col in enumerate(columns):
+                cpath = f"{path}/columns/{ci}"
+                if not isinstance(col, dict):
+                    errs.append(_err("bad-column", "column must be an object", cpath,
+                                     "Use {name, type, keys}."))
+                    continue
+                for key in col:
+                    if key not in _COLUMN_KEYS:
+                        errs.append(_err("additional-property",
+                                         f"Unknown column key: {key!r}", f"{cpath}/{key}",
+                                         f"Remove {key!r}."))
+                if not col.get("name"):
+                    errs.append(_err("missing-field", "column needs a name",
+                                     f"{cpath}/name", "Add the column name."))
+                if not col.get("type"):
+                    errs.append(_err("missing-field",
+                                     f"column {col.get('name')!r} needs a SQL type",
+                                     f"{cpath}/type",
+                                     "Set type, e.g. 'integer' or 'text'."))
+                keys = col.get("keys", [])
+                if not isinstance(keys, list) or any(k not in ("pk", "fk") for k in keys):
+                    errs.append(_err("bad-keys",
+                                     f"column keys must be a subset of ['pk', 'fk']",
+                                     f"{cpath}/keys", "Use keys: [] or ['pk'] or ['fk'] or ['pk','fk']."))
+                refs = col.get("references")
+                if refs is not None:
+                    if not isinstance(refs, str) or "." not in refs:
+                        errs.append(_err("bad-reference",
+                                         f"references must be 'table.column'",
+                                         f"{cpath}/references",
+                                         "Set references to e.g. 'orders.id'."))
+                    elif "fk" not in (col.get("keys") or []):
+                        errs.append(_err("bad-reference",
+                                         "references requires the column to be a fk",
+                                         f"{cpath}/references",
+                                         "Add 'fk' to keys, or drop references."))
+        # Second pass: references must resolve to a real table.column.
+        known_cols = set()
+        for table in tables:
+            if isinstance(table, dict):
+                for col in (table.get("columns") or []):
+                    if isinstance(col, dict) and col.get("name"):
+                        known_cols.add(f"{table.get('name')}.{col['name']}")
+        for table in tables:
+            if not isinstance(table, dict):
+                continue
+            for col in (table.get("columns") or []):
+                if isinstance(col, dict) and col.get("references") \
+                        and col["references"] not in known_cols:
+                    errs.append(_err("unresolved-reference",
+                                     f"reference {col['references']!r} does not "
+                                     "resolve to a table.column",
+                                     "/tables", "Point it at an existing table.column."))
+    elif dtype == "sequence":
+        parts = doc.get("participants")
+        msgs = doc.get("messages")
+        if not isinstance(parts, list) or not parts:
+            errs.append(_err("bad-participants", "participants must be a non-empty list",
+                             "/participants", "Add at least two participants."))
+            parts = []
+        if not isinstance(msgs, list) or not msgs:
+            errs.append(_err("bad-messages", "messages must be a non-empty list",
+                             "/messages", "Add at least one message."))
+            msgs = []
+        ids = _check_ids(parts, "/participants", errs)
+        for i, msg in enumerate(msgs):
+            path = f"/messages/{i}"
+            if not isinstance(msg, dict):
+                continue
+            for end in ("from", "to"):
+                if msg.get(end) not in ids:
+                    errs.append(_err("unresolved-reference",
+                                     f"message {msg.get('id')!r} references unknown "
+                                     f"participant {msg.get(end)!r}", f"{path}/{end}",
+                                     f"Add a participant with id {msg.get(end)!r}."))
+            if msg.get("kind") is not None and msg["kind"] not in ("sync", "async", "return"):
+                errs.append(_err("bad-kind", "message kind must be sync/async/return",
+                                 f"{path}/kind", "Use 'sync', 'async' or 'return'."))
+    elif dtype == "workflow":
+        steps = doc.get("steps")
+        trans = doc.get("transitions")
+        if not isinstance(steps, list) or not steps:
+            errs.append(_err("bad-steps", "steps must be a non-empty list", "/steps",
+                             "Add at least one step."))
+            steps = []
+        if not isinstance(trans, list):
+            errs.append(_err("bad-transitions", "transitions must be a list",
+                             "/transitions", "Set transitions to a list."))
+            trans = []
+        ids = _check_ids(steps, "/steps", errs)
+        for i, tr in enumerate(trans):
+            path = f"/transitions/{i}"
+            if not isinstance(tr, dict):
+                continue
+            for end in ("from", "to"):
+                if tr.get(end) not in ids:
+                    errs.append(_err("unresolved-reference",
+                                     f"transition {tr.get('id')!r} references unknown "
+                                     f"step {tr.get(end)!r}", f"{path}/{end}",
+                                     f"Add a step with id {tr.get(end)!r}."))
+    elif dtype == "timeline":
+        events = doc.get("events")
+        if not isinstance(events, list) or not events:
+            errs.append(_err("bad-events", "events must be a non-empty list", "/events",
+                             "Add at least one event with an 'at' value."))
+            return errs
+        _check_ids(events, "/events", errs)
+        for i, ev in enumerate(events):
+            if isinstance(ev, dict) and ev.get("at") in (None, ""):
+                errs.append(_err("missing-field", "event needs an 'at' value",
+                                 f"/events/{i}/at",
+                                 "Set 'at' to a date or sequence label."))
+    return errs
+
+
+def erd_junctions(doc: dict) -> list[str]:
+    """Tables that are junctions (archify rule): every column carries
+    pk/fk and at least two columns are fk."""
+    out = []
+    for table in (doc.get("tables") or []):
+        cols = table.get("columns") or []
+        if len(cols) >= 2 and all(set(c.get("keys", [])) <= {"pk", "fk"}
+                                  and c.get("keys") for c in cols) \
+                and sum(1 for c in cols if "fk" in c.get("keys", [])) >= 2:
+            out.append(table.get("name"))
+    return out
+
+
+# ---------------------------------------------------------------- layout
+# diagram-design salvage: verifiable geometry, not style words. Nodes
+# are {id, x, y, w, h, label?} in SVG coordinates; the verifier checks
+# the 4px grid, a single accent colour, label/node budgets, and — for
+# this computed-geometry path — rectangle overlap. Mermaid text has no
+# geometry, so overlap stays a visual check there (unchanged claim).
+
+GRID = 4
+MAX_NODES = 60
+MAX_LABEL_CHARS = 60
+
+
+def verify_layout(nodes: list[dict], accent: str | None = None,
+                  accents_used: list[str] | None = None) -> list[dict]:
+    """Verify a computed layout. Returns diagnostics (empty = pass)."""
+    findings: list[dict] = []
+
+    def f(code: str, message: str, fix: str) -> dict:
+        return {"code": code, "message": message, "supportedFixes": fix}
+
+    if len(nodes) > MAX_NODES:
+        findings.append(f("node-budget", f"{len(nodes)} nodes exceeds the "
+                        f"{MAX_NODES}-node budget",
+                        "Split the diagram or collapse detail nodes."))
+    rects = []
+    for node in nodes:
+        nid = node.get("id", "?")
+        for coord in ("x", "y", "w", "h"):
+            value = node.get(coord)
+            if not isinstance(value, (int, float)) or value % GRID != 0:
+                findings.append(f("off-grid",
+                                  f"node {nid!r} {coord}={value!r} is not "
+                                  f"divisible by {GRID}",
+                                  f"Snap {coord} to a multiple of {GRID}."))
+        if len(str(node.get("label", ""))) > MAX_LABEL_CHARS:
+            findings.append(f("label-budget",
+                              f"node {nid!r} label exceeds {MAX_LABEL_CHARS} chars",
+                              "Shorten the label; move detail to a sublabel."))
+        rects.append(node)
+    for i in range(len(rects)):
+        for j in range(i + 1, len(rects)):
+            a, b = rects[i], rects[j]
+            if a.get("x", 0) < b.get("x", 0) + b.get("w", 0) \
+                    and b.get("x", 0) < a.get("x", 0) + a.get("w", 0) \
+                    and a.get("y", 0) < b.get("y", 0) + b.get("h", 0) \
+                    and b.get("y", 0) < a.get("y", 0) + a.get("h", 0):
+                findings.append(f("overlap",
+                                  f"nodes {a.get('id')!r} and {b.get('id')!r} overlap",
+                                  "Move one node so their rectangles no longer intersect."))
+    used = {c.lower() for c in (accents_used or []) if isinstance(c, str)}
+    if accent and len(used - {accent.lower()}) > 0:
+        findings.append(f("multi-accent",
+                          f"more than one accent colour used: {sorted(used)}",
+                          f"Use only the single accent {accent}."))
+    return findings
+
+
+def export_html_svg(doc: dict, nodes: list[dict] | None = None,
+                    accent: str = "#3A7BD5") -> str:
+    """Standalone HTML+SVG export (diagram-design's one-file delivery):
+    a single HTML file with inline SVG. Nodes are placed on the 4px
+    grid as given; without nodes it renders the title + a note that
+    geometry comes from the layout step (never invented positions)."""
+    import html as _html
+    title = _html.escape(str((doc.get("meta") or {}).get("title", "Diagram")))
+    dtype = _html.escape(str(doc.get("diagram_type", "")))
+    evidence = _html.escape(str((doc.get("meta") or {}).get("evidence", "")))
+    shapes = []
+    for node in (nodes or []):
+        x, y, w, h = (node.get("x", 0), node.get("y", 0),
+                      node.get("w", 120), node.get("h", 48))
+        label = _html.escape(str(node.get("label", node.get("id", ""))))
+        shapes.append(f'<g><rect x="{x}" y="{y}" width="{w}" height="{h}" '
+                      f'rx="8" fill="none" stroke="{accent}" stroke-width="1"/>'
+                      f'<text x="{x + w / 2}" y="{y + h / 2 + 4}" '
+                      f'text-anchor="middle" font-family="sans-serif" '
+                      f'font-size="13">{label}</text></g>')
+    body = "\n".join(shapes) if shapes else \
+        "<text x=\"16\" y=\"32\" font-family=\"sans-serif\" font-size=\"13\">" \
+        "No placed nodes — supply layout nodes to render geometry.</text>"
+    return ("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\">"
+            f"<title>{title}</title></head><body>"
+            f"<h1>{title}</h1><p>{dtype} · evidence: {evidence} · "
+            f"single accent {accent} · 1px hairlines · no shadows</p>"
+            f"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\">"
+            f"{body}</svg></body></html>")

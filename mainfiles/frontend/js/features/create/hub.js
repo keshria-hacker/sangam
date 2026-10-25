@@ -518,6 +518,9 @@ const CREATE_SUBVIEWS = [
   { id: 'design',    label: 'Design',    icon: 'fa-palette' },
   // Batch 1: media-job creation lives in Create; tracking lives in Work > Activity.
   { id: 'media',     label: 'Media jobs', icon: 'fa-photo-film' },
+  // Batch 11: Studio is a SECTION inside Create (not a destination):
+  // one pipeline panel for image/audio/diagram/design stages.
+  { id: 'studio',    label: 'Studio',     icon: 'fa-clapperboard' },
 ];
 
 /** Merged Create page — the rail 'Create' entry renders this. */
@@ -568,6 +571,9 @@ async function renderCreateSubview(container, id) {
     } else if (id === 'media') {
       const { renderMediaTab } = await import('../media/media.js');
       await renderMediaTab(container);
+    } else if (id === 'studio') {
+      const { renderStudioSection } = await import('../media/studio.js');
+      await renderStudioSection(container);
     }
   } catch (err) {
     container.innerHTML = `<p class="team-error">Could not load: ${escapeHtml(err?.message || String(err))}</p>`;

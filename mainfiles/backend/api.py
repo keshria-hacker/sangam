@@ -264,6 +264,11 @@ from .api_routes import memory_research_routes  # noqa: F401
 # the runtime endpoints (plan/contract/compact/steering/tray/sandbox/
 # flow/hive/drivers/eval) on the shared router.
 from .api_routes import agent_runtime_routes  # noqa: F401
+# Batch 11 (unified media + design): importing this module registers
+# the pipeline routes (true dub, chunked TTS, audiobook, diagram
+# validate/verify/export, design systems, node graph, overlay,
+# storyboard) on the shared router.
+from .api_routes import media_pipeline_routes  # noqa: F401
 # Doctor lives in its own module with its own router; include it on the
 # shared router so it is served (and authenticated) like /system/*.
 from .doctor import router as _doctor_router
