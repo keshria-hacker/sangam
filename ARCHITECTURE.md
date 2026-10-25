@@ -17,6 +17,7 @@
 13. [Configuration Reference](#13-configuration-reference)
 14. [Data Flow Diagram](#data-flow-diagram-complete)
 15. [Recent Additions (Phase 6)](#15-recent-additions-phase-6-2026-10-09)
+16. [Perfect-Flow Program (2026-10-25)](#16-perfect-flow-program-2026-10-25)
 
 ---
 
@@ -275,29 +276,37 @@ The frontend is a vanilla JS SPA served as static files. There is no build step,
 | DOMPurify | 3.2.4 | HTML sanitization |
 | KaTeX | 0.16.9 | LaTeX math rendering (with SRI integrity hashes) |
 
-### 4.2 Layout Structure
+### 4.2 Layout Structure (perfect-flow IA, 2026-10-25)
 
 ```
-┌──────┬───────────────────────────────────────────────────┐
-│ RAIL │  TAB STRIP                                         │
-│      │  [Main Chat*] [Knowledge] [Create] ... [+]         │
-│ Home ├───────────────────────────────────────────────────┤
-│ Chat │                                                    │
-│Agents│  ACTIVE TAB CONTENT                                │
-│ Know │  (chat, knowledge graph, create hub, etc.)         │
-│Create│                                                    │
-│ Code ├───────────────────────────────────────────────────┤
-│ Learn│  COMPOSER (chat tab only)                          │
-│ Lib  │  [Attach] [Textarea] [Send] [Mode] [Tools] [Tune] │
-│ ...  └───────────────────────────────────────────────────┘
-│      │  INSPECTOR (right, Ctrl+Shift+I) │ ACTIVITY TRAY   │
-└──────┴───────────────────────────────────────────────────┘
+┌──────────┬────────────────────────────────────────────────┐
+│ SIDEBAR  │  DESTINATION CONTENT (one of 8, URL-addressable)│
+│ RAIL (8) │  Chat / Projects / Studio / Code / Research / │
+│ Chat     │  Agents / Library / Settings                   │
+│ Projects │                                                │
+│ Studio   │  Sub-navigation inside a destination is a      │
+│ Code     │  segmented control, never a second sidebar.    │
+│ Research │  Breadcrumb in content, only at depth > 1.     │
+│ Agents   │                                                │
+│ Library  │  COMPOSER (Chat only): [Attach] [Textarea]     │
+│ Settings │  [Send] [Mode: Auto] [Tools] [Tune]             │
+│ ──────── │  INSPECTOR (right, Ctrl+Shift+I)                │
+│ avatar,  │                                                │
+│ usage,   │                                                │
+│ palette, │                                                │
+│ help     │                                                │
+└──────────┴────────────────────────────────────────────────┘
 ```
 
-The **chat-focused sidebar** (left) provides searchable history, New Chat, profile
-actions, and compact collapsed behavior. The main chat tab is pinned and never
-closes. Tool tabs open side-by-side for stateful work. The Inspector (right panel)
-shows contextual details. The Activity Tray (bottom) tracks background jobs.
+The **sidebar rail** (left) is the map of the app: exactly the 8
+destinations above, in that order. There is NO tab strip and NO title
+bar (both deleted in the perfect-flow program); the old Work/Create/
+Knowledge/Home destinations redirect (`work → /agents`,
+`create → /studio`, `knowledge → /research`, `home → /chat`) and
+unknown routes render a 404 page with "Back to Chat". The main chat
+is pinned and never closes. The Inspector (right panel) shows
+contextual details. The Runs centre (Agents → Run History) is the
+single Activity feed; the old composer Runs button is removed.
 
 ### 4.3 Module Organization
 
@@ -1673,3 +1682,81 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
 - `scripts/check_frontend_modules.mjs`: Validates ES module imports/exports via V8
 - Run: `node --experimental-vm-modules scripts/check_frontend_modules.mjs`
 - Catches bugs that `node --check` misses (e.g. wrong relative import paths)
+
+## 16. Perfect-Flow Program (2026-10-25)
+
+The spec (`~/workspace/user/files/prompt.txt`) replaced the
+7-destination IA with 8 destinations, made Auto the default mode
+with a unified response-intelligence pipeline, and rebuilt Settings
+as a searchable control center. Merges, one at a time with tests
+after each: A3 Projects/Memory/Knowledge, A5 Code/Spec/QA, A6
+Studio/Skills/Integrations, A2 Composer/Response Intelligence, A4
+Agent Runtime, A1 IA & Shell, plus coordinator follow-ups (shell
+fixes, Engineering re-mount, browser-gate fixes). Full detail lives
+in `docs/`; this section is the index.
+
+### New IA
+
+Chat / Projects / Studio / Code / Research / Agents / Library /
+Settings — see `docs/INFORMATION_ARCHITECTURE.md`. Work and Create
+are flattened, not containers. Router:
+`frontend/js/features/shell/router.js`; navigation:
+`frontend/js/features/tabs/tabs.js`; rail:
+`frontend/js/core/nav.js`.
+
+### Response-intelligence pipeline
+
+`backend/response_intelligence/` — intake → intent → context →
+complexity → capability → mode → routing → execution → events →
+validation → post-actions. Rule-first intent; deterministic keyword
+scorer labelled as such; LLM classifier only when ambiguous. Golden
+set 50/50 intent+mode agreement. See `docs/RESPONSE_PIPELINE.md`.
+
+### Agent runtime
+
+`backend/agent_runtime/` wraps `code_agent`/`automations`/
+`workflows`/`security` (planner, state machine, scheduler,
+approval gate, budget meter, circuit breaker, audit log,
+restart-safe tables). Scheduler opt-in via
+`SANGAM_AGENT_SCHEDULER=1`. See `docs/AGENT_RUNTIME.md`.
+
+### Memory / knowledge / projects
+
+Project workspaces with scoped retrieval (no cross-project leakage,
+tested); provenance labels (`verified`/`inferred`); memory privacy
+dashboard in Settings → Memory & Knowledge. See `docs/MEMORY.md`.
+
+### Studio / skills
+
+Documents (docx/pdf/pptx/xlsx round-trip), 44-type diagram
+catalogue (SVG/HTML export; PNG honestly 422), image ops, voice
+(TTS/STT/dub/dictation — no cloning), classroom. Skill marketplace
+with SKILL.md contract, SHA-256 + lockfile, dry-run preview;
+first packs Engineering / Science (5-skill curated slice) /
+Creative-Design. See `docs/STUDIO.md` and `docs/SKILLS.md`.
+
+### Settings control center
+
+17 sections, searchable, every row with label/description/default/
+current/reset/requires-restart. `.env`-only options listed read-only
+in Advanced. See `docs/SETTINGS.md`.
+
+### Events / runs
+
+Agents → Run History is the single Activity feed (chat, agent-task,
+workflow, media job kinds). Telemetry default OFF. See
+`docs/EVENTS.md`.
+
+### Decisions / attributions / trees
+
+`docs/DECISIONS.md` (nine user-approved defaults, out-of-scope
+list), `docs/ATTRIBUTIONS.md` (every reference project + what was
+borrowed), `docs/TREE.md`, `docs/CODE_TREE.md`.
+
+### Verification for this program
+
+Full pytest suite, frontend module check (70/70), smoke gate (3/3),
+and 25 Playwright spec tests green across shell, smoke, runs,
+workflows, security, devices, fit, diagrams, media, knowledge,
+notebooks, skills — see `docs/TESTING.md` for totals and the
+retire-or-keep decision on the live-network websearch test.

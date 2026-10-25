@@ -72,7 +72,7 @@ Sangam chunks documents, generates embeddings, retrieves relevant sections, and 
 
 ### 🌐 Web Search
 
-Augment conversations with live web results using the built-in DuckDuckGo integration, or configure Tavily/Brave for a keyed provider. Web Search can be enabled, disabled, limited to 1–10 sources, and tested from **Settings → Research & Web**.
+Augment conversations with live web results using the built-in DuckDuckGo integration, or configure Tavily/Brave for a keyed provider. Web Search can be enabled, disabled, limited to 1–10 sources, and tested from **Settings → Tools**.
 
 ### 🧩 Skills
 
@@ -124,11 +124,19 @@ Opt-in, local-first analytics dashboard — your usage stays on your server, nev
 
 ### ⌨️ Command Palette
 
-Press Ctrl+P for a quick launcher: new chat, skills, teams, export, theme, and more. Export any chat as Markdown.
+Press Ctrl/Cmd+K (Ctrl+P also works) for a quick launcher: destinations, settings sections, skills, saved prompts, models, new chat, and more. Running a prompt from the palette pre-fills the composer — it never auto-sends. Export any chat as Markdown.
 
-### 🏢 Consolidated Workspace
+### 🏢 Eight Destinations, One Map
 
-One pinned Chat tab (the only chat, never closing) plus six destinations in the sidebar: **Home** (status, setup, doctor), **Work** (agents, code, workflows, activity feed, security, engineering pipeline), **Create** (documents, diagrams, images, media jobs, voice, design), **Knowledge** (documents, memory, study, notebooks, graph), **Library** (skills, packs, documents), and **Settings** at the bottom. Older tool tabs resolve as sections inside these destinations, so nothing is orphaned and nothing is duplicated. Every empty view carries exactly one clear next action. A guided first-run setup in Chat walks through a cloud key, local Ollama, or look-around-first, and tests the key before the first chat.
+One pinned Chat (the only chat, never closing) plus seven destinations in the sidebar rail: **Projects** (scoped workspaces), **Studio** (documents, diagrams, images, media jobs, voice, design, classroom), **Code** (code agent, spec & QA, code graph, engineering pipeline), **Research** (explore, notebooks, study, knowledge graph), **Agents** (hub, task board, run history, workflows, security), **Library** (skills, packs, MCP, extensions, templates), and **Settings** at the bottom. Every destination is a real URL-addressable page (`/chat`, `/projects/:id`, `/studio/:artifact`, `/code/:repo`, `/research/:notebook`, `/agents/:id`, `/library`, `/settings/:section`); old Home/Work/Create/Knowledge links redirect instead of 404ing. Sub-navigation inside a destination is a segmented control, never a second sidebar. Every empty view carries exactly one clear next action. A guided first-run setup in Chat walks through a cloud key, local Ollama, or look-around-first, and tests the key before the first chat.
+
+### 📁 Projects
+
+Persistent workspaces with versioned instructions, sources (ingested on add, SSRF-guarded, deduped), tasks, and scoped chats. Retrieval is scoped to the project — a test proves nothing leaks across projects — with provenance labels (`verified`/`inferred`) on retrieved chunks.
+
+### 🧭 Auto Response Pipeline
+
+Auto is the default mode: the pipeline (intake → intent → context → complexity → capability → mode → routing → execution → events → validation → post-actions) routes rule-first, searching the web on date/news/price/version signals and answering directly otherwise. A per-model capability registry warns before execution when a model cannot do what was asked. Quality passes (ADHD-friendly style, no-AI-slop Detect/Edit, suggestions-only Harper lint) never rewrite code or names, and streaming Markdown stays stable on unclosed fences and partial table rows.
 
 ### 🧠 Knowledge Graph
 
@@ -138,9 +146,9 @@ Unified graph of memories, documents, code symbols, and chats. SVG visualization
 
 Build custom agents with system prompts, tools, and approval policies. Built-in Researcher, Coder, Writer, Analyst. Run with streaming, approve/deny tool calls, set cost budgets.
 
-### 🎨 Create Hub
+### 🎨 Studio
 
-Typed artifacts: markdown docs, diagrams (custom SVG renderer), code files, HTML previews. Version history with restore, eight starter templates, image/voice studio shortcuts.
+Typed artifacts: markdown docs, diagrams (44-type catalogue, SVG/HTML export), code files, HTML previews, documents (docx/pdf/pptx/xlsx with parse-back proof), image and voice tools, classroom templates. Version history with restore, starter templates, image/voice studio shortcuts. Video production and voice cloning are intentionally out of scope.
 
 ### ⏰ Automations
 
@@ -176,19 +184,27 @@ Beyond typed memories: LLM fact extraction (defensive parsing — unparseable ou
 
 ### 🏗️ Engineering Pipeline
 
-An enforced grill → brainstorm → design → plan → subagent → review-spec → review-quality → finish pipeline. Stages advance only in order, reviews must reference their prerequisite artifacts, and finishing requires both reviews to pass. The subagent stage runs a linked team run when a model is configured, otherwise records a marked handoff brief — never fabricated output.
+An enforced grill → brainstorm → design → plan → subagent → review-spec → review-quality → finish pipeline, in Code → Engineering. Stages advance only in order, reviews must reference their prerequisite artifacts, and finishing requires both reviews to pass. The subagent stage runs a linked team run when a model is configured, otherwise records a marked handoff brief — never fabricated output.
+
+### 📋 Spec Pipeline & QA
+
+A code-enforced spec chain (constitution → spec → clarify → plan → checklist → tasks → analyze → implement → verify → converge) with TDD evidence gating (real RED then GREEN outputs; green-as-red rejected), graduated GreenContract verification, diff-based review packages with PR-style review artifacts, and convergence reports with a follow-up task per gap. The QA package records traffic, builds noise-handled cassettes, replays deterministically, generates pytest cases, and reports passed/failed/skipped/untested. Deploy targets (Coolify/Quickemu) are a connector interface only, reported as deferred.
+
+### 🤖 Agent Runtime
+
+Validated task plans (topological order, cycle rejection) executed as a persisted state machine, with an hourly/daily/weekly/cron scheduler (opt-in via `SANGAM_AGENT_SCHEDULER=1`), an approval gate over the durable approval table, a budget meter (unknown usage reported as unknown, never estimated), a server-side circuit breaker, and an audit log — all mirrored to Agents → Run History.
 
 ### 📱 LAN Pairing
 
-Stay single-user and still use Sangam from your phone over Wi-Fi. Settings → Devices → Pair shows a QR code or 6-digit code (5-minute, single-use, rate-limited) plus mandatory host approval — the code alone is never enough. Each device gets its own Bearer token (SHA-256-hashed server-side, 90-day expiry, revocable per device, revoke-all). Pending pairings survive a restart, and device tokens stop working while LAN mode is toggled off (re-enable restores them; revoke is the permanent kill switch). TLS with a host-generated self-signed certificate is the default (fingerprint shown next to the QR for manual comparison on first connect); plain HTTP is an explicitly warned opt-in fallback. LAN mode is opt-in and off by default, the server must run with `--host 0.0.0.0`, and the Devices screen states the threat model plainly: what is protected (code guessing/replay, same-Wi-Fi strangers, passive eavesdropping in TLS mode, stolen-phone revocation, hashed token storage) and what is not (physical access to the unlocked laptop, a compromised laptop, an approved compromised phone, the HTTP fallback, internet exposure via port-forwarding).
+Stay single-user and still use Sangam from your phone over Wi-Fi. Settings → Security → Devices → Pair shows a QR code or 6-digit code (5-minute, single-use, rate-limited) plus mandatory host approval — the code alone is never enough. Each device gets its own Bearer token (SHA-256-hashed server-side, 90-day expiry, revocable per device, revoke-all). Pending pairings survive a restart, and device tokens stop working while LAN mode is toggled off (re-enable restores them; revoke is the permanent kill switch). TLS with a host-generated self-signed certificate is the default (fingerprint shown next to the QR for manual comparison on first connect); plain HTTP is an explicitly warned opt-in fallback. LAN mode is opt-in and off by default, the server must run with `--host 0.0.0.0`, and the Devices screen states the threat model plainly: what is protected (code guessing/replay, same-Wi-Fi strangers, passive eavesdropping in TLS mode, stolen-phone revocation, hashed token storage) and what is not (physical access to the unlocked laptop, a compromised laptop, an approved compromised phone, the HTTP fallback, internet exposure via port-forwarding).
 
 ### 🖥️ Model Fit Advisor
 
-Hardware detection (CPU/RAM, VRAM via nvidia-smi or honestly "unknown"), quantization-aware memory maths (GGUF/AWQ/GPTQ/EXL2 weights + KV-cache + overhead), a catalogue of open models with fit scoring and ranked use-case recommendations that label what does not fit on your machine, real tok/s + TTFT benchmarking through the provider stream (local models by default; cloud only with an explicit flag; provider usage when available, otherwise labelled word-count estimates), and Ollama pull/delete management in Settings → Providers.
+Hardware detection (CPU/RAM, VRAM via nvidia-smi or honestly "unknown"), quantization-aware memory maths (GGUF/AWQ/GPTQ/EXL2 weights + KV-cache + overhead), a catalogue of open models with fit scoring and ranked use-case recommendations that label what does not fit on your machine, real tok/s + TTFT benchmarking through the provider stream (local models by default; cloud only with an explicit flag; provider usage when available, otherwise labelled word-count estimates), and Ollama pull/delete management in Settings → Models & Providers.
 
 ### 📊 Diagram Catalogue
 
-Thirteen Mermaid templates (flowchart, sequence, class, ER, state, gantt, pie, journey, mindmap, git graph, quadrant, timeline, sankey) with a style guide (one accent color, hairlines, 4px grid) enforced by a lint that checks only what is statically checkable, brand profiles that substitute accent/font, best-effort draw.io and Excalidraw import (unsupported elements become warnings, never invented nodes), and frontend SVG/PNG export.
+Forty-four diagram types (flowchart, sequence, class, ER, state, gantt, pie, journey, mindmap, git graph, quadrant, timeline, sankey, and more) with a style guide (one accent color, hairlines, 4px grid) enforced by a lint that checks only what is statically checkable, brand profiles that substitute accent/font, best-effort draw.io and Excalidraw import (unsupported elements become warnings, never invented nodes), and SVG/HTML export. PNG export is not available (no raster renderer); it returns an honest error instead of a renamed SVG.
 
 ### 🖼️ Image Operations
 
