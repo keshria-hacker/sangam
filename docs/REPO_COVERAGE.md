@@ -381,16 +381,17 @@ against the tree first; genuinely-missing depth only.
 
 Definitive table: `docs/ALL_IN_ONE_COVERAGE.md`. All 85 deduplicated repos
 from the user's list were verified against files in this tree, not against
-the batch write-ups. Counts: **shipped 58, native-equivalent 22, excluded 5,
-unaccounted 0.**
+the batch write-ups. Counts: **shipped 58, native-equivalent 24, excluded 3,
+unaccounted 0** (coordinator correction 2026-10-26: Dodaios and
+oh-my-claudecode reclassified from excluded to native-equivalent after
+source reads of their now-present clones — Dodaios is the PersonalJarvis
+product, oh-my-claudecode's staged workflows map to the agent runtime).
 
-Excluded (with reasons, full text in the definitive table): Dodaios
-(standalone — clone absent, brief never arrived), oh-my-claudecode (clone
-absent, brief never arrived), invisible_dots (VM-agent undetectability
-conflicts with guardrails, different product), pentagi (autonomous
-exploitation excluded; only the pre-existing engagement shape + checklists
-used, per-run-approved and own-systems-only), heretic (safety-bypass tool,
-excluded entirely).
+Excluded (with reasons, full text in the definitive table):
+invisible_dots (VM-agent undetectability conflicts with guardrails,
+different product), pentagi (autonomous exploitation excluded; only the
+pre-existing engagement shape + checklists used, per-run-approved and
+own-systems-only), heretic (safety-bypass tool, excluded entirely).
 
 Filled in this audit (smallest honest surface, no new large system, no new
 destination, no new route): imajev / Vane / Open-Generative-AI catalogue

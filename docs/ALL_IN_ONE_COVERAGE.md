@@ -20,7 +20,7 @@ state exactly what was NOT ported in the same row.
 - **excluded** — deliberately not built, with the reason in the row. An
   exclusion is an honest outcome, not a gap left unaccounted for.
 
-**Counts: shipped 58 · native-equivalent 22 · excluded 5 · total 85 · unaccounted 0.**
+**Counts: shipped 58 · native-equivalent 24 · excluded 3 · total 85 · unaccounted 0.** (Coordinator correction 2026-10-26: Dodaios and oh-my-claudecode moved from excluded to native-equivalent after source reads of their now-present clones — see rows 59 and 62.)
 
 **Destinations:** unchanged — Chat / Home / Work / Create / Knowledge /
 Library / Settings with sidebar navigation. No new destination, no
@@ -94,10 +94,10 @@ modular monolith throughout.
 | 56 | superpowers | shipped | Subagent-per-task `TaskGraph` (blocking edges, ready frontier, per-task review gate, branch review) + four-stop-rule contract; skill evals now require a failing baseline before publish |
 | 57 | anthropics/skills | shipped | Description word-budget check (warning over ~100 words, not a failure) + trigger-accuracy evals (`creator.trigger_eval`) in the publish path; format itself was already implemented |
 | 58 | mattpocock/skills | shipped | Ticket-graph flow is the same `TaskGraph` engine as superpowers; skill-to-skill invocation rule was already in `registry.check_skill_call` |
-| 59 | Dodaios | excluded | Standalone Dodaios repo: deep-read brief never arrived (clone absent) — nothing claimed or built from it. Distinct from PersonalJarvis's `dodaios` package, covered under row 52. |
+| 59 | Dodaios | native-equivalent | Read from source (coordinator correction): Dodaios IS PersonalJarvis — "Formerly Personal Jarvis", PyPI `personal-jarvis`. Same product as row 52, not a separate system: its portable mechanism is the `RuntimeDriver` protocol already in `mainfiles/backend/agent_runtime/drivers.py` (detect/start/health/kill/log-tail, API detection-only). The desktop agent-OS shell, board-backend and conductor UI are not ported (different product surface; Sangam is a web app, not a desktop OS layer). |
 | 60 | hackingtool | native-equivalent | Tool availability probing (binary + install hint, Sangam never installs) + wholesale rejection of excluded categories (`POST /devqa/security/categories/reject`); install/update lifecycle and per-tool output parsers NOT built; excluded categories: ddos, phishing, remote-admin, post-exploitation, exploit-frameworks, anonsurf, wireless, payload-creator-as-weaponizer |
 | 61 | strix | native-equivalent | Sandbox pre-flight gates failing closed + computed coverage ledger (undefined, never 100%, on zero discovered); reusable labelled sandbox sessions with caps + guaranteed cleanup, proxy integration and scheduled CI passive-scan mode NOT built; existing Docker-or-workspace-fallback behaviour unchanged |
-| 62 | oh-my-claudecode | excluded | Deep-read brief never arrived (clone absent) — nothing claimed or built from it. |
+| 62 | oh-my-claudecode | native-equivalent | Read from source (coordinator correction): a Claude Code plugin (agents/, commands/, autopilot workflows with plan-build-qa stages and ralplan/ralph loops). Its portable mechanisms — staged multi-agent workflows, plan→execution→QA profiles, agent/skill marketplace layout — are covered Sangam-natively by `agent_runtime/orchestration.py` (TaskGraph + flows), the skill system, and teams. The Claude-Code-specific plugin hooks, OAuth handling and HUD are not applicable to Sangam (not Claude Code) and are not ported. |
 | 63 | invisible_dots | excluded | Self-hosted VM-agent platform ("Dots") whose headline property is undetectability by anti-bot systems, running its own VM desktop/browser identities. Not portable to Sangam (different product: VM agent fleet) and its undetectability goal conflicts with Sangam's guardrails. |
 | 64 | gpt-researcher | shipped | `mainfiles/backend/research/deep_research.py` state machine (plan → breadth → depth recursion capped/deduped → curate → word-budget compress → cited report writer that 422s on uncited claims); planner is deterministic templates + keyword follow-ups, honestly labelled — no LLM in this path |
 | 65 | ego-lite | shipped | `mainfiles/backend/skills/bootstrap.py` `bootstrap_command` skill support (approval-gated, argv-only, 4000-char cap, banned-pattern scan; shell metacharacters rejected) |
@@ -144,6 +144,16 @@ modular monolith throughout.
    implementations (two-mode browser agent; prompt-injection wired into
    chat) that stand, so both rows are `native-equivalent`/`shipped`
    respectively with the Batch 12 gap stated, not hidden.
+5. **Coordinator correction (Dodaios / oh-my-claudecode)** — Batch 6
+   excluded both only because their clones were absent at deep-read time.
+   Both clones are now present and were read from source: Dodaios is the
+   PersonalJarvis product (row 52 mechanism already shipped), and
+   oh-my-claudecode's staged-workflow mechanisms map to the existing
+   agent runtime + skill/teams systems. Both rows are therefore
+   `native-equivalent`, and the counts move to 58 shipped / 24
+   native-equivalent / 3 excluded. The remaining exclusions are
+   invisible_dots, pentagi and heretic, each with a standing-guardrail
+   reason in its row.
 
 ## Honest limits carried forward (whole run)
 

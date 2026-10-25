@@ -78,4 +78,4 @@ def test_batch6_coverage_table_accounts_for_85_repos():
     native = sum(1 for r in rows if "| native-equivalent |" in r)
     excluded = sum(1 for r in rows if "| excluded |" in r)
     assert shipped + native + excluded == 85
-    assert shipped == 58 and native == 22 and excluded == 5
+    assert shipped == 58 and native == 24 and excluded == 3
