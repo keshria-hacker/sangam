@@ -72,7 +72,10 @@ async function api(path, options) {
   return data;
 }
 
-export async function renderTaskBoard(bodyEl) {
+export async function renderTaskBoard(bodyEl, opts = {}) {
+  // A1: /agents/:id lands here; pre-selecting the task shows its steps,
+  // budget, audit trail, and run history instead of a bare list.
+  if (opts.taskId) currentTaskId = opts.taskId;
   bodyEl.innerHTML = `
     <div class="task-board">
       <div class="tb-actions">

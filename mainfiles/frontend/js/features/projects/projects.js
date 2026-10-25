@@ -68,7 +68,7 @@ export async function renderProjectsView(containerEl) {
 async function loadList(containerEl) {
   const listEl = containerEl.querySelector('#pjList');
   try {
-    const data = await apiGet('/projects');
+    const data = await (await apiGet('/projects')).json();
     const projects = data.projects || [];
     if (!projects.length) {
       listEl.innerHTML = `<div class="empty-state"><p>No projects yet.</p>
@@ -91,7 +91,7 @@ export async function renderProjectHome(containerEl, projectId) {
   currentProjectId = projectId;
   const homeEl = containerEl.querySelector('#pjHome') || containerEl;
   try {
-    const project = await apiGet(`/projects/${projectId}`);
+    const project = await (await apiGet(`/projects/${projectId}`)).json();
     homeEl.innerHTML = `
       <div class="pj-home">
         <button class="btn-secondary" id="pjBack">← All projects</button>
@@ -121,7 +121,7 @@ async function renderSection(homeEl, projectId, section) {
   el.innerHTML = '<p class="settings-hint">Loading…</p>';
   try {
     if (section === 'overview') {
-      const project = await apiGet(`/projects/${projectId}`);
+      const project = await (await apiGet(`/projects/${projectId}`)).json();
       el.innerHTML = `
         <p>${escapeHtml(project.instruction || 'No instructions yet — add them under Instructions so every answer in this project follows them.')}</p>
         <form id="pjAsk" class="pj-ask">
@@ -135,7 +135,7 @@ async function renderSection(homeEl, projectId, section) {
         const resEl = el.querySelector('#pjResults');
         resEl.innerHTML = '<p class="settings-hint">Searching this project only…</p>';
         try {
-          const data = await apiGet(`/projects/${projectId}/retrieve?q=${encodeURIComponent(q)}`);
+          const data = await (await apiGet(`/projects/${projectId}/retrieve?q=${encodeURIComponent(q)}`)).json();
           const results = data.results || [];
           resEl.innerHTML = `<p class="settings-hint">Grade: ${escapeHtml(data.grade || '')} · Fallback: ${escapeHtml(data.fallback_used || 'none')} · Scope: ${escapeHtml(data.memory_scope || 'project')}</p>` +
             (results.length ? `<ul>${results.map((r) => {
@@ -148,7 +148,7 @@ async function renderSection(homeEl, projectId, section) {
       return;
     }
     if (section === 'instructions') {
-      const data = await apiGet(`/projects/${projectId}/instructions`);
+      const data = await (await apiGet(`/projects/${projectId}/instructions`)).json();
       el.innerHTML = `
         <form id="pjInstr" class="pj-form">
           <textarea id="pjInstrText" rows="6" placeholder="Instructions for this project — tone, constraints, facts the model must respect…">${escapeHtml((data.current && data.current.content) || '')}</textarea>
@@ -167,7 +167,7 @@ async function renderSection(homeEl, projectId, section) {
       return;
     }
     if (section === 'sources') {
-      const data = await apiGet(`/projects/${projectId}/sources`);
+      const data = await (await apiGet(`/projects/${projectId}/sources`)).json();
       el.innerHTML = `
         <form id="pjSrc" class="pj-form">
           <select id="pjSrcKind"><option value="url">Web page (URL)</option><option value="file">Uploaded file id</option><option value="chat">Chat id</option></select>
@@ -201,7 +201,7 @@ async function renderSection(homeEl, projectId, section) {
       return;
     }
     if (section === 'tasks') {
-      const data = await apiGet(`/projects/${projectId}/tasks`);
+      const data = await (await apiGet(`/projects/${projectId}/tasks`)).json();
       el.innerHTML = `
         <form id="pjTask" class="pj-form">
           <input type="text" id="pjTaskTitle" placeholder="Task title" maxlength="200" required>
@@ -232,7 +232,7 @@ async function renderSection(homeEl, projectId, section) {
       return;
     }
     if (section === 'chats') {
-      const data = await apiGet(`/projects/${projectId}/chats`);
+      const data = await (await apiGet(`/projects/${projectId}/chats`)).json();
       el.innerHTML = `
         <form id="pjChat" class="pj-form">
           <input type="text" id="pjChatTitle" placeholder="Chat title" maxlength="200" required>

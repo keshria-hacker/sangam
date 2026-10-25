@@ -39,7 +39,7 @@ export async function renderMemoryDashboard(containerEl) {
   containerEl.querySelector('#mdPreview').addEventListener('click', async () => {
     const days = containerEl.querySelector('#mdDays').value;
     try {
-      const data = await apiGet(`/memory/dashboard?older_than_days=${encodeURIComponent(days)}`);
+      const data = await (await apiGet(`/memory/dashboard?older_than_days=${encodeURIComponent(days)}`)).json();
       const preview = data.retention_preview || {};
       containerEl.querySelector('#mdPreviewOut').textContent =
         `Would forget ${preview.would_forget ?? '?'} of ${data.total_memories ?? '?'} memories.`;
@@ -52,10 +52,10 @@ export async function renderMemoryDashboard(containerEl) {
       return;
     }
     try {
-      const data = await apiPost('/memory/forget', {
+      const data = await (await apiPost('/memory/forget', {
         older_than_days: parseInt(containerEl.querySelector('#mdDays').value, 10),
         confirm: true,
-      });
+      })).json();
       showSuccess(`Forgot ${data.deleted} memories`);
       await loadDashboard(containerEl);
     } catch (err) { showError(err.message || 'Bulk forget failed'); }
@@ -77,7 +77,7 @@ async function loadDashboard(containerEl) {
   const summaryEl = containerEl.querySelector('#mdSummary');
   const listEl = containerEl.querySelector('#mdList');
   try {
-    const data = await apiGet('/memory/dashboard');
+    const data = await (await apiGet('/memory/dashboard')).json();
     const sep = data.separation || {};
     const conv = sep.conversation_context || {};
     const pers = sep.persistent_memory || {};

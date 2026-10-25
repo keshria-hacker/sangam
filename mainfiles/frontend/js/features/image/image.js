@@ -53,7 +53,7 @@ async function loadStyles() {
 
 function openImageDialog() {
   // Composer image button now opens the Image Studio tab (no popup).
-  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('images'));
+  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('studio'));
   return;
   const existing = document.getElementById('imageGenOverlay');
   if (existing) {

@@ -10,6 +10,7 @@ import { openSettings } from './features/settings/open.js';
 import { applyAppearance, initAppearance } from './features/settings/appearance.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
 import { initTabs, openToolTab, showTool, showToolSection, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
+import { renderProjectsDestination, renderStudioDestination, renderCodeDestination, renderResearchDestination, renderAgentsDestination, renderLibraryDestination, renderSettingsDestination } from './features/shell/destinations.js';
 import { trapFocus } from './shared/focus_trap.js';
 import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';
@@ -116,6 +117,9 @@ function initDOM() {
     authResetSubmit: $('#authResetSubmit'),
     authForgotBack: $('#authForgotBack'),
     authResetBack: $('#authResetBack'),
+    paletteHintBtn: $('#paletteHintBtn'),
+    helpBtn: $('#helpBtn'),
+    usageMeter: $('#usageMeter'),
     skillsBtn: $('#skillsBtn'),
     codeBtn: $('#codeBtn'),
     designBtn: $('#designBtn'),
@@ -145,14 +149,12 @@ function initDOM() {
 async function initRail() {
   const container = document.getElementById('railNav');
   if (!container) return;
-  // Register nav handlers
-  registerNavHandler('home', () => {
-    openToolTab('home');
-  });
+  // A1: rail handlers are the 8 destinations; nav.navigate() defaults
+  // (chat -> pinned chat, view:xxx -> destination) cover the rest.
+  // 'settings' is registered explicitly because openSettings() calls
+  // navigate('settings') directly (no view: prefix).
   registerNavHandler('chat', () => {
-    const { switchTab } = window.__sangamTabs || {};
-    // Fallback: main tab is the chat
-    document.getElementById('mainTab')?.click();
+    showTool('chat');
   });
   registerNavHandler('settings', () => {
     openToolTab('settings');
@@ -182,13 +184,12 @@ async function loadRailFeatures() {
 }
 
 function initGlobalListeners() {
-  // Keyboard shortcuts
+  // Keyboard shortcuts.
+  // NOTE (A1): Ctrl/Cmd+K is the command palette, owned by palette.js
+  // (initPalette) — it is deliberately NOT bound to New chat here, so
+  // the two handlers cannot double-fire. New chat lives on the sidebar
+  // button and on the palette's "New chat" action.
   document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd+K - New chat
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault();
-      chatStartNewChat();
-    }
     // Escape - Close modals, dropdowns
     if (e.key === 'Escape') {
       closeModelDropdown();
@@ -279,8 +280,14 @@ function initGlobalListeners() {
   // These buttons used to call showTool() with ids that no longer exist in
   // TOOL_DEFS, so they silently did nothing. They now open the real views.
   elements.skillsBtn?.addEventListener('click', () => showToolSub('library', 'data-libtab', 'skills'));
-  elements.codeBtn?.addEventListener('click', () => showToolSection('work', 'code'));
-  elements.designBtn?.addEventListener('click', () => showToolSub('create', 'data-createsub', 'design'));
+  elements.codeBtn?.addEventListener('click', () => showToolSection('code', 'agent'));
+  elements.designBtn?.addEventListener('click', () => showToolSub('studio', 'data-dest-section', 'design'));
+  // Sidebar footer (A1): palette hint opens the palette, help opens
+  // the shortcuts modal. Usage meter rendering lives in sidebar.js.
+  elements.paletteHintBtn?.addEventListener('click', () => {
+    import('./features/palette/palette.js').then((m) => m.openPalette()).catch(() => {});
+  });
+  elements.helpBtn?.addEventListener('click', () => openShortcutsModal());
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 
@@ -440,38 +447,18 @@ async function init() {
   initRail();
   initPopovers();
   initInspector();
-  // Batch 1: only the 6 consolidated destinations have renderers.
-  // Agents/Code/Workflows/Activity are Work sections; Media is a Create
-  // section; Skills is a Library sub-view; Study is a Knowledge section;
-  // Usage is a Settings section.
-  registerTabRenderer('home', async (bodyEl) => {
-    const { renderHome } = await import('./features/home/home.js');
-    renderHome(bodyEl);
-  });
-  registerTabRenderer('settings', async (bodyEl) => {
-    const { renderSettingsPage } = await import('./features/settings/settings_page.js');
-    renderSettingsPage(bodyEl);
-  });
-  registerTabRenderer('knowledge', async (bodyEl) => {
-    const { renderKnowledgeTab } = await import('./features/knowledge/knowledge.js');
-    renderKnowledgeTab(bodyEl);
-  });
-  registerTabRenderer('agents', async (bodyEl) => {
-    const { renderAgentsPage } = await import('./features/agents/hub.js');
-    renderAgentsPage(bodyEl);
-  });
-  registerTabRenderer('create', async (bodyEl) => {
-    const { renderCreateHub } = await import('./features/create/hub.js');
-    renderCreateHub(bodyEl);
-  });
-  registerTabRenderer('library', async (bodyEl) => {
-    const { renderLibrary } = await import('./features/library/library.js');
-    renderLibrary(bodyEl);
-  });
-  registerTabRenderer('work', async (bodyEl) => {
-    const { renderWorkPage } = await import('./features/work/work.js');
-    renderWorkPage(bodyEl);
-  });
+  // A1: the 8 destinations, each a real page (shell/destinations.js).
+  // Chat has no renderer — it is the pinned chat view itself. Old
+  // destinations (home/work/create/knowledge) are NOT registered: their
+  // ids redirect in tabs.js, and their old page modules (home.js,
+  // work.js) stay in the tree unmounted rather than as dead UI.
+  registerTabRenderer('projects', renderProjectsDestination);
+  registerTabRenderer('studio', renderStudioDestination);
+  registerTabRenderer('code', renderCodeDestination);
+  registerTabRenderer('research', renderResearchDestination);
+  registerTabRenderer('agents', renderAgentsDestination);
+  registerTabRenderer('library', renderLibraryDestination);
+  registerTabRenderer('settings', renderSettingsDestination);
 
 
   // Initialize auth flow (this will call startApplication on success)

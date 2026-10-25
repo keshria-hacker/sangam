@@ -346,8 +346,27 @@ export function deleteChat(chatId) {
   showConfirmDelete(chatId);
 }
 
+/** Sidebar footer usage meter (A1): local usage summary, or an
+ *  honest "unavailable" line — never an invented number. */
+async function renderUsageMeter() {
+  const meter = document.getElementById('usageMeter');
+  if (!meter) return;
+  try {
+    const data = await (await apiFetch('/analytics/summary')).json();
+    const s = data.summary || {};
+    const tokens = typeof s.tokens === 'number' ? s.tokens.toLocaleString() : null;
+    const cost = typeof s.cost_usd === 'number' ? `$${s.cost_usd.toFixed(2)}` : null;
+    meter.textContent = tokens || cost
+      ? `Usage: ${[tokens ? `${tokens} tokens` : null, cost].filter(Boolean).join(' · ')}`
+      : 'Usage: local only';
+  } catch {
+    meter.textContent = 'Usage unavailable';
+  }
+}
+
 export function initSidebar() {
   initElements();
+  renderUsageMeter();
 
   elements.newChatBtn?.addEventListener('click', function() { closeProfilePopup(); callChatModule('startNewChat'); });
   elements.mobileNewChat?.addEventListener('click', function() { closeProfilePopup(); callChatModule('startNewChat'); closeMobileSidebar(); });
