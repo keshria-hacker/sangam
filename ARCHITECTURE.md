@@ -1220,6 +1220,9 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/connectors/{name}/permissions` | Yes | Connector permissions (perfect-flow A6) |
 | POST | `/api/compare/blind` | Yes | Blind model comparison (perfect-flow A6) |
 | POST | `/api/compare/blind/vote` | Yes | Blind vote into leaderboard (perfect-flow A6) |
+| POST | `/api/intelligence/route` | Yes | Response pipeline dry-run routing (perfect-flow A2) |
+| POST | `/api/intelligence/harper` | Yes | Offline grammar/spell lint (perfect-flow A2) |
+| GET | `/api/intelligence/modes` | Yes | Composer modes list (perfect-flow A2) |
 | GET | `/api/security/allowlist` | Yes | List target allowlist (Batch 2) |
 | POST | `/api/security/allowlist` | Yes | Add allowlist target (Batch 2) |
 | DELETE | `/api/security/allowlist/{target_id}` | Yes | Remove allowlist target (Batch 2) |

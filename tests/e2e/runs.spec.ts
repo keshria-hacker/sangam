@@ -121,15 +121,20 @@ test('Runs centre: tab, sections, labelled controls, screenshot', async ({ page 
   expect(ctx.pageErrors, `pageerror: ${JSON.stringify(ctx.pageErrors)}`).toEqual([]);
 });
 
-test('Runs centre: mobile 390px via composer Runs button', async ({ page }) => {
+test('Runs centre: mobile 390px, no composer Runs button (perfect-flow A2)', async ({ page }) => {
   test.setTimeout(180000);
   ctx.badResponses = []; ctx.consoleErrors = []; ctx.pageErrors = [];
   attachGuards(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await register(page);
-  // Phase 1 remainder composition: the composer Runs pill opens the
-  // Runs tab without the tab picker — the chat -> runs path.
-  await page.locator('#runsBtn').click();
+  // Perfect-flow A2: the composer Runs button is removed by spec — the
+  // composer must offer Auto mode instead, and run history lives in
+  // Work → Activity (Agents → Run History once A1 lands the new IA).
+  await expect(page.locator('#runsBtn')).toHaveCount(0);
+  await page.locator('#tabAdd').click();
+  await page.locator('[data-tab-tool="work"]').click();
+  await page.waitForTimeout(2000);
+  await page.locator('[data-worksection="activity"]').click();
   await page.waitForTimeout(3000);
   await expect(page.getByRole('heading', { name: 'Runs centre' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh runs and artifacts' })).toBeVisible();
