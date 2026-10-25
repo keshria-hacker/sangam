@@ -1382,6 +1382,56 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/teams/worktrees/remove` | Yes | Remove a git worktree (Deep-read Wave-2) |
 | POST | `/api/teams/worktrees/run` | Yes | Run an argv command inside a worktree (Deep-read Wave-2) |
 | POST | `/api/teams/worktrees/annotate` | Yes | Validate diff-line review comments against a diff (Deep-read Wave-2) |
+| GET | `/api/knowledge/catalogue` | Yes | Curated MCP-server + LLM-pattern catalogue (Batch 9) |
+| POST | `/api/knowledge/packs` | Yes | Repomix-style workspace pack (Batch 9) |
+| POST | `/api/knowledge/code-map/refresh` | Yes | Refresh code memory if stale (Batch 9) |
+| POST | `/api/knowledge/code-map/change-impact` | Yes | Callers + tests + layers for a symbol (Batch 9) |
+| POST | `/api/knowledge/code-map/analysis` | Yes | Code-map analysis incl. hubs + surprising links (Batch 9) |
+| GET | `/api/memory/observations` | Yes | Observation ledger list (Batch 9) |
+| GET | `/api/memory/observations-context` | Yes | Top observations as a chat context block (Batch 9) |
+| POST | `/api/memory/observations` | Yes | Mint an observation (defense-checked) (Batch 9) |
+| GET | `/api/memory/observations/{id}` | Yes | One observation (Batch 9) |
+| POST | `/api/memory/observations/{id}/refine` | Yes | Strengthen/weaken an observation (Batch 9) |
+| POST | `/api/memory/observations/{id}/supersede` | Yes | Supersede an observation (Batch 9) |
+| POST | `/api/memory/ops/preview` | Yes | mem0-style ops preview, never writes (Batch 9) |
+| POST | `/api/memory/ops/apply` | Yes | Apply previewed ops (confirm + known ids only) (Batch 9) |
+| GET | `/api/memory/notes` | Yes | Browsable Markdown memory notes (Batch 9) |
+| POST | `/api/memory/notes` | Yes | Write a dated, typed Markdown memory note (Batch 9) |
+| GET | `/api/memory/notes/{id}` | Yes | One Markdown memory note (Batch 9) |
+| POST | `/api/memory/notes/normalize` | Yes | Merge duplicate Markdown notes, with report (Batch 9) |
+| POST | `/api/research/jobs` | Yes | Create a deep-research job (Batch 9) |
+| GET | `/api/research/jobs/{id}` | Yes | Research job state (Batch 9) |
+| POST | `/api/research/jobs/{id}/run` | Yes | Run a research job (Batch 9) |
+| POST | `/api/research/jobs/{id}/report` | Yes | Cited report (422 on uncited claims) (Batch 9) |
+| POST | `/api/research/jobs/{id}/slides` | Yes | Guarded slide/lesson outline from the report (Batch 9) |
+| GET | `/api/research/jobs/{id}/source-graph` | Yes | Source graph over the job's own sources (Batch 9) |
+| GET | `/api/notebooks/{id}/timeline` | Yes | Notebook source timeline (Batch 9) |
+| POST | `/api/notebooks/{id}/deep-research` | Yes | Notebook-scoped deep-research job (Batch 9) |
+| POST | `/api/agent/runtime/plan` | Yes | Tool-call dependency planning (Batch 10) |
+| POST | `/api/agent/runtime/contract` | Yes | Freeze a per-turn tool contract (Batch 10) |
+| POST | `/api/agent/runtime/contract/check` | Yes | Check one tool against a contract (Batch 10) |
+| POST | `/api/agent/runtime/compact` | Yes | Structured compaction + branch save (Batch 10) |
+| GET | `/api/agent/runtime/branches` | Yes | List compaction branches (Batch 10) |
+| POST | `/api/agent/runtime/branches/{id}/resume` | Yes | Resume a branch as a child branch (Batch 10) |
+| POST | `/api/agent/runtime/runs/{id}/steer` | Yes | Inject a steering message mid-run (Batch 10) |
+| POST | `/api/agent/runtime/runs/{id}/abort` | Yes | Abort a run at the next step boundary (Batch 10) |
+| GET | `/api/agent/runtime/runs/{id}/steering` | Yes | Queued steering + abort state (Batch 10) |
+| POST | `/api/agent/runtime/approvals/defer` | Yes | Defer a risky call to the tray (Batch 10) |
+| GET | `/api/agent/runtime/approvals/tray` | Yes | The "Needs you" approval tray (Batch 10) |
+| POST | `/api/agent/runtime/approvals/{id}/decide` | Yes | Decide a deferred approval, exactly once (Batch 10) |
+| POST | `/api/agent/runtime/sandbox` | Yes | Per-run sandbox preview / create (confirm) (Batch 10) |
+| POST | `/api/agent/runtime/sandbox/verify` | Yes | Verify gate preview / run (confirm) (Batch 10) |
+| POST | `/api/agent/runtime/flow` | Yes | Ticket graph: order + frontier + branch review (Batch 10) |
+| POST | `/api/agent/runtime/hive/drain` | Yes | Inbox drain + critical-only escalation (Batch 10) |
+| GET | `/api/agent/runtime/drivers` | Yes | Supervised external runtimes, detection only (Batch 10) |
+| GET | `/api/agent/runtime/drivers/{name}/detect` | Yes | Detect one external runtime binary (Batch 10) |
+| POST | `/api/agent/runtime/eval/propose` | Yes | Propose a change from an eval delta, never apply (Batch 10) |
+| POST | `/api/skills/propose-from-transcript` | Yes | Draft a skill from a chat transcript (Batch 10) |
+| POST | `/api/skills/propose-from-runs` | Yes | Draft skills from run-history clusters (Batch 10) |
+| POST | `/api/skills/drafts/save` | Yes | Save a user-reviewed skill draft (not installed) (Batch 10) |
+| GET | `/api/skills/{name}/trigger-eval` | Yes | Trigger-accuracy eval for a skill (Batch 10) |
+| POST | `/api/skills/{name}/eval-blind` | Yes | Blind A/B gate scored from supplied outputs (Batch 10) |
+| POST | `/api/skills/{name}/bootstrap` | Yes | Approval-gated bootstrap skill body (Batch 10) |
 
 ### 13.3 Database Schema
 

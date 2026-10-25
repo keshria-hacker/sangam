@@ -1,0 +1,7 @@
+name: taste-quality
+version: 1.0.0
+description: Taste and quality discipline — substantive frontend design without ornament clutter, and severity-tiered review checklists. Sangam-native, inspired by the taste-skill and agency-agents review patterns.
+source: sangam-native
+skills:
+  - design-taste
+  - review-checklist

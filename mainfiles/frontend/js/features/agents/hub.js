@@ -44,6 +44,26 @@ export async function renderAgentHub(bodyEl) {
       <div class="hub-header">
         <button class="btn-primary btn-sm" id="hubNew"><i class="fa-solid fa-plus"></i> New agent</button>
       </div>
+      <div class="sp-custom-section" id="hubRuntime">
+        <h3 class="sp-section-title"><i class="fa-solid fa-diagram-project"></i> Run mode &amp; task plan</h3>
+        <p class="settings-hint">Pick how a run is shaped before you start it: a single agent,
+          one fresh agent per task (tasks run in order, each reviewed before the next),
+          a hive run that drains its inbox first, or a ticket flow with blocking edges.
+          Previewing a plan below runs no agent and changes nothing — it only shows the order.</p>
+        <label class="settings-hint">Run mode
+          <select id="hubRunMode" class="provider-key-input">
+            <option value="single">Single agent</option>
+            <option value="subagent-per-task">Subagent per task (fresh context per task, review per task)</option>
+            <option value="hive">Hive (drain inbox first, escalate only critical items)</option>
+            <option value="flow">Ticket flow (blocking edges, ready-frontier order)</option>
+          </select>
+        </label>
+        <label class="settings-hint">Tasks (one per line, use "A &gt; B" to mean B waits for A)
+          <textarea id="hubFlowTasks" class="provider-key-input" rows="3" placeholder="Research&#10;Draft > Research&#10;Review > Draft"></textarea>
+        </label>
+        <button class="btn-secondary btn-sm" id="hubFlowPreview"><i class="fa-solid fa-list-check"></i> Preview plan</button>
+        <div id="hubFlowResult"><p class="settings-hint">No plan previewed yet. Enter tasks and preview to see the run order.</p></div>
+      </div>
       <div id="hubFormWrap"></div>
       <h4 class="hub-section-title">Built-in agents</h4>
       <div class="hub-grid" id="hubBuiltins"></div>
@@ -69,6 +89,50 @@ export async function renderAgentHub(bodyEl) {
   });
 
   bodyEl.querySelector('#hubNew')?.addEventListener('click', () => openForm(bodyEl, null));
+  bodyEl.querySelector('#hubFlowPreview')?.addEventListener('click', async () => {
+    const result = bodyEl.querySelector('#hubFlowResult');
+    const mode = bodyEl.querySelector('#hubRunMode')?.value || 'single';
+    const lines = (bodyEl.querySelector('#hubFlowTasks')?.value || '')
+      .split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) {
+      result.innerHTML = '<p class="settings-hint">Enter at least one task to preview a plan.</p>';
+      return;
+    }
+    // "B > A" means B waits for A; plain lines have no dependencies.
+    const tasks = [];
+    const byTitle = new Map();
+    lines.forEach((line, i) => {
+      const parts = line.split('>').map((s) => s.trim()).filter(Boolean);
+      const title = parts[0];
+      const id = `t${i + 1}`;
+      byTitle.set(title, id);
+      tasks.push({ id, title, depends_on: [] });
+    });
+    lines.forEach((line, i) => {
+      const parts = line.split('>').map((s) => s.trim()).filter(Boolean);
+      parts.slice(1).forEach((dep) => {
+        if (byTitle.has(dep)) tasks[i].depends_on.push(byTitle.get(dep));
+      });
+    });
+    try {
+      const data = await (await apiFetch('/agent/runtime/flow', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks }),
+      })).json();
+      const order = (data.execution_order || []).map((id) => {
+        const t = tasks.find((x) => x.id === id);
+        return t ? t.title : id;
+      });
+      result.innerHTML = `<p class="settings-hint">Mode: <strong>${escapeHtml(mode)}</strong> — run order:</p>
+        <ol>${order.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ol>
+        <p class="settings-hint">Ready first: ${(data.frontier || []).map((id) => {
+          const t = tasks.find((x) => x.id === id);
+          return escapeHtml(t ? t.title : id);
+        }).join(', ') || 'none'}</p>`;
+    } catch (err) {
+      result.innerHTML = `<p class="team-error">Could not preview plan: ${escapeHtml(err?.message || String(err))}</p>`;
+    }
+  });
   await loadMine(bodyEl);
 }
 
@@ -366,7 +430,12 @@ async function renderRunsHistory(container) {
     </div>`;
 }
 
-/** Approvals: policy overview (approvals happen inline during runs). */
+/** Approvals: policy overview + the async "Needs you" tray (Batch 10).
+
+The tray is the coucou pattern on Sangam's approval backend: a risky
+call waits here while its run continues with independent work, and it
+can be approved from here or from a paired device — it no longer has
+to block inside the chat stream. */
 function renderApprovalsView(container) {
   container.innerHTML = `
     <div class="sp-custom-section">
@@ -375,7 +444,50 @@ function renderApprovalsView(container) {
         you to approve inline in the run. Configure which tools need approval in
         Settings → Agents &amp; Safety.</p>
       <div class="sp-section-body" data-approval-policy><p class="settings-hint">Loading…</p></div>
+    </div>
+    <div class="sp-custom-section">
+      <h3 class="sp-section-title"><i class="fa-solid fa-bell"></i> Needs you</h3>
+      <p class="settings-hint">Risky calls waiting for a decision. The run keeps working on
+        independent tasks while these wait — approving here (or from a paired device)
+        releases exactly one waiting call.</p>
+      <div data-approval-tray><p class="settings-hint">Loading tray…</p></div>
+      <button class="btn-secondary btn-sm" data-tray-refresh><i class="fa-solid fa-rotate"></i> Refresh tray</button>
     </div>`;
+  const trayEl = container.querySelector('[data-approval-tray]');
+  async function loadTray() {
+    try {
+      const data = await (await apiFetch('/agent/runtime/approvals/tray')).json();
+      const items = (data.tray || []).filter((t) => t.status === 'pending');
+      if (!items.length) {
+        trayEl.innerHTML = '<p class="settings-hint">Nothing needs you right now. When an agent parks a risky call here, it appears with Approve / Deny buttons.</p>';
+        return;
+      }
+      trayEl.innerHTML = items.map((t) => `
+        <div class="run-row" data-tray-id="${escapeHtml(t.id)}">
+          <div class="run-main"><strong>${escapeHtml(t.tool)}</strong>
+            <span class="settings-hint">${escapeHtml(t.args_preview || '')}</span></div>
+          <button class="btn-primary btn-sm" data-tray-decide="approve">Approve</button>
+          <button class="btn-secondary btn-sm" data-tray-decide="deny">Deny</button>
+        </div>`).join('');
+      trayEl.querySelectorAll('[data-tray-id]').forEach((row) => {
+        row.querySelectorAll('[data-tray-decide]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const approved = btn.dataset.trayDecide === 'approve';
+            await apiFetch(`/agent/runtime/approvals/${encodeURIComponent(row.dataset.trayId)}/decide`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ approved, source: 'chat' }),
+            });
+            showToast({ type: 'success', title: approved ? 'Approved.' : 'Denied.' });
+            await loadTray();
+          });
+        });
+      });
+    } catch (err) {
+      trayEl.innerHTML = `<p class="team-error">Could not load tray: ${escapeHtml(err?.message || String(err))}</p>`;
+    }
+  }
+  container.querySelector('[data-tray-refresh]')?.addEventListener('click', loadTray);
+  loadTray();
   const body = container.querySelector('[data-approval-policy]');
   import('../../shared/settings_store.js').then(({ getSetting }) => {
     const req = getSetting('requireApproval') || [];

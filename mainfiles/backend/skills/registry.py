@@ -224,6 +224,15 @@ class SkillDefinition:
     # until explicitly requested. ``source_dir`` is the skill dir.
     reference_files: list[str] = field(default_factory=list)
     source_dir: Path | None = None
+    # Batch 10 (scientific-agent-skills frontmatter contract + ego-lite
+    # bootstrap): validated fields, enforced by verify.run_skill_checks.
+    # ``allowed_tools`` names tools the runtime must actually offer;
+    # ``bootstrap_command`` serves the body from the tool at run time
+    # (see skills/bootstrap.py — approval-gated, capped, scanned).
+    allowed_tools: list[str] = field(default_factory=list)
+    compatibility: str = ""
+    bootstrap_command: str = ""
+    last_reviewed: str = ""
 
     def load_reference(self, name: str) -> str:
         """Load one lazy reference file on explicit request only.
@@ -300,6 +309,9 @@ class SkillRegistry:
             if _coerce_bool(metadata.get("disable_model_invocation"),
                             default=False):
                 model_invocation = False
+            compat = metadata.get("compatibility", "")
+            if isinstance(compat, list):
+                compat = ", ".join(str(c) for c in compat)
             references_dir = skill_file.parent / "references"
             reference_files = (
                 sorted(f"references/{p.name}" for p in references_dir.iterdir()
@@ -321,6 +333,12 @@ class SkillRegistry:
                 model_invocation=model_invocation,
                 reference_files=reference_files,
                 source_dir=skill_file.parent,
+                allowed_tools=[str(t) for t in
+                               (metadata.get("allowed_tools") or [])
+                               if isinstance(t, (str, int))],
+                compatibility=str(compat),
+                bootstrap_command=str(metadata.get("bootstrap_command") or ""),
+                last_reviewed=str(metadata.get("last_reviewed") or ""),
             )
         except (OSError, TypeError, ValueError, yaml.YAMLError):
             return None

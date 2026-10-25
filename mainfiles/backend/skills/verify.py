@@ -56,6 +56,10 @@ ALLOWED_FRONTMATTER_KEYS = {
     "model_invocation", "disable_model_invocation",
     "parameters", "tags", "triggers", "dependencies",
     "source_repo", "version", "license", "compatibility", "argument-hint",
+    # Batch 10: scientific-agent-skills frontmatter contract + ego-lite
+    # bootstrap. ``allowed_tools`` must be a list of tool names;
+    # ``bootstrap_command`` must be a single shell-free command.
+    "allowed_tools", "bootstrap_command", "last_reviewed",
 }
 # Anthropic guidance: SKILL.md under 500 lines; deeper material goes to
 # references/ and is lazy-loaded, never pasted into the body.
@@ -470,6 +474,50 @@ def run_skill_checks(skill_dir: Path) -> dict:
                 "scripts without eval/test coverage: " + ", ".join(uncovered))
         else:
             add("scripts-tests", "passed")
+
+    # -- Batch 10 authoring checks -------------------------------------
+    # allowed-tools: when declared it must be a list of tool-name strings
+    # (a skill declaring tools the runtime cannot offer fails here, not
+    # silently at run time — scientific-agent-skills contract).
+    allowed = data.get("allowed_tools")
+    if allowed is None:
+        add("allowed-tools", "skipped", "not declared")
+    elif isinstance(allowed, list) and all(isinstance(t, str) and t.strip() for t in allowed):
+        add("allowed-tools", "passed")
+    else:
+        add("allowed-tools", "failed",
+            "allowed_tools must be a list of tool-name strings")
+    # bootstrap-command: single shell-free command (bootstrap.py rules).
+    bootstrap = data.get("bootstrap_command")
+    if bootstrap is None:
+        add("bootstrap-command", "skipped", "not declared")
+    else:
+        from .bootstrap import validate_bootstrap_command
+        ok, reason = validate_bootstrap_command(str(bootstrap))
+        add("bootstrap-command", "passed" if ok else "failed", "" if ok else reason)
+    # Description word budget (anthropics "concise is key"): over ~100
+    # words is a warning, not a failure — existing long descriptions
+    # keep passing while new authors get the nudge.
+    desc_words = len(str(data.get("description") or "").split())
+    if desc_words <= 100:
+        add("description-words", "passed")
+    else:
+        add("description-words", "warning",
+            f"description is {desc_words} words (aim for <= 100); "
+            "move detail into the body or references/")
+    # scripts manifest: a scripts.json must list resolvable entries.
+    manifest = skill_dir / "scripts.json"
+    if manifest.is_file():
+        try:
+            from .bootstrap import declared_scripts
+            entries = declared_scripts(skill_dir)
+            missing = [e["name"] for e in entries if not e["exists"]]
+            add("scripts-manifest", "failed" if missing else "passed",
+                ("missing scripts: " + ", ".join(missing)) if missing else "")
+        except ValueError as exc:
+            add("scripts-manifest", "failed", str(exc))
+    else:
+        add("scripts-manifest", "skipped", "no scripts.json")
 
     passed = sum(1 for c in checks if c["status"] == "passed")
     failed = sum(1 for c in checks if c["status"] == "failed")

@@ -252,3 +252,167 @@ async def generate_document_endpoint(payload: DocGenIn):
         content=data, media_type=MEDIA_TYPES[fmt],
         headers={"Content-Disposition":
                  f'attachment; filename="{safe_title}.{EXTENSIONS[fmt]}"'})
+
+
+# ------------------------------------------------ Batch 10: skill runtime v2
+# Reverse-skill drafts, trigger evals, blind A/B gate, bootstrap skills.
+# Drafts are NEVER auto-saved as live skills: propose returns a draft,
+# /drafts/save writes it to a drafts dir OUTSIDE the skills root (so it
+# is not auto-loaded), and only an explicit install publishes it.
+
+class TranscriptIn(BaseModel):
+    transcript: list[dict] = Field(default_factory=list)
+    name_hint: str | None = None
+
+
+@router.post("/propose-from-transcript")
+async def propose_from_transcript(payload: TranscriptIn):
+    from ..skills.reverse import propose_skill_from_transcript
+    try:
+        return propose_skill_from_transcript(payload.transcript,
+                                             name_hint=payload.name_hint)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+class RunsIn(BaseModel):
+    runs: list[dict] = Field(default_factory=list)
+    min_cluster: int = 2
+
+
+@router.post("/propose-from-runs")
+async def propose_from_runs(payload: RunsIn):
+    from ..skills.reverse import propose_skills_from_runs
+    return {"drafts": propose_skills_from_runs(payload.runs,
+                                               min_cluster=payload.min_cluster)}
+
+
+class DraftSaveIn(BaseModel):
+    name: str
+    description: str
+    body: str
+    category: str = "misc"
+    invocation: str = "both"
+    tags: list[str] = Field(default_factory=list)
+    triggers: list[str] = Field(default_factory=list)
+
+
+@router.post("/drafts/save")
+async def save_skill_draft(payload: DraftSaveIn):
+    from ..skills.creator import draft_skill
+    from ..skills.verify import run_skill_checks
+    safe = "".join(c if c.isalnum() or c in "-_" else "-" for c in payload.name)[:80]
+    if not safe:
+        raise HTTPException(422, "draft name must contain a usable slug")
+    drafts_root = Path(__file__).resolve().parents[2] / "config" / "skill-drafts"
+    try:
+        md = draft_skill(drafts_root / safe, payload.name, payload.description,
+                         payload.body, category=payload.category,
+                         invocation=payload.invocation, tags=payload.tags,
+                         triggers=payload.triggers)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    return {"saved": str(md), "draft": safe,
+            "checks": run_skill_checks(drafts_root / safe),
+            "note": "Draft only: it is NOT installed or auto-loaded. "
+                    "Install it explicitly to publish."}
+
+
+@router.get("/{name}/trigger-eval")
+async def trigger_eval_endpoint(name: str, positive: list[str] = [],
+                                negative: list[str] = []):
+    from ..skills.creator import trigger_eval
+    skill_dir = _skill_dir_or_404(name)
+    try:
+        return trigger_eval(skill_dir, positive, negative)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+class BlindCase(BaseModel):
+    prompt: str
+    expected_substrings: list[str] = Field(default_factory=list)
+
+
+class BlindIn(BaseModel):
+    cases: list[BlindCase] = Field(default_factory=list)
+    with_outputs: list[str] = Field(default_factory=list)
+    without_outputs: list[str] = Field(default_factory=list)
+
+
+@router.post("/{name}/eval-blind")
+async def eval_blind_endpoint(name: str, payload: BlindIn):
+    """Blind A/B gate scored from SUPPLIED run outputs (labelled honestly).
+
+    The caller supplies recorded with-skill and without-skill outputs
+    per case; the gate scores both with the same substring rubric and
+    passes only when with-skill beats without-skill strictly. This is
+    a scoring endpoint, not a live run — no model is invoked here, so
+    no live-run pass is claimed.
+    """
+    from ..skills.creator import evaluate_blind
+    skill_dir = _skill_dir_or_404(name)
+    if not payload.cases:
+        raise HTTPException(422, "at least one case is required")
+    if len(payload.with_outputs) != len(payload.cases) or \
+            len(payload.without_outputs) != len(payload.cases):
+        raise HTTPException(422, "with_outputs and without_outputs must each "
+                                 "have one entry per case")
+    cases = [{"prompt": c.prompt, "expected_substrings": c.expected_substrings}
+             for c in payload.cases]
+    with_iter = iter(payload.with_outputs)
+    without_iter = iter(payload.without_outputs)
+    report = evaluate_blind(
+        skill_dir, cases,
+        runner_with=lambda prompt, d: next(with_iter),
+        runner_without=lambda prompt, d: next(without_iter))
+    return {**report, "scored_from": "supplied run outputs (no live model run)"}
+
+
+class BootstrapIn(BaseModel):
+    approval_id: str | None = None
+
+
+_pending_bootstrap: dict[str, dict] = {}
+
+
+@router.post("/{name}/bootstrap")
+async def bootstrap_skill_endpoint(name: str, payload: BootstrapIn):
+    """Resolve a bootstrap skill body, approval-gated (ego-lite pattern).
+
+    First call (no approval_id): creates an approval gate and returns
+    approval_needed + approval_id — approve via POST /api/agent/approve/{id}.
+    Second call (approval_id, after approval): runs the skill's declared
+    bootstrap_command and returns the capped, scanned body.
+    """
+    from ..code_agent import create_approval_gate
+    from ..skills.bootstrap import resolve_bootstrap_body
+    from ..skills.registry import get_registry
+    skill = get_registry().get(name)
+    if skill is None:
+        skill_dir = find_skill_dir(name)
+        if skill_dir is None:
+            raise HTTPException(404, f"Skill not found: {name}")
+        from ..skills.registry import SkillRegistry
+        skill = next((s for s in SkillRegistry(
+            skills_root=skill_dir.parent).skills.values()
+            if s.source_dir is not None
+            and Path(s.source_dir).resolve() == skill_dir.resolve()), None)
+    if skill is None or not getattr(skill, "bootstrap_command", ""):
+        raise HTTPException(422, f"Skill {name!r} declares no bootstrap_command")
+    if payload.approval_id is None:
+        import uuid
+        approval_id = f"boot-{uuid.uuid4().hex[:12]}"
+        gate = create_approval_gate(approval_id)
+        _pending_bootstrap[approval_id] = {
+            "skill_dir": str(skill.source_dir), "command": skill.bootstrap_command,
+            "gate": gate}
+        return {"status": "approval_needed", "approval_id": approval_id,
+                "command": skill.bootstrap_command,
+                "detail": "Approve via POST /api/agent/approve/{id}, then "
+                          "re-call with approval_id."}
+    pending = _pending_bootstrap.pop(payload.approval_id, None)
+    if pending is None:
+        raise HTTPException(404, "bootstrap approval not found or expired")
+    return resolve_bootstrap_body(pending["skill_dir"], pending["command"],
+                                  approval=pending["gate"])

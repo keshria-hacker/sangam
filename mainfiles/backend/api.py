@@ -260,6 +260,10 @@ from .api_routes import goals_routes  # noqa: F401
 # observation / research-job tables and all batch routes on the
 # shared router.
 from .api_routes import memory_research_routes  # noqa: F401
+# Batch 10 (agent runtime + skills): importing this module registers
+# the runtime endpoints (plan/contract/compact/steering/tray/sandbox/
+# flow/hive/drivers/eval) on the shared router.
+from .api_routes import agent_runtime_routes  # noqa: F401
 # Doctor lives in its own module with its own router; include it on the
 # shared router so it is served (and authenticated) like /system/*.
 from .doctor import router as _doctor_router

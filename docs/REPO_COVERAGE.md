@@ -187,3 +187,49 @@ restoration. Tests: `tests/test_batch9_memory_research.py` (14 tests).
 - Chat observation injection is code-wired but NOT live-verified with a real model (no model configured in this environment); the identical context block is endpoint-tested via `GET /memory/observations-context`.
 - Knowledge frontend section is added and module-link-checked, not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
 - Unified cross-source graph merge (code + notes + memories + research into one graph) and mental-model standing pages were scoped out, not silently approximated.
+
+## Batch 10 — Agent Runtime + Skills (2026-10-26, branch `integration/full-program`)
+
+Deep-read batch for the 23 repos in the agents-skills brief. Landed
+inside the existing 7 destinations (Work → Agents/Approvals, Library
+packs) — no new destination, no perfect-flow/tabs-on-top restoration,
+no second agent/team/skill system. `run_agent` in `code_agent.py` is
+untouched as the API-compatible loop; the new `backend/agent_runtime/`
+package (previously only `__pycache__`) is the missing glue. Tests:
+`tests/test_batch10_agent_skills.py` (28 tests).
+
+| # | Repo | Status | Evidence |
+|---|------|--------|----------|
+| 1 | OpenHands/OpenHands | Portable ideas only | Per-run sandbox/worktree as DEFAULT code-agent context + verify-style exit gate (`agent_runtime/sandbox.py`, `POST /agent/runtime/sandbox[/verify]`); Docker runtime NOT ported, Docker isolation NOT claimed verified live — workspace fallback + warning via existing `security_guardrails.run_isolated_command` |
+| 2 | earendil-works/pi | Done | Steering queue + abort at step boundaries, parallel-by-default / sequential-on-`reads` tool planning, structured compaction (summary + read/modified files) with branch resume (`agent_runtime/loop.py`) |
+| 3 | ultraworkers/claw-code | Done (async shape) | Async approval channel (`agent_runtime/approval.py`): risky call waits in the tray while the run continues with independent calls only; decisions from chat or a paired LAN device via the tray; existing per-run policy + DB audit rows unchanged |
+| 4 | iwe-org/iwe | Already covered (Batch 9) | Memory-as-Markdown contract landed in Batch 9 (`backend/memory/markdown_notes.py`); not rebuilt here |
+| 5 | msitarzewski/agency-agents | Done (contract) | Severity-tier review schema blocker/suggestion/nit (`backend/teams/review_schema.py`, parses 🔴/🟡/💭 and Must/Should/Nice); roster-consistency is the existing `persona_registry.validate_roster`, now regression-tested with zero errors |
+| 6 | overmind-core/overmind | Narrow | `propose_from_eval` (`agent_runtime/orchestration.py`): propose (never silently apply) a model/prompt change with the eval delta as evidence |
+| 7 | citrolabs/ego-lite | Done | `bootstrap_command` skill support (`backend/skills/bootstrap.py`): approval-gated, argv-only, 4000-char cap, banned-pattern scan; shell metacharacters rejected |
+| 8 | PersonalJarvis/PersonalJarvis (dodaios) | Done (protocol) | `RuntimeDriver` protocol + `LocalCommandDriver` (detect/start/health/kill/log-tail, `agent_runtime/drivers.py`); API exposes detection only — spawning is host-operator initiated, never an API request (would be unrestricted execution) |
+| 9 | Louis-CFM/coucou | Done (UX pattern) | Persistent "Needs you" tray in Work → Agents → Approvals (`hub.js`), fed by the async tray; no new approval backend |
+| 10 | stablyai/orca | Done (primitives) | Typed `ask` (blocking question + timeout) and `gate` (pass/block) nodes + worktree ownership handoff to a fresh worktree + fresh context (`agent_runtime/orchestration.py`); worktree/SSH/mobile companion pieces were already in `worktrees.py` |
+| 11 | HarnessMD/munder-difflin | Done (mode) | Hive mode: inbox-drain before finish, critical-only escalation (destructive/spend/scope/conflict/secret/production), single-committer path stated in the new coordinator persona; hive module itself unchanged |
+| 12 | obra/superpowers | Done (run shape) | Subagent-per-task `TaskGraph` (blocking edges, ready frontier, per-task review gate, branch review) + four-stop-rule contract; skill evals now require a failing baseline before publish (`creator.publish_skill(require_failing_baseline=...)`) |
+| 13 | anthropics/skills | Done (enforcement) | Description word-budget check (warning over ~100 words, not a failure) + trigger-accuracy evals (`creator.trigger_eval`) as part of the publish path; format itself was already implemented |
+| 14 | mattpocock/skills | Done (same engine) | Ticket-graph flow is the same `TaskGraph` engine as superpowers §12; skill-to-skill invocation rule was already in `registry.check_skill_call` |
+| 15 | multica-ai/andrej-karpathy-skills | Done (native skill) | `coding-guidelines` (original Sangam wording, not copied text) added to the engineering pack; injected by default for code runs via the existing auto-fire path |
+| 16 | midudev/autoskills | Already covered | Stack-detection + verified install already in `recommend.py`/`importer.py`/`verify.py`; no new installer built |
+| 17 | K-Dense-AI/scientific-agent-skills | Done (contract + loop) | Validated frontmatter fields `allowed_tools`/`compatibility`/`version`/`last_reviewed` in registry + verify; user-triggered "propose from my runs" job (`skills/reverse.py`, Runs titles only — no screen capture, Sangam has no screenpipe); 177-skill breadth NOT curated (content, not code) |
+| 18 | Leonxlnx/taste-skill | Done (pattern) | Declared `scripts.json` manifest (`skills/bootstrap.py`) + blind A/B gate (`creator.evaluate_blind`: with-skill must strictly beat without-skill) + original `design-taste` skill in the new `taste-quality` pack; gallery content NOT copied |
+| 19 | Yeachan-Heo/oh-my-claudecode | Excluded — clone absent | Deep-read brief §19: never arrived; nothing claimed or built from it |
+| 20 | odysseus-dev/odysseus | Done | Frozen `TurnContract` (`required <= offered <= executable`, schema snapshot) with no-substitution rule: unavailable → stop and say so (`agent_runtime/loop.py`); slow-tool promotion rule (60s budget → background job in Runs feed) |
+| 21 | Dodaios/Dodaios (standalone) | Excluded — clone absent | Deep-read brief §21: distinct from PersonalJarvis's `dodaios` package (§8, read); nothing further claimed |
+| 22 | zhaoxuya520/reverse-skill | Done (Sangam-native mechanism) | Deep-read brief §22: clone absent, so nothing is claimed from it; the mechanism itself — propose a draft skill from a transcript, user reviews before saving — is implemented in `skills/reverse.py` + `POST /skills/propose-from-transcript`, `POST /skills/drafts/save` (drafts live outside the skills root, never auto-loaded) |
+| — | Agent catalog (agency/ego-lite/overmind/coucou/PersonalJarvis/odysseus/Dodaios/oh-my-claudecode) | Converged, not duplicated | No new agent system: one new persona only (`teams/personas/engineering/coordinator.md`, the god-orchestrator escalation contract — genuinely missing); the rest map to the runtime/skill mechanisms above or are excluded with reason in this table |
+| — | Orca/munder-difflin gap check | Already-covered + gap filled | Teams/hive/worktrees already covered most of both; the genuine gaps (ask/gate nodes, worktree ownership handoff, inbox-drain mode, single-committer contract) are the Batch 10 items above, not a duplicate system |
+
+### Batch 10 honest limits
+- `run_agent` was NOT refactored into the new package: steering, async approval, and the turn contract are runtime primitives + API, wired into new run shapes; the existing loop still blocks on its own approval gate for in-loop calls. Full loop adoption is follow-up work, not claimed here.
+- No live model run exercised the new primitives (no model configured here); steering/approval/flow are unit- + endpoint-tested with deterministic fakes, not live agent runs.
+- Paired-device approval is exercised via the tray endpoint with `source: "paired-device"` under the same authenticated `/api` session; a real phone-over-LAN round-trip was not verified here (standing unverified item).
+- Docker isolation, real-driver browser runs, and physical phone QR scan remain unverified live, as before; the verify gate reports `workspace-fallback` + warning on this machine rather than claiming container isolation.
+- Blind A/B scoring in the API is scored from caller-supplied run outputs and labelled as such — it is not a live model run.
+- Frontend additions (run-mode/flow preview, tray) are module-link-checked (63/63), not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
+- `ARCHITECTURE.md` §13.2 was already drifting at base 93eb40a (Batch 9 routes undocumented, drift test failing); this batch documents all missing rows (Batch 9 + Batch 10) and the drift test passes again.
