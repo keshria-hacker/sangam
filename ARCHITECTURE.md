@@ -1166,6 +1166,25 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/connectors/{name}/callback` | Yes | OAuth callback, token stored encrypted (Phase 5) |
 | DELETE | `/api/connectors/{name}` | Yes | Disconnect an OAuth connector (Phase 5) |
 | GET | `/api/system/backup` | Yes | Download backup zip (DB + uploads) (Phase 5) |
+| POST | `/api/projects` | Yes | Create project workspace (perfect-flow A3) |
+| GET | `/api/projects` | Yes | List projects (perfect-flow A3) |
+| GET | `/api/projects/{id}` | Yes | Project home summary (perfect-flow A3) |
+| PUT | `/api/projects/{id}` | Yes | Update project (perfect-flow A3) |
+| DELETE | `/api/projects/{id}` | Yes | Soft/hard delete project (perfect-flow A3) |
+| POST | `/api/projects/{id}/instructions` | Yes | New instruction version (perfect-flow A3) |
+| GET | `/api/projects/{id}/instructions` | Yes | Instruction current + history (perfect-flow A3) |
+| POST | `/api/projects/{id}/sources` | Yes | Add project source (perfect-flow A3) |
+| GET | `/api/projects/{id}/sources` | Yes | List project sources (perfect-flow A3) |
+| PUT | `/api/projects/{id}/sources/{sid}/context` | Yes | Source context control (perfect-flow A3) |
+| DELETE | `/api/projects/{id}/sources/{sid}` | Yes | Soft-delete source (perfect-flow A3) |
+| POST | `/api/projects/{id}/tasks` | Yes | Project task (reuses goals Task) (perfect-flow A3) |
+| GET | `/api/projects/{id}/tasks` | Yes | List project tasks (perfect-flow A3) |
+| PATCH | `/api/projects/{id}/tasks/{tid}` | Yes | Update project task (perfect-flow A3) |
+| POST | `/api/projects/{id}/chats` | Yes | Scoped chat in project (perfect-flow A3) |
+| GET | `/api/projects/{id}/chats` | Yes | List project chats (perfect-flow A3) |
+| GET | `/api/projects/{id}/context` | Yes | Project-scoped context (perfect-flow A3) |
+| GET | `/api/projects/{id}/retrieve` | Yes | Project-scoped hybrid retrieval (perfect-flow A3) |
+| GET | `/api/memory/dashboard` | Yes | Memory privacy dashboard (perfect-flow A3) |
 | GET | `/api/security/allowlist` | Yes | List target allowlist (Batch 2) |
 | POST | `/api/security/allowlist` | Yes | Add allowlist target (Batch 2) |
 | DELETE | `/api/security/allowlist/{target_id}` | Yes | Remove allowlist target (Batch 2) |
