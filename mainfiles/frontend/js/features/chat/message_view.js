@@ -517,7 +517,7 @@ export function buildMessageNode(msg) {
   // runnable workflow via the existing POST /workflows endpoint — a
   // single llm node whose prompt is the last user question (or, if the
   // chat has none, the canvas default {{input.q}} template) — then opens
-  // Work → Workflows with the new workflow listed.
+  // Agents → Workflows with the new workflow listed.
   const wfBtn = node.querySelector('.workflow-msg-btn');
   wfBtn?.addEventListener('click', async () => {
     if (wfBtn.disabled) return;
@@ -538,9 +538,9 @@ export function buildMessageNode(msg) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || `Workflow creation failed (${res.status})`);
-      showToast({ type: 'success', title: 'Workflow created', message: `"${name}" is ready in Work → Workflows.` });
+      showToast({ type: 'success', title: 'Workflow created', message: `"${name}" is ready in Agents → Workflows.` });
       const { showToolSection } = await import('../tabs/tabs.js');
-      showToolSection('work', 'workflows');
+      showToolSection('agents', 'workflows');
     } catch (err) {
       showToast({ type: 'error', title: 'Workflow failed', message: err?.message || String(err) });
     } finally {
@@ -558,15 +558,12 @@ export function buildMessageNode(msg) {
     if (!isInspectorVisible()) toggleInspector();
   });
 
-  // View run button (spec §3.2): run history lives in Agents → Run
-  // History; until the IA swap re-homes it, the live run-history
-  // surface is Work → Activity (the Runs centre), so that is where
-  // this opens — it never pretends a destination exists that does not.
+  // View run button (spec §3.2, A1 re-homing): run history lives in
+  // Agents → Run History.
   const viewRunBtn = node.querySelector('.view-run-btn');
   viewRunBtn?.addEventListener('click', async () => {
     const { showToolSection } = await import('../tabs/tabs.js');
-    showToolSection('work', 'activity');
-    showToast({ type: 'info', title: 'Run history', message: 'Run history is in Work → Activity.' });
+    showToolSection('agents', 'run-history');
   });
 
   // Speak button (voice feature) — toggles to Stop while speaking

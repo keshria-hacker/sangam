@@ -79,14 +79,12 @@ async function loadAll(bodyEl) {
     const liveEmpty = (bodyEl.querySelector('#liveRuns')?.textContent || '').includes('No live runs');
     const histEmpty = (bodyEl.querySelector('#runHistory')?.textContent || '').includes('No run history yet');
     if (liveEmpty && histEmpty) {
+      // Empty state: exactly ONE guided next action (workflows are
+      // one segment away in Agents, not a competing CTA here).
       actions.innerHTML = `<p class="settings-hint">Nothing has run yet.</p>
-        <button type="button" class="btn-primary btn-sm" id="runsStartAgent">Run your first agent</button>
-        <button type="button" class="btn-secondary btn-sm" id="runsStartWorkflow">Create your first workflow</button>`;
+        <button type="button" class="btn-primary btn-sm" id="runsStartAgent">Run your first agent</button>`;
       actions.querySelector('#runsStartAgent').addEventListener('click', () => {
-        import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'agents'));
-      });
-      actions.querySelector('#runsStartWorkflow').addEventListener('click', () => {
-        import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'workflows'));
+        import('../tabs/tabs.js').then((m) => m.showToolSection('agents', 'tasks'));
       });
     } else {
       actions.innerHTML = '';

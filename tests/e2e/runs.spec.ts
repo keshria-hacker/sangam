@@ -84,11 +84,10 @@ test('Runs centre: tab, sections, labelled controls, screenshot', async ({ page 
   attachGuards(page);
   await register(page);
 
-  // Batch 1: Runs is now the Activity section inside Work.
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="work"]').click();
+  // A1: Runs is now Agents -> Run History (no tab picker anymore).
+  await page.locator('[data-nav="agents"]').click();
   await page.waitForTimeout(2000);
-  await page.locator('[data-worksection="activity"]').click();
+  await page.locator('[data-dest-section="run-history"]').click();
   await page.waitForTimeout(3000);
 
   await expect(page.getByRole('heading', { name: 'Runs centre' })).toBeVisible();
@@ -129,12 +128,11 @@ test('Runs centre: mobile 390px, no composer Runs button (perfect-flow A2)', asy
   await register(page);
   // Perfect-flow A2: the composer Runs button is removed by spec — the
   // composer must offer Auto mode instead, and run history lives in
-  // Work → Activity (Agents → Run History once A1 lands the new IA).
+  // Agents → Run History (A1 new IA).
   await expect(page.locator('#runsBtn')).toHaveCount(0);
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="work"]').click();
+  await page.locator('[data-nav="agents"]').click();
   await page.waitForTimeout(2000);
-  await page.locator('[data-worksection="activity"]').click();
+  await page.locator('[data-dest-section="run-history"]').click();
   await page.waitForTimeout(3000);
   await expect(page.getByRole('heading', { name: 'Runs centre' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh runs and artifacts' })).toBeVisible();

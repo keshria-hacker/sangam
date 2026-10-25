@@ -11,21 +11,24 @@ import { showToast } from '../shared/toast.js';
 
 console.log('[Module] nav.js loaded');
 
-// Batch 1 UX consolidation: the sidebar IS the map of the app. Chat is
-// pinned at the top; the six destinations below it are the only top-level
-// places; Settings sits once at the bottom. Old tabs live as sections
-// inside these destinations (see tabs.js ALIASES), never as rail items.
+// A1 perfect-flow IA (§3): the sidebar IS the map of the app. Chat is
+// pinned at the top; the 8 destinations below it, in spec order, are
+// the only top-level places. Old destinations (Home/Work/Create/
+// Knowledge) are gone: their contents live inside the new destinations
+// as segmented sub-navigation, never as rail items or nested tabs.
+// The sidebar footer (avatar, usage meter, palette hint, help) lives
+// in index.html, not in this rail list.
 export const NAV_ITEMS = [
-  { id: 'chat',      label: 'Chat',      icon: 'fa-message',          action: 'chat' },
-  { id: 'home',      label: 'Home',      icon: 'fa-house',            action: 'view:home' },
-  { id: 'work',      label: 'Work',      icon: 'fa-briefcase',        action: 'view:work' },
-  { id: 'create',    label: 'Create',    icon: 'fa-wand-magic-sparkles', action: 'view:create' },
-  { id: 'knowledge', label: 'Knowledge', icon: 'fa-brain',            action: 'view:knowledge' },
-  { id: 'library',   label: 'Library',   icon: 'fa-book',            action: 'view:library' },
+  { id: 'chat',      label: 'Chat',      icon: 'fa-message',             action: 'chat' },
+  { id: 'projects',  label: 'Projects',  icon: 'fa-folder-open',        action: 'view:projects' },
+  { id: 'studio',    label: 'Studio',    icon: 'fa-wand-magic-sparkles', action: 'view:studio' },
+  { id: 'code',      label: 'Code',      icon: 'fa-code',               action: 'view:code' },
+  { id: 'research',  label: 'Research',  icon: 'fa-magnifying-glass',   action: 'view:research' },
+  { id: 'agents',    label: 'Agents',    icon: 'fa-robot',              action: 'view:agents' },
+  { id: 'library',   label: 'Library',   icon: 'fa-book',               action: 'view:library' },
+  { id: 'settings',  label: 'Settings',  icon: 'fa-gear',               action: 'view:settings' },
 ];
-export const NAV_BOTTOM = [
-  { id: 'settings',  label: 'Settings',  icon: 'fa-gear',             action: 'view:settings' },
-];
+export const NAV_BOTTOM = [];
 
 let handlers = {};
 
@@ -66,8 +69,9 @@ export function markRailActive(container, itemId) {
     btn.setAttribute('aria-current', 'page');
   }
   const toolHidden = document.getElementById('toolView')?.classList.contains('hidden');
-  const title = document.getElementById('toolViewTitle');
-  const target = (!toolHidden && title) ? title : document.getElementById('chatView');
+  // A1: there is no title bar to focus anymore; land on the destination
+  // content itself (or the chat view for Chat).
+  const target = !toolHidden ? document.getElementById('toolViewBody') : document.getElementById('chatView');
   if (target) {
     if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
     target.focus({ preventScroll: true });

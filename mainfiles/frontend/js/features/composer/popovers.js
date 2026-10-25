@@ -11,7 +11,7 @@
  * (Settings → Chat → Tool Mode) the toggles are persistent instead.
  *
  * There is deliberately NO Runs button here: run history lives in
- * Agents → Run History (today: Work → Activity, until the IA swap
+ * Agents → Run History (A1: re-homed from Work → Activity)
  * re-homes it) and in the response action menu ("View run").
  *
  * Legacy mode ids (chat/think/agent/research/code/image) still work

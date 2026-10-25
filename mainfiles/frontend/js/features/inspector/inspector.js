@@ -66,7 +66,7 @@ async function loadLiveRuns() {
       `<button type="button" class="btn-secondary" data-insp-open-runs>Open all runs</button>`;
     section.querySelector('[data-insp-open-runs]')?.addEventListener('click', async () => {
       const { showToolSection } = await import('../tabs/tabs.js');
-      showToolSection('work', 'activity');
+      showToolSection('agents', 'run-history');
     });
   } catch {
     section.innerHTML = '<h4>Live runs</h4><p class="settings-hint">Could not load live runs.</p>';

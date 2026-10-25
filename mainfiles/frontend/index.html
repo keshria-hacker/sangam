@@ -96,10 +96,9 @@ if (location.protocol === 'file:') {
         </div>
       </div>
 
-      <button class="new-chat-btn" id="newChatBtn" title="Start a new chat (Ctrl K)">
+      <button class="new-chat-btn" id="newChatBtn" title="Start a new chat">
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
         <span>New chat</span>
-        <kbd class="kbd-hint">Ctrl K</kbd>
       </button>
 
       <div class="sidebar-search">
@@ -116,6 +115,13 @@ if (location.protocol === 'file:') {
       </nav>
 
       <div class="sidebar-footer">
+        <div class="sidebar-usage" id="usageMeter" role="status">Usage: loading…</div>
+        <button class="sidebar-footer-btn" id="paletteHintBtn" type="button" title="Open command palette (Ctrl/Cmd+K)" aria-label="Open command palette">
+          <i class="fa-solid fa-terminal" aria-hidden="true"></i><span>Commands</span><kbd class="kbd-hint">Ctrl K</kbd>
+        </button>
+        <button class="sidebar-footer-btn" id="helpBtn" type="button" title="Keyboard shortcuts and help" aria-label="Help and keyboard shortcuts">
+          <i class="fa-solid fa-circle-question" aria-hidden="true"></i><span>Help</span>
+        </button>
         <button class="profile-section" id="profileSection" type="button" aria-haspopup="dialog" aria-expanded="false">
           <span class="profile-avatar" id="profileAvatar">N</span>
           <span class="profile-meta">
@@ -156,17 +162,6 @@ if (location.protocol === 'file:') {
 
   <!-- ============ MAIN ============ -->
   <main class="main-panel">
-
-    <!-- ============ TAB STRIP (browser-like) ============ -->
-    <div class="tab-strip" id="tabStrip" role="tablist" aria-label="Open tabs">
-      <div class="tab tab-pinned tab-active" id="mainTab" role="tab" aria-selected="true" data-tab-id="main">
-        <i class="fa-solid fa-message" aria-hidden="true"></i><span>Chat</span>
-      </div>
-      <div class="tab-list" id="toolTabList"></div>
-      <button class="tab-add" id="tabAdd" type="button" title="Open a new tab" aria-label="Open a new tab" aria-expanded="false">
-        <i class="fa-solid fa-plus" aria-hidden="true"></i>
-      </button>
-    </div>
 
     <!-- Chat view (main tab) -->
     <div class="chat-view" id="chatView">
@@ -214,7 +209,7 @@ if (location.protocol === 'file:') {
               <span>Explain temperature vs. token limit</span>
             </button>
           </div>
-          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> New chat · <kbd>Ctrl+P</kbd> Commands · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Alt+W</kbd> Toggle web search</p>
+          <p class="welcome-keyhints"><kbd>Ctrl+K</kbd> Command palette · <kbd>Ctrl+P</kbd> Commands · <kbd>Ctrl+Shift+C</kbd> Copy response · <kbd>Ctrl+Shift+R</kbd> Regenerate · <kbd>Alt+W</kbd> Toggle web search</p>
         </div>
 
         <!-- Messages render here -->
@@ -343,14 +338,10 @@ if (location.protocol === 'file:') {
     </div>
     </div><!-- /chat-view -->
 
-    <!-- Tool tab view -->
+    <!-- Destination view: no title bar. The sidebar shows the active
+         destination; a breadcrumb appears here only at depth > 1. -->
     <div class="tool-view hidden" id="toolView">
-      <div class="tool-view-header" id="toolViewHeader">
-        <h2 id="toolViewTitle">Tool</h2>
-        <button class="icon-btn ghost" id="toolViewClose" title="Close tab" aria-label="Close tab">
-          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-        </button>
-      </div>
+      <nav class="dest-breadcrumb hidden" id="destBreadcrumb" aria-label="Location"></nav>
       <div class="tool-view-body" id="toolViewBody"></div>
     </div>
 
@@ -465,7 +456,7 @@ if (location.protocol === 'file:') {
       <button class="icon-btn ghost" id="closeShortcuts" aria-label="Close shortcuts"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="shortcuts-grid">
-      <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>K</kbd><span>New chat</span></div>
+      <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>K</kbd><span>Command palette</span></div>
       <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd><span>Copy last response</span></div>
       <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>R</kbd><span>Regenerate response</span></div>
       <div class="shortcut-row"><kbd>Alt</kbd><kbd>W</kbd><span>Toggle web search</span></div>
