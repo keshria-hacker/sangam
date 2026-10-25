@@ -34,6 +34,34 @@ Switch models, upload documents, use RAG, search the web, manage provider keys, 
 
 ---
 
+## 🧭 What's new — all-in-one coverage audit (2026-10-26)
+
+Batches 9–13 of this run deepened Sangam from its reference repos instead of
+approximating them: unified memory + cited research (Batch 9), agent runtime +
+skills (Batch 10), media + design pipeline (Batch 11), dev/QA + guarded
+security + platform health (Batch 12), and writing quality + council +
+code-graph + model fit, all wired into Chat (Batch 13). Batch 6 (final)
+audited every one of the 85 deduplicated reference repos against the actual
+code — not against the batch write-ups — and wrote the definitive table to
+[`docs/ALL_IN_ONE_COVERAGE.md`](docs/ALL_IN_ONE_COVERAGE.md): **58 shipped,
+22 native-equivalent, 5 excluded, 0 unaccounted for.**
+
+Honest scope, in one paragraph: Sangam is a single-user, self-hosted,
+vanilla-JS + SQLite workspace with 7 destinations (Chat, Home, Work, Create,
+Knowledge, Library, Settings). It ports the *portable mechanisms* of its
+reference projects — memory ops, research jobs with cited reports, agent
+steering and approvals, media pipelines, design critique, dev/QA gates,
+guarded security runs — and deliberately does **not** port their products:
+no voice cloning, no video generation, no 375-provider gateway, no
+multi-user RBAC, no deployment engine, no autonomous exploitation, no
+CAPTCHA/WAF bypass, no DDoS/RAT/phishing/third-party targeting. Where a
+port is partial (crawl helpers not yet threaded into the crawl job, ECC hook
+matchers not wired, strix reusable sessions not built), the coverage table
+says so in the same row. Live verifications that did not happen here
+(physical phone QR scan, real two-device LAN/mDNS, Docker isolation,
+real-driver browser runs, live-model pipeline/council runs) are listed as
+unverified, not claimed.
+
 ## 🖥️ Interface
 
 <p align="center">

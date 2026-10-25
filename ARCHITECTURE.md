@@ -102,7 +102,7 @@
 │   │   ├── knowledge_graph.py  # Unified knowledge graph builder
 │   │   ├── graph_provenance.py # Edge provenance (EXTRACTED/INFERRED/AMBIGUOUS)
 │   │   ├── automations.py      # Automation scheduler
-│   │   ├── spec_wizard.py      # Spec → build pipeline
+│   │   ├── spec_chain.py       # Spec → plan → tasks → coverage chain (spec_wizard.py retired)
 │   │   ├── instincts.py        # Learned coding patterns (confidence-scored)
 │   │   ├── omniroute_config.py # OmniRoute gateway config
 │   │   ├── feature_flags.py    # Runtime feature flags (persisted)

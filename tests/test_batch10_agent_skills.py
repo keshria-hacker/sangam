@@ -451,14 +451,20 @@ def test_verify_batch10_checks(tmp_path):
 def test_new_packs_and_skills_pass_checks():
     from backend.skills.packs import list_packs
     packs = {p.name: p for p in list_packs()}
+    # Batch 6 audit fix: Batch 13 intentionally added smallest-change-review
+    # to taste-quality (its commit message says so) but left this exact-list
+    # assertion at the old 2-skill list, so the suite went red at 11b08ed.
+    # The list stays exact — it now asserts the intended 3 skills — and the
+    # new skill joins the checks loop below instead of escaping it.
     assert "taste-quality" in packs and packs["taste-quality"].skills == [
-        "design-taste", "review-checklist"]
+        "design-taste", "review-checklist", "smallest-change-review"]
     assert "coding-guidelines" in packs["engineering"].skills
     packs_root = Path(__file__).resolve().parents[1] / "mainfiles" / "backend" / "skills" / "packs"
     for skill_dir in [
             packs_root / "engineering" / "skills" / "coding-guidelines",
             packs_root / "taste-quality" / "skills" / "design-taste",
-            packs_root / "taste-quality" / "skills" / "review-checklist"]:
+            packs_root / "taste-quality" / "skills" / "review-checklist",
+            packs_root / "taste-quality" / "skills" / "smallest-change-review"]:
         report = run_skill_checks(skill_dir)
         assert report["failed"] == 0, (skill_dir, report["checks"])
 

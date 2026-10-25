@@ -13,13 +13,19 @@ manual step, with its risk note attached.
 Freshness is honest: ``CATALOGUE_VERSION`` + ``CURATED_ON`` stamp
 when this snapshot was written; the UI labels it as a curated
 snapshot to verify upstream before installing, not a live index.
+
+Batch 6 audit note (2026-10-26): Batch 11 described imajev, Vane and
+Open-Generative-AI as "catalogue entries", but no such rows existed in
+this file — the claim was checked against the code and found untrue.
+The three ``reference_note`` rows below are the correction: documented
+reference rows only, no model run, no install, no code ported.
 """
 from __future__ import annotations
 
 CATALOGUE_VERSION = "batch9-1"
 CURATED_ON = "2026-10-26"
 
-# kind: "mcp_server" | "llm_pattern"
+# kind: "mcp_server" | "llm_pattern" | "reference_note"
 _ENTRIES: list[dict] = [
     # --- MCP servers (awesome-mcp-servers taxonomy, curated subset) ---
     {"id": "mcp-filesystem", "kind": "mcp_server", "name": "Filesystem",
@@ -131,6 +137,33 @@ _ENTRIES: list[dict] = [
      "install": "Built-in pattern; no install.",
      "risk": "Notes live on disk — the folder itself should stay private.",
      "sangam_equivalent": "GET /memory/notes + POST /memory/notes/normalize"},
+    # --- Batch 6 reference notes: documented rows only, nothing runs ---
+    {"id": "ref-imajev", "kind": "reference_note", "name": "imajev (decision models)",
+     "category": "decision", "official": False,
+     "description": "Small open decision models (2B/4B/9B) that answer in caller-set options "
+     "with per-option probabilities and an explicit can't-tell. No portable mechanism "
+     "beyond model weights + prompting, and the weights are not run in Sangam.",
+     "install": "Not installed; documented pattern only. No model call is faked.",
+     "risk": "Probabilities here are a documented output shape, not a live model result.",
+     "sangam_equivalent": "Documented shape only (options + probabilities + abstain threshold) "
+     "for future critique/decision outputs; no endpoint implements it as a model."},
+    {"id": "ref-vane", "kind": "reference_note", "name": "Vane (privacy answering engine)",
+     "category": "search", "official": False,
+     "description": "Privacy-focused AI answering engine (SearxNG + local/cloud LLMs, cited "
+     "sources, speed/balanced/quality search modes, source picking). That is "
+     "search/research, not media — no Vane code is built in Sangam.",
+     "install": "Not installed; pattern already covered by Sangam's own search/research.",
+     "risk": "Search-mode/source-picking claims are Sangam's own behaviour, not Vane's.",
+     "sangam_equivalent": "POST /research/jobs + websearch (Batch 9) + cited reports"},
+    {"id": "ref-open-generative-ai", "kind": "reference_note", "name": "Open-Generative-AI (model studio)",
+     "category": "studio", "official": False,
+     "description": "Electron studio fronting 600+ models across image/video/audio/lip-sync "
+     "studios. Its portable idea (a model catalogue with per-model input schemas) "
+     "already exists in Sangam as the provider/engine registries.",
+     "install": "Not installed; no new catalogue built for it.",
+     "risk": "Its video, lip-sync and unrestricted-generation studios are excluded "
+     "(video generation + no content-filter bypass, per standing guardrails).",
+     "sangam_equivalent": "Provider/engine registries + GET /api/models; video/lip-sync excluded"},
 ]
 
 

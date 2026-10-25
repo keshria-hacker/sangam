@@ -376,3 +376,66 @@ against the tree first; genuinely-missing depth only.
 - Routing strategies score on chain state (circuit + quota); cost/latency inputs are caller-supplied or absent (absent cost falls back to priority and says so) — there is no live provider cost/latency feed.
 - Frontend Chat wiring is module-link-checked (65/65 modules), not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
 - Physical phone QR scan, real-LAN/mDNS, Docker isolation and real-driver browser runs remain unverified live, as before.
+
+## Coverage audit — final batch (2026-10-26, branch `integration/full-program`)
+
+Definitive table: `docs/ALL_IN_ONE_COVERAGE.md`. All 85 deduplicated repos
+from the user's list were verified against files in this tree, not against
+the batch write-ups. Counts: **shipped 58, native-equivalent 22, excluded 5,
+unaccounted 0.**
+
+Excluded (with reasons, full text in the definitive table): Dodaios
+(standalone — clone absent, brief never arrived), oh-my-claudecode (clone
+absent, brief never arrived), invisible_dots (VM-agent undetectability
+conflicts with guardrails, different product), pentagi (autonomous
+exploitation excluded; only the pre-existing engagement shape + checklists
+used, per-run-approved and own-systems-only), heretic (safety-bypass tool,
+excluded entirely).
+
+Filled in this audit (smallest honest surface, no new large system, no new
+destination, no new route): imajev / Vane / Open-Generative-AI catalogue
+reference rows (`ref-imajev`, `ref-vane`, `ref-open-generative-ai` in
+`mainfiles/backend/research/catalogue.py`, searchable via
+`GET /knowledge/catalogue`). Batch 11 had described these as catalogue
+entries, but no such rows existed in code — the audit found the gap and
+closed it with documented rows only (no model run, no install, no code
+port invented). Also corrected in this audit: `spec_wizard.py` is retired
+(coverage now cites `spec_chain.py` + devqa constitution/mvp-order;
+`ARCHITECTURE.md` tree line corrected); claw-code upgraded from the old
+"Skip / reference only" note to shipped-as-async-approval-shape (Batch 10);
+browser-use / ECC "not built in Batch 12" clarified as "not built in that
+batch" — both have pre-existing implementations that stand.
+
+### Batch 6 verification (this run, venv `~/workspace/.b9venv`, proxies unset)
+
+- Full suite: **1624 passed, 101 skipped, 0 failed** (baseline at 5f20b62:
+  1521 passed / 101 skipped / 0 failed; +103 passed from Batches 9–13 tests
+  plus the 5 new Batch 6 tests, skips unchanged). First full run in this
+  batch showed 1 failure — `test_new_packs_and_skills_pass_checks` — which
+  the audit traced to Batch 13, not Batch 6: Batch 13 added
+  `smallest-change-review` to the taste-quality pack without updating
+  Batch 10's exact-list assertion. Fixed by updating that assertion to
+  the intended 3-skill list and adding the new skill to the checks loop
+  (exact list kept, not weakened); re-run is the 1624/101/0 above.
+- Frontend modules: **65/65 parse + link**
+  (`node --experimental-vm-modules scripts/check_frontend_modules.mjs`).
+- Drift test: passes (`tests/test_docs_routes_drift.py`, in the targeted
+  34-test run with the Batch 10 + Batch 6 files); §13.2 is exact against
+  live routes. No new route was added in Batch 6, so §13.2 needed no rows.
+- Auth: catalogue endpoint correctly refuses unauthenticated requests
+  (live boot check: `GET /knowledge/catalogue` → "Sign in is required");
+  `/api/health` → `{"status":"ok","app":"UniversalAI"}` on a fresh temp DB.
+- Playwright / smoke script: NOT run by this subagent — subagents have no
+  live-browser access, and `tests/e2e/run_smoke.sh` is Playwright-based
+  (`npx playwright test tests/e2e/smoke.spec.ts`). No browser check is
+  claimed here; the smoke spec is the coordinator's step.
+
+### Batch 6 honest limits
+
+- The audit verified file/route existence and batch-test coverage; it did
+  not re-exercise every batch feature live with a real model (none is
+  running in this environment) — live-model, physical-phone, real-LAN/mDNS,
+  Docker-isolation and real-driver browser verifications remain open, as
+  in every prior batch section.
+- "Native-equivalent" rows are deliberately smaller than upstream; the
+  definitive table states each gap in its row rather than implying parity.
