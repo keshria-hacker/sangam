@@ -67,6 +67,11 @@ class Task(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(64), index=True)
     goal_id: Mapped[str | None] = mapped_column(String(32), ForeignKey("goals.id"), nullable=True, default=None)
+    # A3 (perfect-flow Projects): REUSED task system — project tasks
+    # are Task rows with project_id set (goal_id stays NULL). No
+    # second task table: status lifecycle, status_version, and the
+    # goals task endpoints are shared. NULL = goal/global task.
+    project_id: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
     parent_id: Mapped[str | None] = mapped_column(String(32), ForeignKey("tasks.id"), nullable=True, default=None)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
@@ -91,7 +96,9 @@ def goal_out(row: Goal) -> dict:
 
 def task_out(row: Task) -> dict:
     return {
-        "id": row.id, "goal_id": row.goal_id, "parent_id": row.parent_id,
+        "id": row.id, "goal_id": row.goal_id,
+        "project_id": getattr(row, "project_id", None),
+        "parent_id": row.parent_id,
         "title": row.title, "description": row.description,
         "status": row.status, "status_version": row.status_version,
         "priority": row.priority, "assignee_team": row.assignee_team,
