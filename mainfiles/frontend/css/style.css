@@ -3107,7 +3107,6 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   margin-bottom:8px;
 }
 .sidebar-search input{font-size:13px;}
-.rail-nav{display:none;}
 .chat-history-label{padding-top:10px; padding-bottom:5px;}
 
 /* ---------- Phase 1 remainder: Runs centre responsive ---------- */

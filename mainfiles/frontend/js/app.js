@@ -378,12 +378,19 @@ export async function startApplication() {
   // Set up global namespace for inline handlers
   setupGlobalNamespace();
 
-  // Load providers and models from backend
+  // Load providers and models from backend.
+  // Shell first: the rail and the command palette must never wait on
+  // provider/model probing — without Ollama, /models burns ~13s on
+  // auto-start retries, and awaiting it first left the whole shell
+  // (rail, palette) unrendered while the app looked booted. The rail
+  // needs only /features and the palette reads models lazily at open.
   try {
+    await loadRailFeatures();
+    // Command palette (Ctrl+K / Ctrl+P) — also shell, also independent
+    // of providers; init early so it works during the model probe.
+    import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
     await loadProvidersAndModels();
     await sidebarLoadChatList();
-    // A9: render the rail now that /features returns authenticated state.
-    await loadRailFeatures();
     elements.backendDownState?.classList.add('hidden');
     chatStartNewChat();
     // Voice: show mic/speak UI only when the backend flag is on.
@@ -396,8 +403,8 @@ export async function startApplication() {
     import('./features/learn/learn.js').then((m) => m.initLearn()).catch(() => {});
     // Analytics: show the usage button only when the flag is on.
     import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
-    // Command palette (Ctrl+P).
-    import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
+    // (Command palette is imported above, before the model probe, so
+    // Ctrl+K works while providers are still loading.)
     // Batch 1: guided first-run setup in Chat when no provider is ready.
     import('./features/setup/setup.js').then((m) => m.maybeShowFirstRunSetup()).catch(() => {});
     // Note: no "Connected" toast on every load — the topbar connection pulse

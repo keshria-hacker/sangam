@@ -189,7 +189,10 @@ test('Shell: command palette reaches destinations, settings, create actions', as
   await page.locator('#paletteInput').fill('New artifact');
   await page.locator('#paletteInput').press('Enter');
   await page.waitForTimeout(1500);
-  await expect(page).toHaveURL(/\/studio$/);
+  // 'New artifact' lands on Studio's create segment (palette.js
+  // new-artifact -> navigate('studio', { section: 'create' })), not
+  // the bare Studio overview — assert destination + segment.
+  await expect(page).toHaveURL(/\/studio\?section=create$/);
 
   await page.keyboard.press('ControlOrMeta+k');
   await page.locator('#paletteInput').fill('Toggle Auto mode');

@@ -245,7 +245,11 @@ export function showTool(requested, opts = {}) {
     return;
   }
   const redirect = resolveLegacyId(requested);
-  if (redirect) {
+  if (redirect && !TOOL_DEFS[requested]) {
+    // Genuinely old id only: current ids must NOT fall through to
+    // routeFromLocation, which navigates with push:false and would
+    // render the destination without updating the URL (rail clicks
+    // silently stopped changing the address bar).
     routeFromLocation(redirect);
     return;
   }
