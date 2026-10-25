@@ -256,6 +256,10 @@ from .api_routes import devices_routes  # noqa: F401
 from .api_routes import code_graph_routes  # noqa: F401
 from .api_routes import deep_routes  # noqa: F401
 from .api_routes import goals_routes  # noqa: F401
+# spec/a6-studio-skills: one import+register block for the A6 routes
+# (provider contract/capability registry, studio, marketplace, connector
+# health/permissions, blind compare) on the shared router.
+from .api_routes import a6_studio_routes  # noqa: F401
 # Doctor lives in its own module with its own router; include it on the
 # shared router so it is served (and authenticated) like /system/*.
 from .doctor import router as _doctor_router
