@@ -295,6 +295,7 @@ if (location.protocol === 'file:') {
             <i class="fa-solid fa-arrow-up" id="sendBtnIcon"></i>
           </button>
           <button class="send-btn" id="stopBtn" title="Stop generating" aria-label="Stop generating" style="display:none"><i class="fa-solid fa-stop" aria-hidden="true"></i></button>
+          <button class="send-btn" id="continueBtn" title="Continue the interrupted response" aria-label="Continue generation" style="display:none"><i class="fa-solid fa-forward" aria-hidden="true"></i></button>
         </div>
 
         <div class="composer-controls">
@@ -336,12 +337,6 @@ if (location.protocol === 'file:') {
             </button>
             <div class="composer-popover hidden" id="tunePopover" role="menu"></div>
           </div>
-          <div class="composer-popover-wrap">
-            <button class="pill-control" id="runsBtn" title="Open Runs centre" aria-label="Open Runs centre">
-              <i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Runs</span>
-            </button>
-          </div>
-
           <span class="token-counter" id="tokenCounter" title="Estimated token count"></span>
         </div>
       </div>

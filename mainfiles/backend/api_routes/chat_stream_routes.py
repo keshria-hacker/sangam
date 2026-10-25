@@ -36,6 +36,7 @@ from ..response_events import (
 )
 from ..response_intelligence import analyze_request, build_system_prompt_additions
 from ..response_intelligence import config as ri_config
+from ..response_intelligence.pipeline import route_message
 from ..response_postprocessor import post_process_response
 from ..schemas import ChatStreamRequest
 from ..summarizer import should_summarize, summarize_chat
@@ -135,6 +136,41 @@ async def chat_stream(  # noqa: PLR0912
     if model_info is None:
         raise HTTPException(status_code=400, detail=f"Unknown model: {payload.model}")
 
+    # --- A2: Auto response-intelligence routing (spec §4) ---
+    # Runs BEFORE the web-search block so an Auto search decision (date /
+    # news / price / version signals, the user-approved default) can turn
+    # search on even when the client did not ask for it. Pure rules, no
+    # provider call; any failure degrades to the old behaviour (route=None)
+    # and never breaks the chat. The route's system note is injected after
+    # the guidance block below, so it counts in the context budget.
+    auto_route = None
+    auto_web_search = False
+    try:
+        _hist = [{"role": m.role, "content": m.content} for m in payload.messages[:-1]]
+        _last_user = next((m.content for m in reversed(payload.messages) if m.role == "user"), "")
+        auto_route = route_message(
+            _last_user,
+            history=_hist,
+            file_ids=list(payload.file_ids or []),
+            composer_mode=getattr(payload, "composer_mode", "auto") or "auto",
+            tool_overrides=getattr(payload, "tool_overrides", None) or {},
+            adaptive_depth=getattr(payload, "adaptive_depth", True),
+        )
+        # Respect a global web-search opt-out if the user set one in
+        # settings (webSearchEnabled=false); otherwise Auto may search.
+        _web_ok = True
+        try:
+            _pref0 = await db.get(UserPreference, current_user.id)
+            if _pref0 and _pref0.settings_json:
+                _s0 = json.loads(_pref0.settings_json)
+                if isinstance(_s0, dict) and _s0.get("webSearchEnabled") is False:
+                    _web_ok = False
+        except Exception:
+            pass
+        auto_web_search = bool(auto_route.needs_search and _web_ok)
+    except Exception as exc:  # noqa: BLE001 — routing must never break chat
+        logger.warning("Auto routing failed: %s", exc)
+
     # Prompt injection detection (warn-only mode — logs but never blocks).
     # See backend/prompt_injection.py for the heuristic detector.
     try:
@@ -157,7 +193,7 @@ async def chat_stream(  # noqa: PLR0912
     # can answer with current information. Failures never break the chat — they
     # surface as a notice inside the stream instead.
     web_context = ""
-    if getattr(payload, "web_search", False):
+    if getattr(payload, "web_search", False) or auto_web_search:
         try:
             last_user = next((m.content for m in reversed(payload.messages) if m.role == "user"), "")
             if last_user:
@@ -289,6 +325,22 @@ async def chat_stream(  # noqa: PLR0912
                 logger.debug("Injected %d response intelligence guidance additions", len(system_additions))
         except Exception as exc:  # noqa: BLE001 — never break chat for guidance errors
             logger.warning("Response intelligence analysis failed: %s", exc)
+
+    # --- A2: route system note (mode/tools/clarification/blocked-video) ---
+    # Inserted after any existing system messages so the model sees the
+    # Auto decision as instruction, not as conversation. For clarification
+    # it is the "exactly one question" instruction when the older
+    # clarification gate did not fire; for video it is the honest
+    # not-available note (never a fake video).
+    if auto_route is not None and auto_route.system_note:
+        try:
+            _insert_idx = 0
+            for _i, _msg in enumerate(messages):
+                if _msg.get("role") == "system":
+                    _insert_idx = _i + 1
+            messages.insert(_insert_idx, {"role": "system", "content": auto_route.system_note})
+        except Exception as exc:  # noqa: BLE001 — note must never break chat
+            logger.warning("Auto route note injection failed: %s", exc)
 
     # --- Phase 2: Clarification gate ---
     # Ambiguous short requests are intercepted BEFORE generation: we persist the

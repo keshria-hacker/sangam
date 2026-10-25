@@ -262,6 +262,9 @@ from .doctor import router as _doctor_router
 
 router.include_router(_doctor_router)
 from .api_routes.routing_routes import evaluate_routing  # noqa: F401
+# A2 (spec §4): Auto response-intelligence dry-run + Harper lint routes.
+# Importing registers them on the shared router (api_routes/common.py).
+from .api_routes import intelligence_routes  # noqa: F401
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401
 from .document import extract_text, truncate_preview  # noqa: F401

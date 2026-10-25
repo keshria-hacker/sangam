@@ -1,12 +1,25 @@
 /**
- * Composer popovers — Mode / Tools / Tune (Sangam-native, Phase 2).
+ * Composer popovers — Auto mode / Tools / Tune (perfect-flow spec §3.2).
  *
- * Replaces the scattered pill controls with three intent-grouped popovers:
- * - Mode: Chat, Think, Agent, Research, Code, Image
- * - Tools: web search, memory recall, image gen, voice reply, documents, MCP, code tools
- * - Tune: reasoning effort, token cap, temperature, output style, streaming, context %
+ * Auto is a mode selector, not a button. Options: Auto (default),
+ * Answer only, Research, Code, Create, Agent. In Auto the
+ * response-intelligence pipeline decides the tools; the Tools popover
+ * shows what Auto chose for the current composer text (via a dry-run
+ * POST /intelligence/route, which never calls a provider) and any
+ * checkbox change there is a per-message override — it is consumed by
+ * the next send and then cleared, never persisted. In Manual tool mode
+ * (Settings → Chat → Tool Mode) the toggles are persistent instead.
+ *
+ * There is deliberately NO Runs button here: run history lives in
+ * Agents → Run History (today: Work → Activity, until the IA swap
+ * re-homes it) and in the response action menu ("View run").
+ *
+ * Legacy mode ids (chat/think/agent/research/code/image) still work
+ * through setMode(), mapped onto the composer modes, so older callers
+ * (slash commands, presets) keep working.
  */
 import { getSetting, setSetting } from '../../shared/settings_store.js';
+import { apiFetch } from '../../shared/http.js';
 import {
   getReasoningEffort, setReasoningEffort, getMaxTokens, setMaxTokens,
   getTemperature, setTemperature, getAgentModeEnabled, setAgentModeEnabled,
@@ -15,31 +28,43 @@ import {
 
 console.log('[Module] popovers.js loaded');
 
-export const MODES = [
-  { id: 'chat',     label: 'Chat',     icon: 'fa-comment',            desc: 'Normal conversation' },
-  { id: 'think',    label: 'Think',    icon: 'fa-brain',              desc: 'Deep reasoning, shows thinking' },
-  { id: 'agent',    label: 'Agent',    icon: 'fa-robot',              desc: 'Uses tools to get things done' },
-  { id: 'research', label: 'Research', icon: 'fa-magnifying-glass',   desc: 'Web research with citations' },
-  { id: 'code',     label: 'Code',     icon: 'fa-code',               desc: 'Code agent with file tools' },
-  { id: 'image',    label: 'Image',    icon: 'fa-image',              desc: 'Generate images' },
+export const COMPOSER_MODES = [
+  { id: 'auto',     label: 'Auto',        icon: 'fa-wand-magic-sparkles', desc: 'Pipeline decides: answer, search, code, create, or agent' },
+  { id: 'answer',   label: 'Answer only', icon: 'fa-comment',            desc: 'Direct answer, no tools or search' },
+  { id: 'research', label: 'Research',    icon: 'fa-magnifying-glass',   desc: 'Web research with citations' },
+  { id: 'code',     label: 'Code',        icon: 'fa-code',               desc: 'Code agent with file tools' },
+  { id: 'create',   label: 'Create',      icon: 'fa-pen-nib',            desc: 'Artifacts, diagrams, images' },
+  { id: 'agent',    label: 'Agent',       icon: 'fa-robot',              desc: 'Uses tools to get things done, with approval' },
 ];
+// Back-compat name: older code imported MODES.
+export const MODES = COMPOSER_MODES;
 
-let currentMode = 'chat';
+const LEGACY_MODE_MAP = {
+  chat: 'auto', think: 'auto', agent: 'agent',
+  research: 'research', code: 'code', image: 'create',
+};
 
+let currentMode = 'auto';
+
+export function getComposerMode() { return currentMode; }
 export function getMode() { return currentMode; }
-export function setMode(mode) {
-  if (!MODES.some((m) => m.id === mode)) return;
+export function setComposerMode(mode) {
+  if (!COMPOSER_MODES.some((m) => m.id === mode)) return;
   currentMode = mode;
-  // Map modes to underlying state
+  // Code mode keeps the legacy code-agent path; agent mode keeps the
+  // agent path; every other composer mode streams normally.
   setAgentModeEnabled(mode === 'agent' || mode === 'code');
-  if (mode === 'think' && getReasoningEffort() === 'none') setReasoningEffort('medium');
   document.dispatchEvent(new CustomEvent('sangam:mode-changed', { detail: { mode } }));
   renderModeButton();
+}
+export function setMode(mode) {
+  if (mode === 'think' && getReasoningEffort() === 'none') setReasoningEffort('medium');
+  setComposerMode(LEGACY_MODE_MAP[mode] || mode);
 }
 
 function renderModeButton() {
   const btn = document.getElementById('modeBtn');
-  const m = MODES.find((x) => x.id === currentMode);
+  const m = COMPOSER_MODES.find((x) => x.id === currentMode);
   if (btn && m) {
     btn.innerHTML = `<i class="fa-solid ${m.icon}"></i><span>${m.label}</span><i class="fa-solid fa-chevron-down"></i>`;
     btn.dataset.mode = currentMode;
@@ -47,31 +72,60 @@ function renderModeButton() {
 }
 
 const TOOL_DEFS = [
-  { id: 'web_search',    label: 'Web search',    icon: 'fa-globe',             desc: 'Search the web for current info' },
-  { id: 'memory_recall', label: 'Memory recall', icon: 'fa-brain',             desc: 'Recall from your memories' },
-  { id: 'image_gen',     label: 'Image gen',     icon: 'fa-image',              desc: 'Generate images' },
-  { id: 'voice_reply',   label: 'Voice reply',   icon: 'fa-volume-high',       desc: 'Speak the response aloud' },
-  { id: 'documents',     label: 'Documents',     icon: 'fa-file-lines',        desc: 'Use attached documents' },
-  { id: 'mcp_tools',     label: 'MCP tools',     icon: 'fa-plug',              desc: 'Use MCP server tools' },
-  { id: 'code_tools',    label: 'Code tools',    icon: 'fa-code',              desc: 'File + shell tools' },
+  { id: 'web_search',          label: 'Web search',          icon: 'fa-globe',       desc: 'Search the web for current info' },
+  { id: 'deep_crawl',          label: 'Deep crawl',          icon: 'fa-spider',      desc: 'Follow sources beyond the first results' },
+  { id: 'code_execution',      label: 'Code execution',      icon: 'fa-terminal',    desc: 'Run code in the sandbox' },
+  { id: 'browser',             label: 'Browser',             icon: 'fa-window-maximize', desc: 'Open pages and read them like a user' },
+  { id: 'image',               label: 'Image',               icon: 'fa-image',       desc: 'Generate images' },
+  { id: 'memory_recall',       label: 'Memory recall',       icon: 'fa-brain',       desc: 'Recall from your memories' },
+  { id: 'artifact_generation', label: 'Artifact generation', icon: 'fa-file-code',   desc: 'Build files, pages, and diagrams' },
 ];
 
-let enabledTools = new Set(['web_search', 'memory_recall', 'documents']);
+// Persistent toggle set (Manual tool mode, and the fallback display set).
+let enabledTools = new Set(['web_search', 'memory_recall']);
 if (getSetting('webSearchEnabled') === false) enabledTools.delete('web_search');
+// Per-message overrides (Auto tool mode only): tool id -> bool, consumed
+// by the next send and then cleared. Never persisted.
+let messageOverrides = new Map();
+// Last Auto decision for the current composer text (dry-run only).
+let autoChosen = null;
 
-export function getEnabledTools() { return [...enabledTools]; }
-export function isToolEnabled(id) { return enabledTools.has(id); }
+export function getToolMode() { return getSetting('toolMode') || 'auto'; }
+export function getEffectiveTools() {
+  if (getToolMode() === 'auto' && autoChosen) {
+    const out = new Set(autoChosen);
+    messageOverrides.forEach((on, id) => { if (on) out.add(id); else out.delete(id); });
+    return [...out];
+  }
+  return [...enabledTools];
+}
+export function getEnabledTools() { return getEffectiveTools(); }
+export function isToolEnabled(id) { return getEffectiveTools().includes(id); }
 export function setToolEnabled(id, on) {
-  if (on) enabledTools.add(id); else enabledTools.delete(id);
-  if (id === 'web_search') setSetting('webSearchEnabled', on);
-  document.dispatchEvent(new CustomEvent('sangam:tools-changed', { detail: { tools: [...enabledTools] } }));
+  if (!TOOL_DEFS.some((t) => t.id === id)) return;
+  if (getToolMode() === 'auto') {
+    // Auto: this message only. The next send consumes and clears it.
+    messageOverrides.set(id, on);
+  } else {
+    if (on) enabledTools.add(id); else enabledTools.delete(id);
+    if (id === 'web_search') setSetting('webSearchEnabled', on);
+  }
+  document.dispatchEvent(new CustomEvent('sangam:tools-changed', { detail: { tools: getEffectiveTools() } }));
   renderToolsButton();
 }
+/** Overrides for the next send; clears the per-message map. */
+export function getMessageToolOverrides() { return Object.fromEntries(messageOverrides); }
+export function consumeMessageToolOverrides() {
+  const out = getMessageToolOverrides();
+  messageOverrides.clear();
+  return out;
+}
+export function clearMessageToolOverrides() { messageOverrides.clear(); }
 
 function renderToolsButton() {
   const btn = document.getElementById('toolsBtn');
   if (btn) {
-    const n = enabledTools.size;
+    const n = getEffectiveTools().length;
     btn.innerHTML = `<i class="fa-solid fa-wrench"></i><span>Tools${n ? ` · ${n}` : ''}</span><i class="fa-solid fa-chevron-down"></i>`;
   }
 }
@@ -80,26 +134,45 @@ function closeAllPopovers() {
   document.querySelectorAll('.composer-popover').forEach((p) => p.classList.add('hidden'));
 }
 
+/** Dry-run Auto routing for the current composer text. Never a provider call. */
+async function fetchAutoChosen(text) {
+  if (!text || !text.trim()) return null;
+  try {
+    const res = await apiFetch('/intelligence/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+    }, false);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return new Set(Array.isArray(data.tools) ? data.tools : []);
+  } catch {
+    return null;
+  }
+}
+
 export function initPopovers() {
+  const savedMode = getSetting('composerMode');
+  if (COMPOSER_MODES.some((m) => m.id === savedMode)) currentMode = savedMode;
   renderModeButton();
   renderToolsButton();
-  // Phase 1 remainder: one click from chat to the Runs centre, so a
-  // user can start in chat, invoke a capability, and monitor its run
-  // without hunting through the tab picker.
-  document.getElementById('runsBtn')?.addEventListener('click', async () => {
-    const { openToolTab } = await import('../tabs/tabs.js');
-    openToolTab('runs');
-  });
   document.addEventListener('sangam:settings-changed', (event) => {
-    if (event.detail?.key !== 'webSearchEnabled') return;
-    const enabled = event.detail.value !== false;
-    if (enabled) enabledTools.add('web_search');
-    else enabledTools.delete('web_search');
-    document.dispatchEvent(new CustomEvent('sangam:tools-changed', { detail: { tools: [...enabledTools] } }));
-    renderToolsButton();
+    if (event.detail?.key === 'webSearchEnabled') {
+      const enabled = event.detail.value !== false;
+      if (enabled) enabledTools.add('web_search');
+      else enabledTools.delete('web_search');
+      document.dispatchEvent(new CustomEvent('sangam:tools-changed', { detail: { tools: getEffectiveTools() } }));
+      renderToolsButton();
+    }
+    if (event.detail?.key === 'composerMode' && COMPOSER_MODES.some((m) => m.id === event.detail.value)) {
+      currentMode = event.detail.value;
+      setAgentModeEnabled(currentMode === 'agent' || currentMode === 'code');
+      renderModeButton();
+    }
+    if (event.detail?.key === 'toolMode') renderToolsButton();
   });
 
-  // Mode popover
+  // Mode popover (Auto is the default; the pipeline decides in Auto).
   const modeBtn = document.getElementById('modeBtn');
   const modePop = document.getElementById('modePopover');
   modeBtn?.addEventListener('click', (e) => {
@@ -107,7 +180,7 @@ export function initPopovers() {
     const wasHidden = modePop.classList.contains('hidden');
     closeAllPopovers();
     if (wasHidden) {
-      modePop.innerHTML = MODES.map((m) => `
+      modePop.innerHTML = COMPOSER_MODES.map((m) => `
         <button class="popover-option${m.id === currentMode ? ' selected' : ''}" data-mode="${m.id}">
           <i class="fa-solid ${m.icon}"></i>
           <span><strong>${m.label}</strong><small>${m.desc}</small></span>
@@ -115,22 +188,40 @@ export function initPopovers() {
         </button>`).join('');
       modePop.classList.remove('hidden');
       modePop.querySelectorAll('[data-mode]').forEach((b) => {
-        b.addEventListener('click', () => { setMode(b.dataset.mode); closeAllPopovers(); });
+        b.addEventListener('click', () => {
+          setComposerMode(b.dataset.mode);
+          setSetting('composerMode', b.dataset.mode);
+          closeAllPopovers();
+        });
       });
     }
   });
 
-  // Tools popover
+  // Tools popover: in Auto it shows what Auto chose for the current text
+  // and lets the user override for this message only; in Manual the
+  // toggles are persistent.
   const toolsBtn = document.getElementById('toolsBtn');
   const toolsPop = document.getElementById('toolsPopover');
-  toolsBtn?.addEventListener('click', (e) => {
+  toolsBtn?.addEventListener('click', async (e) => {
     e.stopPropagation();
     const wasHidden = toolsPop.classList.contains('hidden');
     closeAllPopovers();
     if (wasHidden) {
-      toolsPop.innerHTML = TOOL_DEFS.map((t) => `
+      const auto = getToolMode() === 'auto' && currentMode === 'auto';
+      if (auto) {
+        const text = document.getElementById('messageInput')?.value || '';
+        autoChosen = await fetchAutoChosen(text);
+        renderToolsButton();
+      }
+      const effective = new Set(getEffectiveTools());
+      const note = auto
+        ? (autoChosen
+          ? `Auto chose ${autoChosen.size ? [...autoChosen].join(', ') : 'no tools'} for this message. Changes here apply to this message only.`
+          : 'Auto decides on send. Changes here apply to this message only.')
+        : 'Manual tool mode: these toggles stay on for every message.';
+      toolsPop.innerHTML = `<div class="popover-note">${note}</div>` + TOOL_DEFS.map((t) => `
         <label class="popover-check">
-          <input type="checkbox" data-tool="${t.id}"${enabledTools.has(t.id) ? ' checked' : ''}>
+          <input type="checkbox" data-tool="${t.id}"${effective.has(t.id) ? ' checked' : ''}>
           <i class="fa-solid ${t.icon}"></i>
           <span><strong>${t.label}</strong><small>${t.desc}</small></span>
         </label>`).join('');
