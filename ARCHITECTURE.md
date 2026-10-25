@@ -1223,6 +1223,23 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/intelligence/route` | Yes | Response pipeline dry-run routing (perfect-flow A2) |
 | POST | `/api/intelligence/harper` | Yes | Offline grammar/spell lint (perfect-flow A2) |
 | GET | `/api/intelligence/modes` | Yes | Composer modes list (perfect-flow A2) |
+| POST | `/api/agent-tasks` | Yes | Create durable agent task (perfect-flow A4) |
+| GET | `/api/agent-tasks` | Yes | List agent tasks (perfect-flow A4) |
+| GET | `/api/agent-tasks/{task_id}` | Yes | Agent task detail (perfect-flow A4) |
+| POST | `/api/agent-tasks/{task_id}/run` | Yes | Execute/resume agent task (perfect-flow A4) |
+| POST | `/api/agent-tasks/{task_id}/pause` | Yes | Pause agent task (perfect-flow A4) |
+| POST | `/api/agent-tasks/{task_id}/cancel` | Yes | Cancel agent task (perfect-flow A4) |
+| POST | `/api/agent-tasks/{task_id}/record-usage` | Yes | Record usage, enforce budget (perfect-flow A4) |
+| GET | `/api/agent-tasks/{task_id}/audit` | Yes | Agent task audit trail (perfect-flow A4) |
+| GET | `/api/agent-tasks/{task_id}/notifications` | Yes | Agent task notifications (perfect-flow A4) |
+| POST | `/api/agent-tasks/scheduler/tick` | Yes | Run due tasks + workflows (perfect-flow A4) |
+| POST | `/api/agent-tasks/security-graph` | Yes | Pentest graph as runtime task (perfect-flow A4) |
+| POST | `/api/agent-tasks/{task_id}/event` | Yes | Event trigger for task (perfect-flow A4) |
+| POST | `/api/agent-tasks/{task_id}/webhook` | Yes | Token webhook for task (perfect-flow A4) |
+| GET | `/api/agent-approvals` | Yes | Approval queue (perfect-flow A4) |
+| POST | `/api/agent-tasks/{task_id}/approvals/{approval_id}/decide` | Yes | Decide approval (perfect-flow A4) |
+| GET | `/api/agent-notifications` | Yes | In-app notifications (perfect-flow A4) |
+| POST | `/api/agent-notifications/{notification_id}/read` | Yes | Mark notification read (perfect-flow A4) |
 | GET | `/api/security/allowlist` | Yes | List target allowlist (Batch 2) |
 | POST | `/api/security/allowlist` | Yes | Add allowlist target (Batch 2) |
 | DELETE | `/api/security/allowlist/{target_id}` | Yes | Remove allowlist target (Batch 2) |
