@@ -5,8 +5,8 @@ Covers, without a browser (the coordinator runs Playwright at merge):
   order, every route shape, legacy redirects, 404, breadcrumb depth.
 - the pure palette index (shell/palette_index.js) via Node: every
   required surface is reachable and search filters correctly.
-- static shell facts: no tab strip / title bar left in index.html,
-  sidebar footer present, settings schema covers every manifest key
+- static shell facts: tabs-on-top bar present and no sidebar / title
+  bar left in index.html, settings schema covers every manifest key
   from A2/A3/A4/A5/A6 plus the A1 token keys, all 17 §7 sections exist,
   and destinations.js mounts the five previously-unmounted modules.
 - TestClient (port-free): the API surfaces the shell mounts actually
@@ -138,13 +138,24 @@ def test_palette_index_via_node():
     _run_node(PALETTE_SCRIPT)
 
 
-def test_shell_html_has_no_top_bar_or_tab_strip():
+def test_shell_html_has_tabs_on_top_no_sidebar():
+    # Tabs-on-top correction (2026-10-25): the A1 sidebar rail is gone
+    # and the tab bar is the navigation. The old "no tab strip" test
+    # asserted the reversed shell (railNav, paletteHintBtn button,
+    # helpBtn all lived in the removed sidebar); those are now gone
+    # and the tab bar elements are present instead. The composer Runs
+    # button stays removed (separate complaint fix).
     html = (FRONTEND / "index.html").read_text()
     for gone in ["id=\"tabStrip\"", "id=\"mainTab\"", "id=\"tabAdd\"",
-                 "id=\"toolViewTitle\"", "id=\"toolViewClose\"", "id=\"runsBtn\""]:
+                 "id=\"toolViewTitle\"", "id=\"toolViewClose\"", "id=\"runsBtn\"",
+                 "id=\"sidebar\"", "id=\"railNav\"", "id=\"paletteHintBtn\"",
+                 "id=\"helpBtn\"", "id=\"mobileSidebarToggle\"",
+                 "id=\"sidebarScrim\""]:
         assert gone not in html, f"removed element still present: {gone}"
-    for present in ["id=\"destBreadcrumb\"", "id=\"paletteHintBtn\"",
-                    "id=\"helpBtn\"", "id=\"usageMeter\"", "id=\"railNav\""]:
+    for present in ["id=\"destBreadcrumb\"", "id=\"tabBar\"",
+                    "id=\"tabBarScroll\"", "id=\"usageMeter\"",
+                    "id=\"profileSection\"", "id=\"newChatBtn\"",
+                    "tabbar-kbd-hint"]:
         assert present in html, f"missing shell element: {present}"
 
 

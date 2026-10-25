@@ -1,27 +1,41 @@
 /**
- * Shell navigation — A1 perfect-flow IA (§3, §6.2).
+ * Shell navigation — tabs on top (2026-10-25 user correction).
  *
- * The sidebar is the single source of navigation. There are exactly 8
- * destinations (see shell/router.js), each a real page rendered into
- * the main view; Chat is pinned and is the only chat surface. There
- * are NO strip tabs and NO container-that-opens-tabs: Work and Create
- * are flattened (their contents now live in Agents / Code / Studio /
- * Research), and sub-navigation inside a destination is a segmented
- * control at the top of that destination's content area.
+ * The tab bar at the top of the app IS the navigation. There is no
+ * sidebar and no sidebar destination button: the perfect-flow spec's
+ * "no destination opens another destination as a tab" contradicted
+ * the user's standing vision (Chat pinned as the only chat, everything
+ * else opening as separate tool tabs) and was followed without
+ * flagging it. This module restores that vision.
  *
- * Navigation is URL-addressable: /chat, /projects/:id, /studio/:artifact,
- * /code/:repo, /research/:notebook, /agents/:id, /library,
- * /settings/:section (plus ?section= for in-destination segments).
- * Unknown routes render a 404 page with a "back to Chat" action.
- * Old destination ids (home/work/create/knowledge/…) REDIRECT through
- * router.js instead of 404ing, so old palette actions, slash commands,
- * and specs keep resolving.
+ * There are exactly 8 destinations (see shell/router.js), each a real
+ * page rendered into the main view; Chat is pinned first, never
+ * closable, never duplicated. Every other destination opens as a
+ * switchable, closable tab: navigating to a destination that already
+ * has a tab focuses it (restoring that tab's stored param/section/
+ * URL) instead of duplicating it. Closing a tab activates the most
+ * recently used remaining tab, falling back to Chat; closing can
+ * never leave a blank screen. Tabs start as the full destination set
+ * (so the bar is also the map of the app) and closed tabs disappear
+ * until reopened via the palette, a deep link, or a composer action.
+ * With many tabs open the bar scrolls horizontally, never wraps.
+ * Sub-navigation inside a destination is a segmented control at the
+ * top of that destination's content area.
  *
- * Compatibility: the old tab API (showTool, showToolSection,
- * showToolSub, openToolTab, switchTab, closeTab, registerTabRenderer,
+ * Navigation stays URL-addressable: /chat, /projects/:id,
+ * /studio/:artifact, /code/:repo, /research/:notebook, /agents/:id,
+ * /library, /settings/:section (plus ?section= for in-destination
+ * segments). Tab switches push URL state, so browser back/forward
+ * moves between tabs, and a deep link opens (or focuses) the right
+ * tab on load. Unknown routes render a 404 page with a "back to Chat"
+ * action. Old destination ids (home/work/create/knowledge/…) REDIRECT
+ * through router.js instead of 404ing, so old palette actions, slash
+ * commands, and specs keep resolving.
+ *
+ * Compatibility: the tab API (showTool, showToolSection, showToolSub,
+ * openToolTab, switchTab, closeTab, registerTabRenderer,
  * registerSectionActivator, getActiveViewTool, getActiveTabId) is
- * preserved — those functions now navigate destinations instead of
- * opening tabs. Nothing in the app opens a second view anymore.
+ * preserved — those functions now open/focus/close real tabs.
  */
 import { DESTINATIONS, parseRoute, urlFor, resolveLegacyId, breadcrumbText } from '../shell/router.js';
 
@@ -106,13 +120,129 @@ export function getActiveViewTool() { return activeDest === 'chat' ? null : acti
 export function getActiveDestination() { return activeDest; }
 export function getActiveTabId() { return activeDest === 'chat' ? 'main' : `view-${activeDest}`; }
 
-/** Highlight the active destination in the sidebar rail. */
-function markSidebarActive(dest) {
-  document.querySelectorAll('.rail-item').forEach((b) => {
-    const on = b.dataset.nav === dest;
-    b.classList.toggle('active', on);
-    if (on) b.setAttribute('aria-current', 'page');
-    else b.removeAttribute('aria-current');
+/* ------------------------------------------------------------------ */
+/* Tab-bar state. One tab per destination (keyed by destination id);  */
+/* each tab remembers the param/section/URL it was last left at, so   */
+/* switching back restores where the user was instead of resetting   */
+/* to the destination landing page. Chat is always first and can     */
+/* never be closed. `mru` is most-recently-used first, and decides   */
+/* which tab activates when the active tab is closed.                */
+/* ------------------------------------------------------------------ */
+let openTabs = DESTINATIONS.map((d) => ({ dest: d.id, param: null, section: null, url: d.path }));
+let activeTab = 'chat';
+let mru = ['chat'];
+let lastTabBarSignature = null;
+
+function tabEntry(dest) {
+  return openTabs.find((t) => t.dest === dest) || null;
+}
+
+function touchMru(dest) {
+  mru = [dest, ...mru.filter((d) => d !== dest)];
+}
+
+/** Ensure a tab exists for a destination and make it active. */
+function ensureTab(dest, { param = null, section = null, url = null } = {}) {
+  let entry = tabEntry(dest);
+  if (!entry) {
+    entry = { dest, param, section, url };
+    openTabs.push(entry);
+  } else {
+    entry.param = param;
+    entry.section = section;
+    entry.url = url;
+  }
+  activeTab = dest;
+  touchMru(dest);
+  return entry;
+}
+
+/**
+ * Render the tab bar. Skips rebuilding the DOM when nothing changed
+ * (same tab set, same active tab) so focus is never stolen by a
+ * re-render during ordinary navigation.
+ */
+function renderTabBar() {
+  const scroll = $('#tabBarScroll');
+  if (!scroll) return;
+  const signature = openTabs.map((t) => `${t.dest}@${t.url || ''}`).join('|') + `#${activeTab}`;
+  if (signature === lastTabBarSignature) return;
+  lastTabBarSignature = signature;
+  scroll.innerHTML = '';
+  for (const tab of openTabs) {
+    const def = TOOL_DEFS[tab.dest];
+    if (!def) continue;
+    const item = document.createElement('div');
+    item.className = 'tab-item';
+    item.dataset.tab = tab.dest;
+    item.setAttribute('role', 'tab');
+    const selected = activeTab === tab.dest;
+    item.setAttribute('aria-selected', String(selected));
+    if (selected) item.classList.add('active');
+    const label = document.createElement('button');
+    label.type = 'button';
+    label.className = 'tab-item-label';
+    // data-nav keeps every existing [data-nav="…"] caller (specs,
+    // composer actions) working: clicking a tab label focuses it.
+    label.dataset.nav = tab.dest;
+    label.title = def.title;
+    label.setAttribute('aria-label', `${def.title} tab`);
+    label.innerHTML = `<i class="fa-solid ${def.icon}" aria-hidden="true"></i><span>${def.title}</span>`
+      + (tab.dest === 'chat' ? '<i class="fa-solid fa-thumbtack tab-pin" aria-hidden="true" title="Pinned"></i>' : '');
+    label.addEventListener('click', () => {
+      const entry = tabEntry(tab.dest);
+      navigate(tab.dest, {
+        param: entry ? entry.param : null,
+        section: entry ? entry.section : null,
+      });
+    });
+    item.appendChild(label);
+    if (tab.dest !== 'chat') {
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'tab-item-close';
+      close.dataset.tabClose = tab.dest;
+      close.setAttribute('aria-label', `Close ${def.title} tab`);
+      close.title = `Close ${def.title}`;
+      close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+      close.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeTabByDest(tab.dest);
+      });
+      item.appendChild(close);
+      // Middle-click closes, like a browser tab.
+      item.addEventListener('auxclick', (e) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          closeTabByDest(tab.dest);
+        }
+      });
+    }
+    scroll.appendChild(item);
+  }
+}
+
+/** Close a destination tab. Chat can never be closed. */
+export function closeTabByDest(dest) {
+  if (dest === 'chat' || !tabEntry(dest)) return;
+  const wasActive = activeTab === dest;
+  openTabs = openTabs.filter((t) => t.dest !== dest);
+  mru = mru.filter((d) => d !== dest);
+  if (!wasActive) {
+    // Inactive tab closed: active tab and URL are untouched, but the
+    // bar must still re-render (signature changed).
+    lastTabBarSignature = null;
+    renderTabBar();
+    return;
+  }
+  // Active tab closed: fall back to the most recently used remaining
+  // tab, else Chat. This can never blank the screen: Chat always
+  // exists and always renders.
+  const next = mru[0] || 'chat';
+  const entry = tabEntry(next);
+  navigate(next, {
+    param: entry ? entry.param : null,
+    section: entry ? entry.section : null,
   });
 }
 
@@ -135,6 +265,8 @@ function renderNotFound(path) {
   const body = $('#toolViewBody');
   if (!body) return;
   activeDest = null;
+  activeTab = null;
+  renderTabBar();
   $('#chatView')?.classList.add('hidden');
   $('#toolView')?.classList.remove('hidden');
   renderBreadcrumb(null);
@@ -151,10 +283,6 @@ function renderNotFound(path) {
     <p class="settings-hint">There is no page at “${path}”. It may be an old link — the destinations are Chat, Projects, Studio, Code, Research, Agents, Library, and Settings.</p>
     <button type="button" class="btn-primary" id="notFoundBack">Back to Chat</button>`;
   page.querySelector('#notFoundBack')?.addEventListener('click', () => navigate('chat'));
-  document.querySelectorAll('.rail-item').forEach((b) => {
-    b.classList.remove('active');
-    b.removeAttribute('aria-current');
-  });
 }
 
 /**
@@ -171,29 +299,26 @@ export function navigate(dest, { param = null, section = null, push = true } = {
   activeParam = param;
   activeSection = section;
   currentParsed = parseRoute(url);
+  // Tab state follows navigation: the destination's tab is created
+  // (if it was closed) or focused, remembering this param/section/
+  // URL for the next switch back. There is no sidebar drawer anymore
+  // — nothing can linger over content after a navigation.
+  ensureTab(dest, { param, section, url });
+  renderTabBar();
   document.dispatchEvent(new CustomEvent('sangam:destination-changed', {
     detail: { dest, param, section },
   }));
-
-  // Mobile: navigating closes the drawer, otherwise the off-canvas
-  // sidebar keeps covering the destination just opened (same rule as
-  // chat-history clicks in sidebar.js). No-op on desktop: the class
-  // only affects the <=900px layout.
-  document.getElementById('sidebar')?.classList.remove('mobile-open');
-  document.getElementById('sidebarScrim')?.classList.remove('show');
 
   if (dest === 'chat') {
     $('#toolView')?.classList.add('hidden');
     $('#chatView')?.classList.remove('hidden');
     renderBreadcrumb(currentParsed);
-    markSidebarActive('chat');
     return;
   }
 
   $('#chatView')?.classList.add('hidden');
   $('#toolView')?.classList.remove('hidden');
   renderBreadcrumb(currentParsed);
-  markSidebarActive(dest);
 
   const body = $('#toolViewBody');
   if (!body) return;
@@ -305,25 +430,37 @@ export function showToolSub(tool, subAttr, subId) {
 }
 
 /**
- * Old tab API: opening a "tab" now just navigates to the destination
- * (no second view is ever opened). Returns the view id, or null.
+ * Open (or focus, if already open) a destination tab. Returns the view
+ * id, or null. Kept for every existing caller (palette, composer,
+ * slash commands, nav handlers).
  */
 export function openToolTab(tool, _opts = {}) {
   if (!tool) return null;
-  const before = activeDest;
   showTool(tool);
   return activeDest ? `view-${activeDest}` : null;
 }
 
+/**
+ * Close a tab by id: 'main' (Chat, never closable), 'view-<dest>', or
+ * a bare destination id. Closing the active tab falls back to the
+ * most recently used remaining tab (else Chat).
+ */
 export function closeTab(tabId) {
-  if (tabId === 'main') return;
-  navigate('chat');
+  if (tabId === 'main' || tabId === 'chat') return;
+  const dest = String(tabId).startsWith('view-') ? String(tabId).slice(5) : tabId;
+  closeTabByDest(dest);
 }
 
+/** Focus a tab by id ('main', 'view-<dest>', or a destination id). */
 export function switchTab(tabId) {
   if (tabId === 'main' || tabId === 'chat') navigate('chat');
-  else if (TOOL_DEFS[tabId]) navigate(tabId);
-  else showTool(tabId);
+  else if (TOOL_DEFS[tabId]) {
+    const entry = tabEntry(tabId);
+    navigate(tabId, {
+      param: entry ? entry.param : null,
+      section: entry ? entry.section : null,
+    });
+  } else showTool(tabId);
 }
 
 /** Route the current (or given) URL: redirects, destinations, or 404. */
@@ -345,6 +482,9 @@ export function routeFromLocation(url = null) {
 
 export function initTabs() {
   window.addEventListener('popstate', () => routeFromLocation());
-  // First paint: honour the URL the user arrived on (deep link or '/').
+  // First paint: render the bar (Chat pinned + the destination set),
+  // then honour the URL the user arrived on (deep link or '/') — the
+  // deep-linked destination's tab is focused, Chat stays pinned.
+  renderTabBar();
   routeFromLocation();
 }

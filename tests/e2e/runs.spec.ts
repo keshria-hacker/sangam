@@ -134,10 +134,10 @@ test('Runs centre: mobile 390px, no composer Runs button (perfect-flow A2)', asy
   // composer must offer Auto mode instead, and run history lives in
   // Agents → Run History (A1 new IA).
   await expect(page.locator('#runsBtn')).toHaveCount(0);
-  // Mobile: the rail lives in the off-canvas drawer below 900px, so a
-  // real phone user opens the menu first, then taps the destination.
-  await page.locator('#mobileSidebarToggle').click();
-  await page.waitForTimeout(500);
+  // Mobile (tabs-on-top): no drawer — the Agents tab in the top tab
+  // bar is tapped directly, and it must not linger over content.
+  await expect(page.locator('#mobileSidebarToggle')).toHaveCount(0);
+  await expect(page.locator('#sidebar')).toHaveCount(0);
   await page.locator('[data-nav="agents"]').click();
   await page.waitForTimeout(2000);
   await page.locator('[data-dest-section="run-history"]').click();

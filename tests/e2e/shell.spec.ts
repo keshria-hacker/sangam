@@ -1,10 +1,12 @@
 /**
- * A1 perfect-flow shell spec (coordinator: run at merge — shared ports
- * meant the shell agent could not run Playwright itself).
+ * Shell spec (tabs-on-top correction, 2026-10-25: the A1 sidebar rail
+ * was replaced by a top tab bar per the user's correction — Chat
+ * pinned, every destination a switchable/closable tab, no sidebar).
  *
- * Covers the §9 shell criteria that only a browser can prove:
- * - all 8 destinations are real pages with URL-addressable routes
- * - no tab strip, no repeated title bar; breadcrumb only at depth > 1
+ * Covers the shell criteria that only a browser can prove:
+ * - all 8 destinations are real pages with URL-addressable routes,
+ *   reached as tabs on top (no sidebar, no sidebar buttons)
+ * - no repeated title bar; breadcrumb only at depth > 1
  * - legacy destinations redirect instead of 404ing; unknown routes 404
  *   with a "back to Chat" action
  * - command palette (Ctrl/Cmd+K) reaches destinations, settings
@@ -95,20 +97,25 @@ async function gotoDest(page: Page, nav: string) {
   await page.waitForTimeout(1500);
 }
 
-test('Shell: 8 destinations, no tab strip, no title bar', async ({ page }) => {
+test('Shell: 8 destinations as tabs on top, no sidebar, no title bar', async ({ page }) => {
   test.setTimeout(180000);
   attachGuards(page);
   await register(page);
 
-  // No browser-like tab strip and no repeated title bar anywhere.
-  await expect(page.locator('#tabStrip')).toHaveCount(0);
+  // Tabs-on-top: the tab bar is the navigation, and there is no
+  // sidebar and no sidebar destination button anywhere in the DOM.
+  await expect(page.locator('#tabBar')).toBeVisible();
+  await expect(page.locator('#sidebar')).toHaveCount(0);
+  await expect(page.locator('.rail-item')).toHaveCount(0);
   await expect(page.locator('#toolViewTitle')).toHaveCount(0);
-  await expect(page.locator('#tabAdd')).toHaveCount(0);
 
-  // Sidebar rail holds exactly the 8 destinations, in spec order.
-  const rail = await page.locator('.rail-item').evaluateAll((els) =>
-    els.map((el) => el.getAttribute('data-nav')));
-  expect(rail).toEqual(['chat', 'projects', 'studio', 'code', 'research', 'agents', 'library', 'settings']);
+  // The tab bar holds exactly the 8 destinations, in spec order,
+  // Chat pinned first with no close control.
+  const tabs = await page.locator('.tab-item').evaluateAll((els) =>
+    els.map((el) => el.getAttribute('data-tab')));
+  expect(tabs).toEqual(['chat', 'projects', 'studio', 'code', 'research', 'agents', 'library', 'settings']);
+  await expect(page.locator('.tab-item[data-tab="chat"] [data-tab-close]')).toHaveCount(0);
+  await expect(page.locator('.tab-item[data-tab="chat"]')).toHaveAttribute('aria-selected', 'true');
 
   // Each destination is a real page with its URL.
   await gotoDest(page, 'projects');

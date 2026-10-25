@@ -279,46 +279,49 @@ The frontend is a vanilla JS SPA served as static files. There is no build step,
 ### 4.2 Layout Structure (perfect-flow IA, 2026-10-25)
 
 ```
-┌──────────┬────────────────────────────────────────────────┐
-│ SIDEBAR  │  DESTINATION CONTENT (one of 8, URL-addressable)│
-│ RAIL (8) │  Chat / Projects / Studio / Code / Research / │
-│ Chat     │  Agents / Library / Settings                   │
-│ Projects │                                                │
-│ Studio   │  Sub-navigation inside a destination is a      │
-│ Code     │  segmented control, never a second sidebar.    │
-│ Research │  Breadcrumb in content, only at depth > 1.     │
-│ Agents   │                                                │
-│ Library  │  COMPOSER (Chat only): [Attach] [Textarea]     │
-│ Settings │  [Send] [Mode: Auto] [Tools] [Tune]             │
-│ ──────── │  INSPECTOR (right, Ctrl+Shift+I)                │
-│ avatar,  │                                                │
-│ usage,   │                                                │
-│ palette, │                                                │
-│ help     │                                                │
-└──────────┴────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│ TAB BAR (top): [Chat📌] [Projects] [Studio] [Code] [Research] │
+│ [Agents] [Library] [Settings] …  New chat │ Ctrl K │ Usage │ 👤│
+├───────────────────────────────────────────────────────────────┤
+│ DESTINATION CONTENT (one of 8, URL-addressable):               │
+│ Chat / Projects / Studio / Code / Research / Agents / Library │
+│ / Settings                                                     │
+│ Sub-navigation inside a destination is a segmented control,    │
+│ never a second sidebar. Breadcrumb in content, only at depth   │
+│ > 1. COMPOSER (Chat only): [Attach] [Textarea] [Send]          │
+│ [Mode: Auto] [Tools] [Tune]. INSPECTOR (right, Ctrl+Shift+I).  │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-The **sidebar rail** (left) is the map of the app: exactly the 8
-destinations above, in that order. There is NO tab strip and NO title
-bar (both deleted in the perfect-flow program); the old Work/Create/
-Knowledge/Home destinations redirect (`work → /agents`,
-`create → /studio`, `knowledge → /research`, `home → /chat`) and
-unknown routes render a 404 page with "Back to Chat". The main chat
-is pinned and never closes. The Inspector (right panel) shows
-contextual details. The Runs centre (Agents → Run History) is the
-single Activity feed; the old composer Runs button is removed.
+The **tab bar** (top) is the map of the app: exactly the 8
+destinations above, in that order, as switchable, closable tabs —
+Chat pinned first and never closable. There is NO sidebar and NO
+sidebar destination button (both removed in the 2026-10-25 tabs-on-top
+correction; see FIX_LOG.md — the perfect-flow spec's "no destination
+opens another destination as a tab" contradicted the user's standing
+tab vision and was followed without flagging it). Tabs remember their
+param/section/URL, closing the active tab falls back to the most
+recently used tab (else Chat), and tab switches push URL state so
+back/forward moves between tabs. The old Work/Create/Knowledge/Home
+destinations redirect (`work → /agents`, `create → /studio`,
+`knowledge → /research`, `home → /chat`) and unknown routes render a
+404 page with "Back to Chat". The main chat is pinned and never
+closes. The Inspector (right panel) shows contextual details. The
+Runs centre (Agents → Run History) is the single Activity feed; the
+old composer Runs button is removed.
 
 ### 4.3 Module Organization
 
 The frontend uses a **feature-based module structure** under `frontend/js/` — each
-feature owns its own DOM, state, and logic. 50 modules total (verified by
-`scripts/check_frontend_modules.mjs`).
+feature owns its own DOM, state, and logic. 69 modules total (verified by
+`scripts/check_frontend_modules.mjs` after the tabs-on-top correction
+deleted `core/nav.js`).
 
 **Core** (`js/core/`):
 | Module | Responsibility |
 |--------|----------------|
 | `state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings, etc. Also `createComputed` / `createSyncedSignal` helpers |
-| `nav.js` | Compatibility hook for future tool navigation; the current UI keeps the sidebar focused on chat history |
+| *(nav.js deleted 2026-10-25)* | The old sidebar rail module was deleted with the sidebar in the tabs-on-top correction; navigation lives in `features/tabs/tabs.js` |
 | `jobs.js` | Background job tracking for the Activity Tray |
 
 **Shared** (`js/shared/`):
@@ -342,8 +345,8 @@ feature owns its own DOM, state, and logic. 50 modules total (verified by
 | `chat/` | SSE streaming orchestration, send/regenerate, file attachments, clarification cards, agent mode |
 | `models/` | Model selector dropdown, provider status badges |
 | `settings/` | `settings.js` (legacy modal: theme, API keys) + `settings_page.js` (schema-driven full page) |
-| `sidebar/` | Chat history list (bucketed by date), new chat, delete chat |
-| `tabs/` | Mount-once persistent tab manager (main chat pinned) |
+| `sidebar/` | Chat-list fetching (feeds the command palette) + usage meter + new-chat binding; the `<aside>` element itself was removed in the tabs-on-top correction — all DOM lookups here are null-safe |
+| `tabs/` | Tab bar shell: mount-once persistent views, one tab per destination, Chat pinned, MRU close fallback, URL-synced tab state |
 | `agents/` | Agent Hub: custom agent CRUD, run with streaming, approval cards |
 | `teams/` | Multi-agent team UI |
 | `knowledge/` | Knowledge graph (SVG), search, MCP manager, memory browser |
@@ -1700,9 +1703,9 @@ in `docs/`; this section is the index.
 Chat / Projects / Studio / Code / Research / Agents / Library /
 Settings — see `docs/INFORMATION_ARCHITECTURE.md`. Work and Create
 are flattened, not containers. Router:
-`frontend/js/features/shell/router.js`; navigation:
-`frontend/js/features/tabs/tabs.js`; rail:
-`frontend/js/core/nav.js`.
+`frontend/js/features/shell/router.js`; navigation + tab bar:
+`frontend/js/features/tabs/tabs.js` (the old `core/nav.js` rail module
+was deleted with the sidebar in the 2026-10-25 tabs-on-top correction).
 
 ### Response-intelligence pipeline
 

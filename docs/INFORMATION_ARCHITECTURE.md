@@ -1,13 +1,33 @@
-# Sangam — Information Architecture (perfect-flow program)
+# Sangam — Information Architecture (perfect-flow program, tabs-on-top correction 2026-10-25)
 
-## Destinations (exactly 8, in sidebar order)
+## Destinations (exactly 8, as tabs on top)
 
 Chat, Projects, Studio, Code, Research, Agents, Library, Settings.
-Each is a real page with a URL; Chat is pinned and is the only chat
-surface — never closed, duplicated, or nested inside another
-destination. Sub-navigation inside a destination is a segmented
-control at the top of that destination's content, never a second
-sidebar and never a tab that opens another destination.
+Each is a real page with a URL; Chat is pinned first in the tab bar
+and is the only chat surface — never closed, duplicated, or nested
+inside another destination. Every other destination opens as a
+switchable, closable tab in the bar at the top of the app: opening a
+destination that already has a tab focuses it instead of duplicating
+it, and closing the active tab falls back to the most recently used
+remaining tab (else Chat), so closing can never blank the screen.
+Each tab remembers the param/section/URL it was last left at, so
+switching back restores where the user was. Sub-navigation inside a
+destination is a segmented control at the top of that destination's
+content, never a second sidebar. There is NO sidebar and NO sidebar
+destination button: the old sidebar's bottom items live in compact
+form at the right of the tab bar (New chat, usage meter, avatar
+menu, palette hint as plain text, not a button). Chat history is
+reached through the command palette, not a sidebar list.
+
+> **Reversal note (2026-10-25):** the perfect-flow spec said "no
+> destination opens another destination as a tab", which contradicted
+> the user's standing vision (Chat pinned as the only chat, everything
+> else as separate tool tabs). That line was followed without flagging
+> the contradiction, and the visible tab bar was replaced by sidebar
+> destination buttons. The user corrected this on 2026-10-25: tabs on
+> top, sidebar buttons removed. This document, the shell section of
+> `ARCHITECTURE.md`, and `FIX_LOG.md` now describe the corrected
+> navigation. See `tests/e2e/tabs.spec.ts` for the behavioural proof.
 
 | Destination | URL | Contents (flattened from the old IA) |
 |---|---|---|
@@ -22,44 +42,52 @@ sidebar and never a tab that opens another destination.
 
 ## Rules that replaced the old shell
 
-- **No tab strip, no title bar.** The old `#tabStrip` / `#toolViewTitle`
-  / `#tabAdd` elements are gone. The only header-like element is a
-  slim contextual breadcrumb (`#destBreadcrumb`) inside the content,
-  shown only at depth > 1 (detail pages, settings sections).
-- **No top bar repeating the destination name.** (The pre-existing
-  mobile hamburger bar is excepted: on small screens it opens the
-  drawer; it is not a title bar.)
+- **Tabs on top, no title bar.** The tab bar (`#tabBar`) is the only
+  header-like element besides a slim contextual breadcrumb
+  (`#destBreadcrumb`) inside the content, shown only at depth > 1
+  (detail pages, settings sections). The old `#toolViewTitle` element
+  is gone, and the old sidebar rail (`.rail-item`, `#sidebar`) is
+  gone with the sidebar itself.
+- **Tab clicks pushState.** A tab click navigates AND updates the
+  address bar (fix 2026-10-25: `showTool()` used to fall through to
+  `routeFromLocation` with `push:false` for current ids, rendering
+  without changing the URL). Browser back/forward moves between tabs,
+  and a deep link opens (or focuses) the right tab on load.
+- **Tab overflow scrolls, never wraps.** With many tabs open the bar
+  scrolls horizontally; the page itself never gains horizontal scroll.
+- **No mobile drawer.** There is no hamburger menu and no off-canvas
+  sidebar on small screens: the tab bar is the only navigation on
+  mobile too, and nothing can linger over content after a tap.
 - **Legacy destinations redirect, never 404.** `home → /chat`,
   `work → /agents`, `create → /studio`, `knowledge → /research`, plus
   sub-id mappings (see `features/shell/router.js`
   `LEGACY_ID_REDIRECTS` / `LEGACY_PATH_REDIRECTS`). Unknown routes
   render a 404 page with a working "Back to Chat" action.
-- **Rail clicks pushState.** A rail click navigates AND updates the
-  address bar (fix 2026-10-25: `showTool()` used to fall through to
-  `routeFromLocation` with `push:false` for current ids, rendering
-  without changing the URL).
-- **Mobile drawer closes on navigation.** Below 900px the sidebar is
-  off-canvas; tapping a rail destination closes it, so the destination
-  is actually visible (same rule chat-history clicks already had).
 - **Empty states have exactly one guided next action.** The Runs
   centre lost its second competing CTA in this program; every
   destination was audited to the same rule.
-- **Sidebar footer (bottom, always):** avatar, usage meter, palette
-  hint (Ctrl/Cmd+K), help. The usage meter shows "Usage unavailable"
-  before auth by design — never an invented number.
+- **Tab bar right side (compact, always):** New chat, palette hint as
+  plain text (Ctrl/Cmd+K — the keybinding is bound by the palette
+  module, not a button), usage meter, avatar menu. The usage meter
+  shows "Usage unavailable" before auth by design — never an invented
+  number.
 
 ## Router
 
 `mainfiles/frontend/js/features/shell/router.js` is the pure source of
 truth (destinations, URL shapes, legacy redirects, breadcrumb text);
-`features/tabs/tabs.js` consumes it and preserves the old tab API
-(`showTool`, `showToolSection`, `showToolSub`, `openToolTab`,
-`switchTab`) as navigation calls, so old palette actions, slash
-commands, and specs keep resolving. `features/shell/destinations.js`
-renders each destination; `features/shell/router.js` + `tabs.js` are
-covered by `tests/e2e/shell.spec.ts` (5 tests: destinations, no
-strip/title bar, redirects/404/breadcrumb, palette reach, two-click
-reachability + empty states, first-run).
+`features/tabs/tabs.js` consumes it and implements the tab bar (tab
+state, most-recently-used fallback, per-tab param/section memory) while
+preserving the old tab API (`showTool`, `showToolSection`,
+`showToolSub`, `openToolTab`, `switchTab`, `closeTab`), so old palette
+actions, slash commands, and specs keep resolving. The old rail module
+(`core/nav.js`) was deleted with the sidebar. `features/shell/
+destinations.js` renders each destination; `features/shell/router.js`
++ `tabs.js` are covered by `tests/e2e/shell.spec.ts` (destinations as
+tabs, no sidebar/title bar, redirects/404/breadcrumb, palette reach,
+two-click reachability + empty states, first-run) and by
+`tests/e2e/tabs.spec.ts` (behavioural tab proof: palette open, switch
+changes URL, close falls back to MRU, back/forward, deep link, mobile).
 
 ## Command palette (Ctrl/Cmd+K, Ctrl+P alias)
 

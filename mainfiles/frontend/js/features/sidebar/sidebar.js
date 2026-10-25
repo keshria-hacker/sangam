@@ -1,6 +1,11 @@
 /**
- * Sidebar module - Chat history, new chat, sidebar collapse, mobile toggle.
- * Enhanced with pin, rename, and context menu.
+ * Sidebar module — kept name, new home. The <aside> sidebar element
+ * was removed in the tabs-on-top correction (2026-10-25): its controls
+ * now live in the tab bar (New chat button, usage meter, avatar menu)
+ * and chat history is reached through the command palette, which reads
+ * the chat list this module loads. All DOM lookups here are null-safe
+ * because the old sidebar elements no longer exist. Pin/rename/delete
+ * helpers remain for the palette-driven history flows that use them.
  */
 
 import { getApiBaseUrl, apiFetch, apiDelete } from '../../shared/http.js';

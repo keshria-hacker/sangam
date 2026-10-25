@@ -21,7 +21,7 @@ export function isTeamsEnabled() {
 }
 
 export async function initTeams() {
-  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
+  // Navigation via the tab bar — no per-button wiring needed.
   try {
     const data = await (await apiFetch('/features')).json();
     teamsEnabled = !!(data && data.features && data.features.multi_agent);

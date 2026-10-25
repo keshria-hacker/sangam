@@ -10,7 +10,7 @@ import { escapeHtml } from '../../shared/utils.js';
 console.log('[Module] analytics.js loaded');
 
 export async function initAnalytics() {
-  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
+  // Navigation via the tab bar — no per-button wiring needed.
   let enabled = false;
   try {
     const data = await (await apiFetch('/features')).json();

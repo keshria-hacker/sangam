@@ -60,82 +60,35 @@ if (location.protocol === 'file:') {
 }
 </script>
 
-<!-- ============ MOBILE TOPBAR ============ -->
-<header class="mobile-topbar">
-  <button class="icon-btn" id="mobileSidebarToggle" aria-label="Open menu">
-    <i class="fa-solid fa-bars" aria-hidden="true"></i>
-  </button>
-  <div class="mobile-brand">
-    <span class="logo-mark mobile-logo-mark" aria-hidden="true">
-      <img src="assets/logo.png" alt="" class="app-logo">
-    </span>
-    <span>Sangam</span>
-  </div>
-  <button class="icon-btn" id="mobileNewChat" title="New chat" aria-label="New chat">
-    <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
-  </button>
-</header>
-
 <div class="app-shell">
 
-  <!-- ============ SIDEBAR ============ -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-inner">
-
-      <div class="sidebar-header">
-        <div class="brand">
-          <button class="sidebar-brand-toggle" id="collapseSidebar" title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true">
-            <span class="logo-mark sidebar-logo-mark" aria-hidden="true">
-              <img src="assets/logo.png" alt="Sangam logo" class="app-logo">
-            </span>
-            <span class="sidebar-toggle-icon" aria-hidden="true">
-              <i class="fa-solid fa-angles-left"></i>
-            </span>
-          </button>
-          <span class="brand-name">Sangam</span>
-        </div>
-      </div>
-
-      <button class="new-chat-btn" id="newChatBtn" title="Start a new chat">
-        <i class="fa-solid fa-plus" aria-hidden="true"></i>
-        <span>New chat</span>
-      </button>
-
-      <div class="sidebar-search">
-        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input type="text" id="searchChats" placeholder="Search chats…" autocomplete="off" aria-label="Search chats">
-      </div>
-
-      <nav class="rail-nav" id="railNav" aria-label="Studio navigation">
-        <!-- Populated by core/nav.js -->
-      </nav>
-
-      <nav class="chat-history" id="chatHistory" aria-label="Chat history">
-        <!-- Populated by JS -->
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="sidebar-usage" id="usageMeter" role="status">Usage: loading…</div>
-        <button class="sidebar-footer-btn" id="paletteHintBtn" type="button" title="Open command palette (Ctrl/Cmd+K)" aria-label="Open command palette">
-          <i class="fa-solid fa-terminal" aria-hidden="true"></i><span>Commands</span><kbd class="kbd-hint">Ctrl K</kbd>
-        </button>
-        <button class="sidebar-footer-btn" id="helpBtn" type="button" title="Keyboard shortcuts and help" aria-label="Help and keyboard shortcuts">
-          <i class="fa-solid fa-circle-question" aria-hidden="true"></i><span>Help</span>
-        </button>
-        <button class="profile-section" id="profileSection" type="button" aria-haspopup="dialog" aria-expanded="false">
-          <span class="profile-avatar" id="profileAvatar">N</span>
-          <span class="profile-meta">
-            <span class="profile-name" id="profileName">Local account</span>
-            <span class="profile-plan">Personal workspace</span>
-          </span>
-          <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
-        </button>
-      </div>
-
+  <!-- ============ TAB BAR (top navigation) ============ -->
+  <!-- Tabs-on-top (2026-10-25 user correction): the tab bar IS the
+       navigation. There is no sidebar and no sidebar destination
+       buttons. Chat is pinned first and never closable; every other
+       destination opens as a switchable, closable tab. Tab buttons are
+       rendered by features/tabs/tabs.js (renderTabBar). The right side
+       holds, in compact form, the relocated sidebar-footer items: a
+       New-chat action, the palette keyboard hint (plain text, not a
+       button — Ctrl/Cmd+K itself is bound by the palette module), the
+       usage meter, and the avatar menu. Chat history lives in the
+       command palette (search conversations), not in a sidebar. -->
+  <div class="tab-bar" id="tabBar">
+    <div class="tab-bar-scroll" id="tabBarScroll" role="tablist" aria-label="Open tabs">
+      <!-- Populated by features/tabs/tabs.js -->
     </div>
-  </aside>
-
-  <div class="sidebar-scrim" id="sidebarScrim"></div>
+    <div class="tab-bar-right">
+      <button class="icon-btn" id="newChatBtn" title="Start a new chat" aria-label="New chat">
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+      </button>
+      <span class="tabbar-kbd-hint" aria-hidden="true">Ctrl K</span>
+      <span class="tabbar-usage" id="usageMeter" role="status">Usage: loading…</span>
+      <button class="tabbar-avatar" id="profileSection" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Account">
+        <span class="profile-avatar" id="profileAvatar">N</span>
+        <span class="profile-name" id="profileName">Local account</span>
+      </button>
+    </div>
+  </div>
 
   <!-- ============ PROFILE POPUP (positioned near sidebar profile) ============ -->
   <div class="profile-popup" id="profilePopup">
@@ -338,8 +291,8 @@ if (location.protocol === 'file:') {
     </div>
     </div><!-- /chat-view -->
 
-    <!-- Destination view: no title bar. The sidebar shows the active
-         destination; a breadcrumb appears here only at depth > 1. -->
+    <!-- Destination view: no title bar. The tab bar shows the active
+         tab; a breadcrumb appears here only at depth > 1. -->
     <div class="tool-view hidden" id="toolView">
       <nav class="dest-breadcrumb hidden" id="destBreadcrumb" aria-label="Location"></nav>
       <div class="tool-view-body" id="toolViewBody"></div>

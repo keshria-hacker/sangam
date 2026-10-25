@@ -39,12 +39,25 @@ BACKEND_PID=$!
 cd "$REPO/mainfiles/frontend"
 # No-cache headers: the smoke test iterates on frontend files.
 "$VENV" -c "
+import os
+from urllib.parse import urlparse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 class H(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store, must-revalidate')
         super().end_headers()
     def log_message(self, *a): pass
+    def do_GET(self):
+        # SPA fallback (tabs-on-top correction): client-side routes
+        # (/agents, /projects/123, ...) have no file on disk. Serve
+        # index.html for extensionless paths that do not resolve to a
+        # file, so a deep link loads the app and its router — exactly
+        # what any static SPA host does. Real asset paths (with an
+        # extension, or resolving to a file) are served unchanged.
+        path = urlparse(self.path).path
+        if '.' not in os.path.basename(path) and not os.path.isfile(self.translate_path(path)):
+            self.path = '/index.html'
+        return super().do_GET()
 HTTPServer(('127.0.0.1', $FRONTEND_PORT), H).serve_forever()
 " >/dev/null 2>&1 &
 FRONTEND_PID=$!

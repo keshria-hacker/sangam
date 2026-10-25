@@ -14,7 +14,6 @@ import { renderProjectsDestination, renderStudioDestination, renderCodeDestinati
 import { trapFocus } from './shared/focus_trap.js';
 import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';
-import { renderRail, registerNavHandler } from './core/nav.js';
 import { initPopovers } from './features/composer/popovers.js';
 import { initInspector } from './features/inspector/inspector.js';
 import { initElements as initSidebarElements, initSidebar, openMobileSidebar, closeMobileSidebar, toggleSidebarCollapse, loadChatList as sidebarLoadChatList, renderChatHistory as sidebarRenderChatHistory, openChat as sidebarOpenChat, deleteChat as sidebarDeleteChat } from './features/sidebar/sidebar.js';
@@ -142,46 +141,12 @@ function initDOM() {
  * Set up global event listeners that cross modules.
  */
 /**
- * Initialize the studio rail (intent-grouped navigation).
- * A9: only registers handlers here. The rail itself renders in
- * loadRailFeatures(), called post-auth when /features returns real state.
+ * Tabs-on-top (2026-10-25 user correction): the sidebar rail is gone
+ * and so is its module (core/nav.js, deleted). Navigation lives in
+ * features/tabs/tabs.js, which renders the tab bar during initTabs()
+ * — there is nothing to initialise here anymore. (openSettings() now
+ * calls tabs.js navigate() directly; feature toggles live in Settings.)
  */
-async function initRail() {
-  const container = document.getElementById('railNav');
-  if (!container) return;
-  // A1: rail handlers are the 8 destinations; nav.navigate() defaults
-  // (chat -> pinned chat, view:xxx -> destination) cover the rest.
-  // 'settings' is registered explicitly because openSettings() calls
-  // navigate('settings') directly (no view: prefix).
-  registerNavHandler('chat', () => {
-    showTool('chat');
-  });
-  registerNavHandler('settings', () => {
-    openToolTab('settings');
-  });
-  // Load features and render
-  // (moved to loadRailFeatures — called post-auth from startApplication)
-  // Re-render rail when features change
-  document.addEventListener('sangam:features-changed', async (e) => {
-    renderRail(container, e.detail?.features || {});
-  });
-}
-
-/**
- * A9: Fetch /features and render the rail. Called once post-auth from
- * startApplication, so the rail never shows stale "Turn on" badges.
- */
-async function loadRailFeatures() {
-  const container = document.getElementById('railNav');
-  if (!container) return;
-  try {
-    const { apiFetch } = await import('./shared/http.js');
-    const data = await (await apiFetch('/features')).json();
-    renderRail(container, data.features || {});
-  } catch {
-    renderRail(container, {});
-  }
-}
 
 function initGlobalListeners() {
   // Keyboard shortcuts.
@@ -301,7 +266,7 @@ function initGlobalListeners() {
       : `<i class="fa-solid fa-chevron-down"></i> Show details`;
   });
 
-  // (Footer Settings button removed in Phase 8 B1 — rail Settings is the single entry.)
+  // (Footer Settings button removed in Phase 8 B1 — the tab bar Settings tab is the single entry.)
 
 }
 
@@ -379,13 +344,13 @@ export async function startApplication() {
   setupGlobalNamespace();
 
   // Load providers and models from backend.
-  // Shell first: the rail and the command palette must never wait on
-  // provider/model probing — without Ollama, /models burns ~13s on
+  // Shell first: the tab bar and the command palette must never wait
+  // on provider/model probing — without Ollama, /models burns ~13s on
   // auto-start retries, and awaiting it first left the whole shell
-  // (rail, palette) unrendered while the app looked booted. The rail
-  // needs only /features and the palette reads models lazily at open.
+  // (tab bar, palette) unrendered while the app looked booted. The
+  // tab bar renders in initTabs() and the palette reads models lazily
+  // at open, so neither waits on the probe.
   try {
-    await loadRailFeatures();
     // Command palette (Ctrl+K / Ctrl+P) — also shell, also independent
     // of providers; init early so it works during the model probe.
     import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
@@ -451,7 +416,6 @@ async function init() {
   initSidebar();
   initGlobalListeners();
   initTabs();
-  initRail();
   initPopovers();
   initInspector();
   // A1: the 8 destinations, each a real page (shell/destinations.js).

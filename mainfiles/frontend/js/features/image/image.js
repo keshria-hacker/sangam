@@ -21,7 +21,7 @@ export function isImageGenEnabled() {
 }
 
 export async function initImage() {
-  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
+  // Navigation via the tab bar — no per-button wiring needed.
   const studioBtn = document.getElementById('imagesBtn');
   if (studioBtn && !studioBtn.dataset.wired) {
     studioBtn.dataset.wired = '1';

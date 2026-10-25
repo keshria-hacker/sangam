@@ -132,7 +132,7 @@ test.describe('Smoke (required gate)', () => {
     expect(missing, `undefined CSS vars (no fallback): ${missing.join(', ')}`).toEqual([]);
   });
 
-  test('full pass: register, rail, popovers, settings, chat, knowledge', async ({ page }) => {
+  test('full pass: register, tab bar, popovers, settings, chat, knowledge', async ({ page }) => {
     const ctx: Ctx = { badResponses: [], consoleErrors: [], pageErrors: [], loggedIn: false };
     attachGuards(page, ctx);
     test.setTimeout(180000);
@@ -142,12 +142,15 @@ test.describe('Smoke (required gate)', () => {
     assertClean(ctx, 'register');
     await assertNoBadText(page, 'post-register');
 
-    // 2. Perfect-flow A1: the sidebar rail IS the map of the app — the
-    // 8 destinations (Chat, Projects, Studio, Code, Research, Agents,
-    // Library, Settings). The old "chat-focused, zero rail items"
-    // assertion predates the IA swap and contradicts the shell spec.
-    await expect(page.locator('#sidebar')).toBeVisible();
-    expect(await page.locator('.rail-item[data-nav]').count()).toBe(8);
+    // 2. Tabs-on-top (2026-10-25 user correction): the tab bar IS the
+    // map of the app — the 8 destinations (Chat, Projects, Studio,
+    // Code, Research, Agents, Library, Settings) as tabs, Chat pinned
+    // first. No sidebar, no sidebar destination buttons.
+    await expect(page.locator('#tabBar')).toBeVisible();
+    expect(await page.locator('.tab-item[data-tab]').count()).toBe(8);
+    await expect(page.locator('#sidebar')).toHaveCount(0);
+    await expect(page.locator('.rail-item')).toHaveCount(0);
+    await expect(page.locator('.tab-item[data-tab="chat"] [data-tab-close]')).toHaveCount(0);
 
     // 3. Composer popovers (back on chat view) — B4: Temp/Tokens pills deleted,
     // Tune is the single owner. Popovers: Mode, Tools, Tune.
@@ -216,22 +219,22 @@ test.describe('Smoke (required gate)', () => {
     assertClean(ctx, 'final');
   });
 
-  test('mobile 390px: rail reachable via menu button', async ({ page }) => {
+  test('mobile 390px: tab bar is the only navigation, no drawer', async ({ page }) => {
     const ctx: Ctx = { badResponses: [], consoleErrors: [], pageErrors: [], loggedIn: false };
     attachGuards(page, ctx);
     await page.setViewportSize({ width: 390, height: 844 });
     await register(page, ctx);
-    const menuBtn = page.locator('#mobileSidebarToggle');
-    await expect(menuBtn, 'mobile menu button not visible at 390px').toBeVisible({ timeout: 10000 });
-    await menuBtn.click();
-    await page.waitForTimeout(800);
-    const railVisible = await page.evaluate(() => {
-      const rail = document.querySelector('#sidebar, .rail, nav');
-      if (!rail) return false;
-      const r = rail.getBoundingClientRect();
-      return r.width > 0 && r.left < 390;
-    });
-    expect(railVisible, 'rail did not open from mobile menu').toBe(true);
+    // Tabs-on-top: no menu button, no sidebar drawer on mobile — the
+    // tab bar itself navigates, scrolling horizontally if needed.
+    await expect(page.locator('#mobileSidebarToggle')).toHaveCount(0);
+    await expect(page.locator('#sidebar')).toHaveCount(0);
+    await expect(page.locator('#tabBar')).toBeVisible();
+    await page.locator('[data-nav="agents"]').click();
+    await page.waitForTimeout(1200);
+    await expect(page.locator('#toolViewBody'), 'agents destination did not render on mobile').toBeVisible();
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, 'page scrolls horizontally on mobile').toBeLessThanOrEqual(1);
     await page.screenshot({ path: 'tests/e2e/screenshots/smoke-mobile.png' });
     assertClean(ctx, 'mobile');
     await assertNoBadText(page, 'mobile');
