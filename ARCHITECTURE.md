@@ -1205,6 +1205,21 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/code-graph/search-v2` | Yes | Grep + graph search (perfect-flow A5) |
 | GET | `/api/deploy/connectors` | Yes | Deploy connectors status, deferred (perfect-flow A5) |
 | GET | `/api/deploy/permissions` | Yes | Deploy permission matrix (perfect-flow A5) |
+| GET | `/api/providers/capability-registry` | Yes | Per-model capability registry (perfect-flow A6) |
+| GET | `/api/providers/contract-check` | Yes | Adapter contract check (perfect-flow A6) |
+| POST | `/api/providers/preflight` | Yes | Model capability pre-flight warnings (perfect-flow A6) |
+| POST | `/api/providers/cost-ranked` | Yes | Cost-ranked routing (perfect-flow A6) |
+| GET | `/api/studio/catalog` | Yes | Studio catalogue + engine status (perfect-flow A6) |
+| POST | `/api/studio/documents/proof` | Yes | Document proof: generate + parse back (perfect-flow A6) |
+| POST | `/api/diagrams/export` | Yes | Node/edge spec to SVG/HTML (perfect-flow A6) |
+| POST | `/api/studio/classroom/generate` | Yes | Classroom slides + quiz + HTML + PBL (perfect-flow A6) |
+| GET | `/api/marketplace/sources` | Yes | Marketplace sources, registry labelled stub (perfect-flow A6) |
+| POST | `/api/marketplace/packs/{pack}/dry-run` | Yes | Pack dry-run preview (perfect-flow A6) |
+| POST | `/api/marketplace/packs/{pack}/install` | Yes | Hash-verified pack install (perfect-flow A6) |
+| GET | `/api/connectors/{name}/health` | Yes | Connector health, no token value (perfect-flow A6) |
+| GET | `/api/connectors/{name}/permissions` | Yes | Connector permissions (perfect-flow A6) |
+| POST | `/api/compare/blind` | Yes | Blind model comparison (perfect-flow A6) |
+| POST | `/api/compare/blind/vote` | Yes | Blind vote into leaderboard (perfect-flow A6) |
 | GET | `/api/security/allowlist` | Yes | List target allowlist (Batch 2) |
 | POST | `/api/security/allowlist` | Yes | Add allowlist target (Batch 2) |
 | DELETE | `/api/security/allowlist/{target_id}` | Yes | Remove allowlist target (Batch 2) |
