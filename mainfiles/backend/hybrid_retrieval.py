@@ -182,7 +182,16 @@ def rerank(
 
 
 def make_citation(candidate: dict[str, Any]) -> dict[str, Any]:
-    """Provenance for one retrieved chunk: what to cite, where it came from."""
+    """Provenance for one retrieved chunk: what to cite, where it came from.
+
+    ``provenance`` is ``verified`` for every chunk here: the chunk is
+    grounded in a stored document (vector and/or BM25 match against
+    its own text), not generated or guessed. The ``inferred`` label
+    is reserved for signals that are NOT a stored chunk — graph
+    keyword-links and web-search fallbacks, which label themselves
+    in their own routes — so a reader can tell grounded citations
+    from heuristic ones at a glance.
+    """
     text = candidate.get("text", "") or ""
     return {
         "file_id": candidate.get("file_id", ""),
@@ -190,6 +199,7 @@ def make_citation(candidate: dict[str, Any]) -> dict[str, Any]:
         "chunk_index": candidate.get("chunk_index"),
         "excerpt": text[:200],
         "source": candidate.get("source", "vector"),
+        "provenance": "verified",
     }
 
 

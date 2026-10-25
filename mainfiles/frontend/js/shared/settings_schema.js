@@ -72,6 +72,18 @@ export const SETTINGS_SCHEMA = [
   // ---- Knowledge & Memory ----
   { key: 'memoryAutoExtract', label: 'Auto-extract memories', description: 'Save important facts from conversations.', type: 'boolean',
     default: true, category: 'knowledge' },
+  // A3 (perfect-flow Projects, Memory & Knowledge): retention and
+  // project-scope controls are user-visible settings, not .env-only.
+  // memoryRetentionDays is advisory (0 = keep forever): the privacy
+  // dashboard previews and runs the forget; nothing auto-deletes
+  // without the user confirming there.
+  { key: 'memoryRetentionDays', label: 'Memory retention (days)', description: 'Dashboard forget preview uses this many days by default. 0 = keep memories forever; nothing is auto-deleted.', type: 'number',
+    default: 0, min: 0, max: 3650, category: 'knowledge' },
+  { key: 'projectMemoryScope', label: 'Default project memory scope', description: 'New projects retrieve only their own sources (project) or all uploads (global). Per-project override on the project itself.', type: 'select',
+    options: [{ v: 'project', l: 'Project only' }, { v: 'global', l: 'Global' }],
+    default: 'project', category: 'knowledge' },
+  { key: 'projectContextTopK', label: 'Project retrieval results', description: 'How many chunks project-scoped retrieval returns.', type: 'number',
+    default: 5, min: 1, max: 20, category: 'knowledge' },
 
   // ---- Research ----
   { key: 'webSearchEnabled', label: 'Web search', description: 'Allow current web results to be added to research and chat responses.', type: 'boolean',

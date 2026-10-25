@@ -23,6 +23,11 @@ class Chat(Base):
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     title: Mapped[str] = mapped_column(String(255), default="New chat")
     model: Mapped[str] = mapped_column(String(64), default="")
+    # A3 (perfect-flow Projects): project scoping for chats. NULL =
+    # unscoped (legacy / global chat). Project chats are listed from
+    # the project home; the column is nullable so existing rows and
+    # the global chat path are untouched.
+    project_id: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
     # Phase 5: rolling conversation summary + topics for cross-session memory.
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     key_topics: Mapped[str | None] = mapped_column(String(500), nullable=True)  # comma-separated

@@ -28,7 +28,7 @@ from ..memory import (
 )
 from ..models import Chat, Message, UploadedFile, UserPreference
 from ..rag import TOP_K as RAG_TOP_K
-from ..rag import retrieve_relevant_chunks
+from ..rag import retrieve_hybrid_chunks
 from ..response_events import (
     ResponseEventBuilder,
     ResponseEventType,
@@ -180,15 +180,19 @@ async def chat_stream(  # noqa: PLR0912
         await db.refresh(chat)
 
     # 2. Fold any attached files into the latest user message.
-    #    Uses RAG retrieval when possible (top-k similar chunks); falls back
-    #    to the full extracted text stored in the database on any error.
+    #    Uses hybrid retrieval (vector + BM25, RRF) when possible;
+    #    falls back to the full extracted text stored in the database
+    #    on any error or empty result. (A3: the last vector-only
+    #    chat path — notebooks and /knowledge/retrieve already used
+    #    hybrid; hybrid results carry the same text/filename/file_id
+    #    keys this block consumes, plus provenance-labelled citations.)
     messages = [m.model_dump() for m in payload.messages]
     if payload.file_ids:
         result = await db.execute(select(UploadedFile).where(UploadedFile.id.in_(payload.file_ids)))
         files = result.scalars().all()
         if files and messages:
             last_user_msg = messages[-1]["content"]
-            rag_chunks = retrieve_relevant_chunks(last_user_msg, payload.file_ids, top_k=RAG_TOP_K)
+            rag_chunks = retrieve_hybrid_chunks(last_user_msg, payload.file_ids, top_k=RAG_TOP_K)
             if rag_chunks:
                 file_context = "\n\n".join(
                     f"--- From {c['filename']} ---\n{c['text']}" for c in rag_chunks

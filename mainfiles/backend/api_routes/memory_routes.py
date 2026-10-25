@@ -166,6 +166,94 @@ async def forget_memories(payload: MemoryForgetIn):
     return {"deleted": len(deleted), "ids": deleted}
 
 
+@router.get("/memory/dashboard")
+async def get_memory_dashboard(older_than_days: int | None = None):
+    """Privacy dashboard data: exactly what is stored, in one call.
+
+    Persistent memories (Chroma, via the memory service) are listed
+    separately from conversation context (chat messages in SQL):
+    deleting a chat removes its messages but does NOT delete
+    memories extracted from it — those live here and are removed
+    only via per-memory DELETE /memory/{id} or POST /memory/forget.
+    ``older_than_days`` (optional) previews how many stored
+    memories are older than that many days, so the retention
+    control in the UI can show the effect before the user confirms
+    a forget. Retention itself runs through the existing
+    POST /memory/forget (confirm + filter required) — no second
+    deletion path, and no .env-only retention knob: the dashboard
+    is the control surface.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func, select
+
+    from ..database import get_db as _get_db  # local import: no cycle
+    from ..models import Chat as _Chat, Message as _Message
+
+    stats = await memory_stats()
+    records = await list_memories(limit=10000)
+    rooms: dict[str, dict[str, int]] = {}
+    for r in records:
+        room = r.room or "default"
+        drawer = r.drawer or "general"
+        rooms.setdefault(room, {})[drawer] = rooms.get(room, {}).get(drawer, 0) + 1
+    older_count = None
+    if older_than_days is not None and older_than_days >= 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        older_count = 0
+        for r in records:
+            created = r.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if created < cutoff:
+                older_count += 1
+    # Conversation-context counts come from the live DB session.
+    # The route is mounted on the authenticated router, and this
+    # endpoint resolves its own session via the get_db generator.
+    chat_count = 0
+    message_count = 0
+    gen = _get_db()
+    try:
+        db = await gen.__anext__()
+        chat_count = (await db.execute(
+            select(func.count()).select_from(_Chat))).scalar() or 0
+        message_count = (await db.execute(
+            select(func.count()).select_from(_Message))).scalar() or 0
+    except Exception:
+        pass
+    finally:
+        try:
+            await gen.aclose()
+        except Exception:
+            pass
+    return {
+        "stats": stats,
+        "total_memories": len(records),
+        "rooms": [{"name": room, "drawers": [
+            {"name": d, "count": c} for d, c in sorted(drawers.items())],
+            "total": sum(drawers.values())}
+            for room, drawers in sorted(rooms.items())],
+        "memories": [MemoryOut.from_record(r) for r in records[:200]],
+        "retention_preview": ({"older_than_days": older_than_days,
+                               "would_forget": older_count}
+                              if older_count is not None else None),
+        "separation": {
+            "conversation_context": {
+                "stored_as": "chat messages in the SQL database",
+                "chat_count": chat_count,
+                "message_count": message_count,
+                "deleted_when": "its chat is deleted",
+            },
+            "persistent_memory": {
+                "stored_as": "typed memories in the memory store",
+                "memory_count": len(records),
+                "deleted_when": "only via this dashboard (per-memory delete or bulk forget)",
+                "note": "Deleting a chat does not delete memories extracted from it.",
+            },
+        },
+    }
+
+
 @router.get("/memory/stats")
 async def get_memory_stats():
     """Totals by kind for the settings UI."""

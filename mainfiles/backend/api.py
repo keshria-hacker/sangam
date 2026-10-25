@@ -256,6 +256,31 @@ from .api_routes import devices_routes  # noqa: F401
 from .api_routes import code_graph_routes  # noqa: F401
 from .api_routes import deep_routes  # noqa: F401
 from .api_routes import goals_routes  # noqa: F401
+# A3 (perfect-flow Projects, Memory & Knowledge): one import+register
+# block for the projects module — all other A3 changes live in their
+# own modules (knowledge_routes, notebooks_routes, memory_routes,
+# chat_stream_routes, hybrid_retrieval, knowledge_graph, models,
+# goal_models, database) and need no api.py touch.
+from .api_routes.projects_routes import (  # noqa: F401
+    add_project_instruction,
+    add_project_source,
+    create_project,
+    create_project_chat,
+    create_project_task,
+    delete_project,
+    delete_project_source,
+    get_project,
+    get_project_context,
+    list_project_chats,
+    list_project_instructions,
+    list_project_sources,
+    list_project_tasks,
+    list_projects,
+    retrieve_project,
+    set_project_source_context,
+    update_project,
+    update_project_task,
+)
 # Doctor lives in its own module with its own router; include it on the
 # shared router so it is served (and authenticated) like /system/*.
 from .doctor import router as _doctor_router
