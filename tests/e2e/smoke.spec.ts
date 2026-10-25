@@ -142,10 +142,12 @@ test.describe('Smoke (required gate)', () => {
     assertClean(ctx, 'register');
     await assertNoBadText(page, 'post-register');
 
-    // 2. The current sidebar is intentionally chat-focused. Tool views are
-    // opened from tabs, the profile menu, or the command palette.
+    // 2. Perfect-flow A1: the sidebar rail IS the map of the app — the
+    // 8 destinations (Chat, Projects, Studio, Code, Research, Agents,
+    // Library, Settings). The old "chat-focused, zero rail items"
+    // assertion predates the IA swap and contradicts the shell spec.
     await expect(page.locator('#sidebar')).toBeVisible();
-    expect(await page.locator('.rail-item[data-nav]').count()).toBe(0);
+    expect(await page.locator('.rail-item[data-nav]').count()).toBe(8);
 
     // 3. Composer popovers (back on chat view) — B4: Temp/Tokens pills deleted,
     // Tune is the single owner. Popovers: Mode, Tools, Tune.
@@ -169,7 +171,12 @@ test.describe('Smoke (required gate)', () => {
     await page.waitForTimeout(1200);
     assertClean(ctx, 'settings');
     await assertNoBadText(page, 'settings');
-    await expect(page.getByText('Research & Web')).toBeVisible();
+    // Settings control center (A1): searchable, sectioned. The old
+    // 'Research & Web' section label no longer exists anywhere in the
+    // frontend — research/web settings live under Tools and
+    // Chat & Responses now. Assert the control center itself rendered.
+    await expect(page.locator('#spSearchInput')).toBeVisible();
+    await expect(page.locator('.sp-cat[data-cat="models"]')).toBeVisible();
     await page.screenshot({ path: 'tests/e2e/screenshots/smoke-settings.png' });
 
     // 5. Send one chat message against the mock model

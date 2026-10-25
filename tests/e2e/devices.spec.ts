@@ -86,8 +86,10 @@ test('Devices: section renders, pairing QR + code, approve/claim/revoke', async 
   await register(page);
 
   await page.locator('[data-nav="settings"]').click();
-  await expect(page.locator('.sp-cat[data-cat="devices"]')).toBeVisible({ timeout: 20000 });
-  await page.locator('.sp-cat[data-cat="devices"]').click();
+  // No standalone Devices category: LAN pairing lives in the Security
+  // category (settings_schema.js legacy map: devices -> security).
+  await expect(page.locator('.sp-cat[data-cat="security"]')).toBeVisible({ timeout: 20000 });
+  await page.locator('.sp-cat[data-cat="security"]').click();
   await expect(page.locator('[data-devices-section]')).toBeVisible({ timeout: 20000 });
   await expect(page.locator('[data-key="LAN_ENABLED"]')).toBeVisible();
   await expect(page.getByText('What this protects')).toBeVisible();
@@ -101,8 +103,9 @@ test('Devices: section renders, pairing QR + code, approve/claim/revoke', async 
   await page.locator('[data-key="LAN_ENABLED"] label.switch').click();
   await putPromise;
 
-  // Re-open the Devices section so it re-reads the toggled setting.
-  await page.locator('.sp-cat[data-cat="devices"]').click();
+  // Re-open the Security category (which hosts the Devices section) so
+  // it re-reads the toggled setting.
+  await page.locator('.sp-cat[data-cat="security"]').click();
   await expect(page.locator('[data-devices-pair]')).toBeVisible({ timeout: 20000 });
 
   await page.locator('[data-devices-pair]').click();

@@ -175,6 +175,13 @@ export function navigate(dest, { param = null, section = null, push = true } = {
     detail: { dest, param, section },
   }));
 
+  // Mobile: navigating closes the drawer, otherwise the off-canvas
+  // sidebar keeps covering the destination just opened (same rule as
+  // chat-history clicks in sidebar.js). No-op on desktop: the class
+  // only affects the <=900px layout.
+  document.getElementById('sidebar')?.classList.remove('mobile-open');
+  document.getElementById('sidebarScrim')?.classList.remove('show');
+
   if (dest === 'chat') {
     $('#toolView')?.classList.add('hidden');
     $('#chatView')?.classList.remove('hidden');

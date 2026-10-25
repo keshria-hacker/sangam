@@ -47,6 +47,11 @@ function attachGuards(page: Page) {
 }
 
 async function register(page: Page) {
+  // Fresh login state per test: ctx is module-shared, and without this
+  // reset the pre-login /analytics/summary 401 (usage meter, expected
+  // before auth) from a later test would be mis-flagged as post-login
+  // (same latent bug fixed in runs.spec.ts).
+  ctx.loggedIn = false;
   const api = page.request;
   let resp = await api.post(`${BACKEND_URL}/api/auth/register`, {
     data: { username: USER, password: PASS },
@@ -95,11 +100,14 @@ test('Diagrams: catalogue -> flowchart template -> lint -> export buttons', asyn
 
   await page.locator('[data-createsub="diagrams"]').click();
   await expect(page.locator('.diagrams-section')).toBeVisible({ timeout: 20000 });
-  await expect(page.getByRole('button', { name: 'Flowchart' })).toBeVisible();
+  // Exact catalogue entry: the 44-type catalogue also has "Pyramid /
+  // Funnel / Venn (flowchart starter)" buttons, so a substring name
+  // match is ambiguous in strict mode. data-diag-type is exact.
+  await expect(page.locator('button[data-diag-type="flowchart"]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export SVG' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Flowchart' }).click();
+  await page.locator('button[data-diag-type="flowchart"]').click();
   await expect(page.locator('[data-diag-editor]')).toHaveValue(/flowchart/);
 
   await page.getByRole('button', { name: 'Run lint' }).click();

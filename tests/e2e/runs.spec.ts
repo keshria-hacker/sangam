@@ -46,6 +46,10 @@ function attachGuards(page: Page) {
 }
 
 async function register(page: Page) {
+  // Fresh login state per test: ctx is module-shared, and without this
+  // reset the pre-login /analytics/summary 401 (usage meter, expected
+  // before auth) from a later test would be mis-flagged as post-login.
+  ctx.loggedIn = false;
   const api = page.request;
   let resp = await api.post(`${BACKEND_URL}/api/auth/register`, {
     data: { username: USER, password: PASS },
@@ -130,6 +134,10 @@ test('Runs centre: mobile 390px, no composer Runs button (perfect-flow A2)', asy
   // composer must offer Auto mode instead, and run history lives in
   // Agents → Run History (A1 new IA).
   await expect(page.locator('#runsBtn')).toHaveCount(0);
+  // Mobile: the rail lives in the off-canvas drawer below 900px, so a
+  // real phone user opens the menu first, then taps the destination.
+  await page.locator('#mobileSidebarToggle').click();
+  await page.waitForTimeout(500);
   await page.locator('[data-nav="agents"]').click();
   await page.waitForTimeout(2000);
   await page.locator('[data-dest-section="run-history"]').click();
