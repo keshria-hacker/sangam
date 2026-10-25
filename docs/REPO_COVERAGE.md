@@ -322,3 +322,57 @@ this batch, including the 5 the earlier deep-read brief could not read
 - Health-action catalogue entries are declarations (risk + undo text); `verify_backup` and `prune_runs` are not executed by any Batch 12 endpoint — execution stays with the existing system routes.
 - Frontend Dev & QA section is module-link-checked (65/65 modules), not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
 - Docker isolation, real-driver browser runs, and physical phone QR scan remain unverified live, as before.
+
+### Batch 13 — Writing / Quality / Council / Code-Graph / Model-Fit (2026-10-26, branch integration/full-program)
+
+One writing-quality pipeline, one council/debate mode, one code-graph
+evidence layer, one fit+routing surface — all landed in the existing
+7 destinations, primarily Chat. No new destination, no perfect-flow /
+tabs-on-top restoration, no Batch 1–4 files touched, `writing_lint.py`
+untouched (Batch 12's Harper rules already cover it — verified, not
+duplicated). Backend: `response_quality/structure.py` (detect-only
+structural patterns), `eval.py` (no-ai-slop eval checklist as code),
+`humanizer.py` (natural rewrite), `adhd.py` pre-send check +
+state restatement; `council_mode.py` panels/Chairman/re-prompts;
+`teams/debate.py` ledger/branches/closing report; `code_graph.py`
+Python `extends` edges; `code_graph_queries.py` BM25/IDF + test
+de-rank + evidence + orphans + impact + explain-change + layering;
+`model_fit.py` weighted scores + bandwidth estimate + measured
+override; `providers/fallback_chain.py` named strategies + session
+pinning. Routes extend existing modules only: `/quality/check`,
+`/quality/humanize`, `/quality/report`, preview `structure`+`eval`;
+`/models/route`; council `profile/members/chairman` fields;
+`/code-graph/impact`, `/code-graph/orphans`,
+`/code-graph/explain-change`, `/teams/debate/scenarios`,
+`/teams/debate/jobs/{id}/report`. Frontend (Chat): per-message
+"Check writing" / "Natural rewrite" buttons with inline panels
+(nothing auto-applied), Council composer mode + `/council` slash
+command (verdict + tally + minority report + ledger id rendered
+and persisted as a chat turn), stale ADHD settings copy fixed.
+Settings keeps the toggles as the single place for defaults.
+Library gains the original Sangam-authored `smallest-change-review`
+skill (taste-quality pack). All 11 brief repos below were verified
+against the tree first; genuinely-missing depth only.
+
+| # | Repo | Status | Evidence |
+|---|------|--------|----------|
+| 1 | ayghri/i-have-adhd | Done (Chat-wired) | `pre_send_check()` (first-line action, last-line next step, tangent count, list runs over 5) + `restate_state()` (step x of y, clamped) + per-message report in Chat; prompt block was already chat-wired, post-hoc transform unchanged. Stale settings copy fixed (no longer claims "not yet wired into chat") |
+| 2 | petergyang/no-ai-slop | Done (Chat-wired) | `structure.py`: binary-contrast, colon-reveal, faux-insight, importance-puffery, weasel-attribution, recap/kicker endings, formatting slop, em-dash clusters, robotic rhythm — detect-only (pattern + line + quote + fix, never rewrite); `eval.py` checklist (numbers preserved, no new sentences, length bounded, change list matches, no opener left, no slop left); `POST /quality/preview` gains `structure` + `eval` |
+| 3 | 0xNyk/council-of-high-intelligence | Done (Chat-wired) | Panel selection (`classic` / `exploration-orthogonal` / `execution-lean` / duo pairs / manual members), domain-seat locking before analysis, restate gate, distinct Chairman synthesis step (opt-in), enforcement re-prompts (dissent quota, novelty, missing stance — max one per member), session metadata, verdict-specific kill criteria (replaces generic "See verdict text"). Tally arithmetic untouched and still exact. Chat: Council composer mode + `/council` renders verdict + tally + minority report + ledger id |
+| 4 | trailhq/Graft | Done | BM25 (k1=1.2, b=0.75) + IDF over symbol text + test-path de-rank 0.35x in `find_code()`; `extends` edges for Python classes (unique resolution only, ambiguous dropped + counted). NOT built: concept/module layer and ask-index sidecar cache — symbol bodies are not stored (only body_hash), so a body-text index and a concept layer would need a new store; recorded as future work, not claimed |
+| 5 | garrytan/gstack | Partial (checklists, not engine) | Design-QA checklist and shared-code dedup finder are NOT separate engines; their portable discipline lands as: Ponytail-shaped `/quality/check` findings and code-graph `orphans` (dead-code candidates) + `layering_check` (caller-supplied layer order). gstack's `deslop-shared-libs` (code dedup) is kept distinct from prose de-slopping in naming and docs |
+| 6 | DietrichGebert/ponytail | Done (report shape + Library skill) | Ponytail report contract in `/quality/check` (ranked must-fix first, concrete case + fix + if-skipped, not-checked/risks footer) and original Sangam-authored `smallest-change-review` SKILL.md in the taste-quality pack (reuse-first order, no case no finding, footer convention). The Claude-Code "band" cost/reuse meter is NOT ported (harness-dependent) |
+| 7 | 666ghj/MiroFish | Native equivalent (capped, never the swarm) | `position_ledger()` (per-persona statements side by side, contradiction judged by the reader, never keyword-inferred), `scenario_branches()` (1–3 injected variables, over-cap refused), `closing_report()` (ledger + quoted disagreements + what-would-change-it) + `/teams/debate/scenarios` and `/teams/debate/jobs/{id}/report`. OASIS/Zep thousand-agent simulation explicitly NOT built |
+| 8 | AlexsJones/llmfit | Done | Per-use-case weights (chat/general 0.45/0.30/0.15/0.10, code 0.50/0.20/0.15/0.15, reasoning 0.55/0.15/0.15/0.15) shown in every row, weighted scores, bandwidth roofline speed estimate (labelled estimated, 50 GB/s DDR default), measured-benchmark override (plausible ≤10000 tok/s replaces the estimate and is marked measured; implausible ignored with a note), MoE total-vs-active note, AWQ/GPTQ kernel-fallback flag, estimation-cap honesty note. Role-rubric routing matrix NOT built (would need real rubric runs, not invented scores) |
+| 9 | diegosouzapw/OmniRoute | Done (strategy layer, not gateway) | `POST /models/route` + `fallback_chain.choose_provider()` / `choose()`: priority, cost-optimized, headroom, quota-weighted, round-robin, fail-closed (never falls back to a billable provider), each returning reasons; session pinning (`pin_session` / pinned-first in `execute_with_fallback`, failure falls through). The 375-provider gateway itself, quota-share pooling, and token compression are NOT built |
+| 10 | morluto/rea | Done (evidence discipline only) | Every code-graph answer gains an `evidence` block: sources (file:line + body_hash), dropped ambiguous/unresolved/extends counts, skipped dirs, file-cap flag, freshness pointer to `/knowledge/graph/check`. Binary/JS-app reverse engineering and disassembly are NOT ported (out of scope by the standing guardrails; only the user's own workspace code is graphed) |
+| 11 | AhmadHassan-BTed/Turnitout-Humanizer | Done as natural rewrite ONLY; evasion EXCLUDED | `POST /quality/humanize` + per-message "Natural rewrite" button: slop removal, filler deletion, >45-word sentence splits — labelled readability only. No AI-detection evasion, no detector-bypass guarantee, no authorship concealment, no invisible-character handling, no auto-citation fabrication — stated in code, UI panel, route response note, and here. The upstream repo's detector-defeating purpose is explicitly not ported |
+
+### Batch 13 honest limits
+- Council Chat mode needs a configured model (same as normal chat); the deliberate route itself was unit-tested with fake completers, not live-hit with a real model here (no model is running in this environment).
+- Code-graph BM25 runs over symbol text (name/qualname/signature/file), not full function bodies — bodies are not stored, only body_hash — so length normalisation applies to symbol text, not body length. Stated in the module header.
+- `extends` edges cover Python classes only; the JS scanner does not record class bases.
+- Fit speed estimates use a conservative DDR bandwidth default unless the caller supplies one; measured override only applies where a stored local benchmark exists for that exact catalogue id.
+- Routing strategies score on chain state (circuit + quota); cost/latency inputs are caller-supplied or absent (absent cost falls back to priority and says so) — there is no live provider cost/latency feed.
+- Frontend Chat wiring is module-link-checked (65/65 modules), not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
+- Physical phone QR scan, real-LAN/mDNS, Docker isolation and real-driver browser runs remain unverified live, as before.

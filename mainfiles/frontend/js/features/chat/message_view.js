@@ -467,6 +467,8 @@ export function buildMessageNode(msg) {
         <button class="msg-action-btn save-msg-btn" aria-label="Save answer as a file"><i class="fa-regular fa-bookmark" aria-hidden="true"></i> Save</button>
         <button class="msg-action-btn workflow-msg-btn" aria-label="Turn this chat into a workflow"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Workflow</button>
         <button class="msg-action-btn inspect-msg-btn" aria-label="Inspect this message's evidence"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Inspect</button>
+        <button class="msg-action-btn quality-msg-btn" aria-label="Check this message's writing quality"><i class="fa-solid fa-spell-check" aria-hidden="true"></i> Check writing</button>
+        <button class="msg-action-btn humanize-msg-btn" aria-label="Rewrite this message in plainer, more natural phrasing"><i class="fa-solid fa-pen" aria-hidden="true"></i> Natural rewrite</button>
         ${window.__sangamVoice ? '<button class="msg-action-btn speak-msg-btn" aria-label="Read aloud"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Speak</button>' : ''}
         <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
         <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
@@ -578,6 +580,86 @@ export function buildMessageNode(msg) {
       });
     }).catch(() => {});
   }
+
+  // Check writing + Natural rewrite (Batch 13 writing-quality, Chat-wired):
+  // per-message actions that call /quality/report and /quality/humanize
+  // and render the result INLINE under the message. Nothing is ever
+  // auto-applied: Check only reports, and Rewrite shows the rewritten
+  // text in a panel with its own Copy button — the original message
+  // stays untouched until the user copies or saves the rewrite.
+  // The rewrite panel states plainly that it improves readability
+  // and does not evade AI detectors.
+  function qualityPanel() {
+    let panel = node.querySelector('.msg-quality-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'msg-quality-panel';
+      const actions = node.querySelector('.msg-actions');
+      (actions ? actions.parentNode : node).insertBefore(panel, actions ? actions.nextSibling : null);
+    }
+    return panel;
+  }
+  const checkBtn = node.querySelector('.quality-msg-btn');
+  checkBtn?.addEventListener('click', async () => {
+    if (checkBtn.disabled) return;
+    checkBtn.disabled = true;
+    const panel = qualityPanel();
+    panel.innerHTML = '<p>Checking writing…</p>';
+    try {
+      const res = await apiFetch('/quality/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: msg.content || '' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Quality check failed (${res.status})`);
+      const r = data.readability || {};
+      const pre = data.adhd_pre_send_check || {};
+      const fmt = (hits) => (hits || []).map((h) => `<li>${escapeHtml(h.pattern || h.rule || '')} (line ${h.line}): “${escapeHtml(h.quote || '')}” — ${escapeHtml(h.fix || h.suggestion || '')}</li>`).join('');
+      panel.innerHTML = `<div class="quality-report"><p><strong>Writing check:</strong> ${escapeHtml(data.summary || '')}</p>`
+        + `<p>Readability (rough figures, not a grade): ${r.words ?? 0} words, ${r.sentences ?? 0} sentences, avg ${r.avg_sentence_words ?? 0} words/sentence, ${r.long_sentences ?? 0} long sentences. ${escapeHtml(r.note || '')}</p>`
+        + (pre.issues?.length ? `<p>ADHD pre-send check: ${escapeHtml(pre.issues.join('; '))}</p>` : '<p>ADHD pre-send check: first line is an action and last line is a next step.</p>')
+        + (data.slop?.length ? `<p>Slop hits:</p><ul>${fmt(data.slop)}</ul>` : '')
+        + (data.structure?.length ? `<p>Structural patterns:</p><ul>${fmt(data.structure)}</ul>` : '')
+        + `<p>Full ranked findings with fixes: use Check in Settings → Quality, or POST /quality/check. This panel never rewrites your message.</p></div>`;
+    } catch (err) {
+      panel.innerHTML = `<p>Quality check failed: ${escapeHtml(err?.message || String(err))}</p>`;
+    } finally {
+      checkBtn.disabled = false;
+    }
+  });
+  const rewriteBtn = node.querySelector('.humanize-msg-btn');
+  rewriteBtn?.addEventListener('click', async () => {
+    if (rewriteBtn.disabled) return;
+    rewriteBtn.disabled = true;
+    const panel = qualityPanel();
+    panel.innerHTML = '<p>Rewriting for readability…</p>';
+    try {
+      const res = await apiFetch('/quality/humanize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: msg.content || '' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Rewrite failed (${res.status})`);
+      const changes = (data.changes || []).map((c) => `<li>${escapeHtml(c.pattern)}: “${escapeHtml(c.before)}” → “${escapeHtml(c.after)}”</li>`).join('');
+      panel.innerHTML = `<div class="quality-rewrite"><p><strong>Natural rewrite (readability only):</strong></p>`
+        + `<article class="assistant-response">${renderMarkdown(data.rewritten || '')}</article>`
+        + `<p>${escapeHtml(data.note || '')}</p>`
+        + (changes ? `<p>What changed:</p><ul>${changes}</ul>` : '<p>No changes: the text was already plain.</p>')
+        + `<button class="msg-action-btn quality-copy-btn" type="button"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy rewrite</button>`
+        + `<p>The original message above is unchanged — copy the rewrite only if you want it.</p></div>`;
+      panel.querySelector('.quality-copy-btn')?.addEventListener('click', () => {
+        navigator.clipboard.writeText(data.rewritten || '').then(() => {
+          showToast({ type: 'success', title: 'Rewrite copied' });
+        }).catch(() => {});
+      });
+    } catch (err) {
+      panel.innerHTML = `<p>Rewrite failed: ${escapeHtml(err?.message || String(err))}</p>`;
+    } finally {
+      rewriteBtn.disabled = false;
+    }
+  });
 
   // Feedback buttons (thumbs up/down) — persisted via the messages API.
   // Clicking the active thumb again clears the feedback (toggle-off undo).

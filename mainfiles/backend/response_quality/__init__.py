@@ -12,8 +12,13 @@ from .adhd import (
     adhd_style_enabled,
     adhd_style_text,
     apply_adhd_style_to_messages,
+    pre_send_check,
+    restate_state,
 )
+from .eval import run_eval
+from .humanizer import HONEST_NOTE, natural_rewrite
 from .slop import detect_slop, remove_slop, remove_slop_with_changes
+from .structure import detect_structure, readability_report
 
 
 def apply_quality(
@@ -52,13 +57,20 @@ def register_quality_extension() -> bool:
 
 
 __all__ = [
+    "HONEST_NOTE",
     "adhd_format",
     "adhd_style_enabled",
     "adhd_style_text",
     "apply_adhd_style_to_messages",
     "apply_quality",
     "detect_slop",
+    "detect_structure",
+    "natural_rewrite",
+    "pre_send_check",
+    "readability_report",
     "register_quality_extension",
     "remove_slop",
     "remove_slop_with_changes",
+    "restate_state",
+    "run_eval",
 ]

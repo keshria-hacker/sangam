@@ -22,6 +22,7 @@ export const MODES = [
   { id: 'research', label: 'Research', icon: 'fa-magnifying-glass',   desc: 'Web research with citations' },
   { id: 'code',     label: 'Code',     icon: 'fa-code',               desc: 'Code agent with file tools' },
   { id: 'image',    label: 'Image',    icon: 'fa-image',              desc: 'Generate images' },
+  { id: 'council',  label: 'Council',  icon: 'fa-users',              desc: 'Panel debate: tally, minority report, ledger entry' },
 ];
 
 let currentMode = 'chat';

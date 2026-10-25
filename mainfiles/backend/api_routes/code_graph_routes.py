@@ -24,17 +24,22 @@ from pathlib import Path
 
 from fastapi import Depends, Query
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 from ..auth import get_current_user
 from ..code_graph import cached_graph, ensure_fresh_graph
 from ..code_graph_queries import (
     affected,
     check_freshness_tool,
+    explain_change,
     export_graph_html,
     export_graph_json,
     file_api,
     find_all,
     find_code,
+    find_orphans,
+    impact_analysis,
+    layering_check,
     repo_map,
     trace_calls,
 )
@@ -171,6 +176,52 @@ async def graph_affected(symbol: str = Query(min_length=1),
     if err:
         return err
     return affected(graph, symbol)
+
+
+@router.get("/code-graph/impact")
+async def graph_impact(symbol: str = Query(min_length=1),
+                       root: str | None = Query(default=None),
+                       user=Depends(get_current_user)):
+    """Cross-file impact analysis for one symbol (callers, files
+    touched, risk note, evidence block)."""
+    graph, warning, err = _graph_or_error(root)
+    if err:
+        return err
+    out = impact_analysis(graph, symbol)
+    out["warning"] = warning
+    return out
+
+
+@router.get("/code-graph/orphans")
+async def graph_orphans(root: str | None = Query(default=None),
+                        user=Depends(get_current_user)):
+    """Dead-code candidates: symbols with no caller, not exported,
+    not a main entry point. Candidates only — nothing is deleted."""
+    graph, warning, err = _graph_or_error(root)
+    if err:
+        return err
+    out = find_orphans(graph)
+    out["warning"] = warning
+    return out
+
+
+class ExplainChangeIn(BaseModel):
+    diff: str
+    root: str | None = None
+
+
+@router.post("/code-graph/explain-change")
+async def graph_explain_change(payload: ExplainChangeIn,
+                               user=Depends(get_current_user)):
+    """Explain a unified diff via the graph: files touched, symbols
+    in those files, and each mentioned symbol's impact. Read-only
+    over the graph; the diff itself is never applied."""
+    graph, warning, err = _graph_or_error(payload.root)
+    if err:
+        return err
+    out = explain_change(graph, payload.diff)
+    out["warning"] = warning
+    return out
 
 
 @router.get("/code-graph/diagram")

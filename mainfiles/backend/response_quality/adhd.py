@@ -140,6 +140,90 @@ def adhd_format(text: str) -> tuple[str, int]:
     return text, changes
 
 
+# ---------------------------------------------------------------- pre-send
+# Batch 13: the pre-send self-check i-have-adhd describes (first line =
+# action, last line = one next step, no tangent sidebar) applied to the
+# GENERATED text, plus per-turn state restatement data. Deterministic
+# heuristics, never a rewrite: a check that fails is reported, not
+# silently "fixed" by reordering the model's words.
+_IMPERATIVES = {
+    "do", "open", "run", "write", "check", "send", "fix", "start",
+    "create", "build", "test", "read", "add", "remove", "update",
+    "install", "copy", "move", "rename", "delete", "try", "use",
+    "follow", "complete", "finish", "pick", "choose", "set",
+}
+
+_TANGENT_MARKERS = re.compile(
+    r"\b(by the way|also note|side note|on a related note|fun fact)\b",
+    re.IGNORECASE,
+)
+
+
+def pre_send_check(text: str) -> dict:
+    """Pre-send self-check on generated text.
+
+    Returns {first_line_is_action, last_line_is_next_step,
+    tangent_count, list_runs_over_5, issues, ok}. ``ok`` means no
+    issue was found; a failed check is evidence for the author, not
+    a verdict that the text is bad — the imperative list is a
+    heuristic, and a good answer can legitimately open with context
+    when the user asked for an explanation."""
+    if not text or not text.strip():
+        return {"first_line_is_action": False, "last_line_is_next_step": False,
+                "tangent_count": 0, "list_runs_over_5": [], "issues": ["empty text"],
+                "ok": False}
+    lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
+    first = lines[0]
+    first_word = re.match(r"[A-Za-z]+", first)
+    first_is_action = bool(
+        first_word and first_word.group(0).lower() in _IMPERATIVES
+    ) or bool(re.match(r"^(\d+[.)]\s+|step\s+\d+|next:\s*)", first, re.IGNORECASE))
+    last = lines[-1]
+    last_is_next = bool(re.search(
+        r"\b(next step|next:|todo|do this (next|now)|start (with|by))\b",
+        last, re.IGNORECASE)) or bool(re.match(r"^(\d+[.)]\s+|step\s+\d+)", last))
+    tangents = len(_TANGENT_MARKERS.findall(text))
+    # List runs over 5 (same rule as _cap_lists, reported not capped).
+    runs_over: list[int] = []
+    run = 0
+    for ln in text.splitlines():
+        if _LIST_ITEM.match(ln):
+            run += 1
+        else:
+            if run > 5:
+                runs_over.append(run)
+            run = 0
+    if run > 5:
+        runs_over.append(run)
+    issues: list[str] = []
+    if not first_is_action:
+        issues.append("first line is not a doable action")
+    if not last_is_next:
+        issues.append("last line is not a single next step")
+    if tangents:
+        issues.append(f"{tangents} tangent sidebar(s) ('by the way' style)")
+    if runs_over:
+        issues.append(f"list run(s) over 5 items: {runs_over}")
+    return {"first_line_is_action": first_is_action,
+            "last_line_is_next_step": last_is_next,
+            "tangent_count": tangents,
+            "list_runs_over_5": runs_over,
+            "issues": issues, "ok": not issues}
+
+
+def restate_state(step: int, total: int, next_action: str) -> dict:
+    """Per-turn state restatement data (step x of y, one next action).
+
+    Pure data for the chat path to display; it does not edit text.
+    Out-of-range steps are clamped, never rejected — a restatement
+    must survive a miscounted turn."""
+    step = max(1, min(int(step), max(1, int(total)))) if total else 1
+    total = max(1, int(total)) if total else 1
+    text = f"Step {step} of {total} — next: {next_action}".strip()
+    return {"step": step, "total": total, "next_action": next_action or "",
+            "text": text}
+
+
 def adhd_style_enabled(settings_json: str | None) -> bool:
     """Is the prompt-level ADHD style on for this user?
 

@@ -139,29 +139,45 @@ class DeliberateIn(BaseModel):
     question: str
     domain_seat: str | None = None
     model: str | None = None
+    profile: str = "classic"  # Batch 13: classic / exploration-orthogonal / execution-lean / duo-*
+    members: list[str] | None = None  # manual panel selection (wins over profile)
+    chairman: bool = False  # distinct Chairman synthesis step
 
 
 @router.post("/teams/council/deliberate")
 async def council_deliberate(payload: DeliberateIn, db: Any = Depends(get_db), user: Any = Depends(get_current_user)):
-    from ..council_mode import OutcomeLedger, deliberate
+    from ..council_mode import OutcomeLedger, deliberate, lock_domain_seat, select_panel
     from ..teams.definitions import get_council_lenses
 
     try:
-        lenses = get_council_lenses()
+        all_lenses = get_council_lenses()
+        lenses, panel_name = select_panel(all_lenses, profile=payload.profile,
+                                          members=payload.members)
+        # Domain seat locked BEFORE any analysis (council STEP 0); an
+        # explicit domain_seat wins, otherwise lock from the question.
+        domain_seat = payload.domain_seat or lock_domain_seat(payload.question, lenses)
         result = await deliberate(payload.question, lenses, await _completer(db, payload.model),
-                                  domain_seat=payload.domain_seat)
+                                  domain_seat=domain_seat, chairman=payload.chairman,
+                                  profile=panel_name)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
-    # Persist the verdict + an outcome-ledger entry (kill criteria are
-    # dated by the review date; the verdict text carries the detail).
+    # Persist the verdict + an outcome-ledger entry. Kill criteria are
+    # verdict-specific (Batch 13 fix for the old generic "See verdict
+    # text"): the verdict stands unless new evidence overturns its
+    # strongest argument, reviewed by the review date.
+    review_date = (datetime.now(UTC) + timedelta(days=30)).date().isoformat()
+    winner = result.tally.winner or "no consensus"
+    kill_criteria = (f"Verdict '{winner}' is overturned if new evidence "
+                     f"contradicts its strongest argument; review by {review_date}.")
     ledger = OutcomeLedger(_hive_root() / "outcomes.json")
     entry = ledger.record(prediction=result.verdict, owner=user.id,
-                          review_date=(datetime.now(UTC) + timedelta(days=30)).date().isoformat(),
-                          kill_criteria="See verdict text.")
+                          review_date=review_date, kill_criteria=kill_criteria)
     out = result.to_dict()
     out["consensus"] = result.tally.consensus
     out["split"] = not result.tally.consensus
     out["ledger_entry_id"] = entry.id
+    out["kill_criteria"] = kill_criteria
+    out["review_date"] = review_date
     return out
 
 
@@ -259,6 +275,43 @@ async def debate_job(job_id: str, user: Any = Depends(get_current_user)):
     if job is None:
         raise HTTPException(404, "Unknown debate job.")
     return {"job_id": job_id, "status": job["status"], "result": job["result"], "error": job["error"]}
+
+
+@router.get("/teams/debate/jobs/{job_id}/report")
+async def debate_job_report(job_id: str, user: Any = Depends(get_current_user)):
+    """Closing report for a finished debate: position ledger,
+    quoted disagreements, and what would change the synthesis.
+    Caps and cost behaviour are unchanged; this only reads a
+    finished job's stored transcript."""
+    from ..teams.debate import closing_report
+
+    job = _DEBATE_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Unknown debate job.")
+    if job["status"] != "done" or not job["result"]:
+        return {"job_id": job_id, "status": job["status"],
+                "report": None, "note": "Report is available once the debate finishes."}
+    result = job["result"]
+    return {"job_id": job_id, "status": "done",
+            "report": closing_report(result.get("topic", ""), result.get("synthesis", ""),
+                                     result.get("transcript", []))}
+
+
+class DebateScenarioIn(BaseModel):
+    topic: str
+    variables: list[str]
+
+
+@router.post("/teams/debate/scenarios")
+async def debate_scenarios(payload: DebateScenarioIn, user: Any = Depends(get_current_user)):
+    """Scenario branches for a debate topic: 1-3 injected variables,
+    each stated as an assumption. Over-cap is refused, not trimmed."""
+    from ..teams.debate import scenario_branches
+
+    try:
+        return {"topic": payload.topic, "branches": scenario_branches(payload.topic, payload.variables)}
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
 
 
 @router.post("/teams/debate/jobs/{job_id}/stop")

@@ -297,6 +297,60 @@ export async function handleSend() {
     return;
   }
 
+  // Council mode (Batch 13): the question goes to the council panel,
+  // not to a normal single-model reply. The verdict — with its vote
+  // tally, minority report, and outcome-ledger entry id — is rendered
+  // as the assistant message and persisted like any other chat turn,
+  // so a split below the 2/3 bar is visible in Chat, never smoothed
+  // into a fake consensus.
+  try {
+    const { getMode } = await import('../composer/popovers.js');
+    if (getMode() === 'council') {
+      setIsGenerating(true);
+      setSendButtonState(true);
+      try {
+        const res = await apiPost('/teams/council/deliberate', { question: userMsg.content });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `Council run failed (${res.status})`);
+        const tally = data.tally || {};
+        const totals = Object.entries(tally.totals || {}).map(([opt, w]) => `- ${opt}: ${Number(w).toFixed(2)} / ${tally.denominator ?? ''}`).join('\n');
+        const minority = (tally.dealbreakers || []).length
+          ? `\n\nMinority report: dealbreaker dissent from ${tally.dealbreakers.join(', ')} — preserved even though outvoted.`
+          : '';
+        const split = data.split ? '\n\nNo consensus reached (below the 2/3 bar) — the split above is handed back for a human decision.' : '';
+        const answer = `${data.verdict || ''}\n\nVote tally:\n${totals}${minority}${split}\n\nLedger entry: ${data.ledger_entry_id || 'n/a'} (review by ${data.review_date || 'n/a'}).`;
+        const asstMsg = { role: 'assistant', content: answer, created_at: new Date().toISOString() };
+        setMessages([...getMessages(), asstMsg]);
+        elements.messages?.appendChild(buildMessageNode(asstMsg));
+        try {
+          let chatId = getActiveChatId();
+          if (!chatId) {
+            const created = await (await apiPost('/chats', {
+              title: userMsg.content.slice(0, 60) || 'New chat',
+              model: getSelectedModel()?.id || '',
+            })).json();
+            chatId = created.id;
+            setActiveChatId(chatId);
+            const sidebarModule = await import('../sidebar/sidebar.js');
+            sidebarModule.loadChatList?.();
+          }
+          await apiPost(`/chats/${chatId}/messages`, {
+            messages: [
+              { role: 'user', content: userMsg.content },
+              { role: 'assistant', content: answer },
+            ],
+          });
+        } catch (e) { console.warn('[Council] persist failed', e); }
+      } catch (err) {
+        showToast({ type: 'error', title: 'Council run failed', message: err?.message || String(err) });
+      } finally {
+        setIsGenerating(false);
+        setSendButtonState(false);
+      }
+      return;
+    }
+  } catch {}
+
   runGeneration({ content: userMsg.content, fileIds, mediaIds, regenerate: false });
 }
 

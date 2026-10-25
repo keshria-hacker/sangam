@@ -1303,7 +1303,8 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/devices/cert/regenerate` | Yes | New self-signed cert; revokes all devices + expires pending pairings (Batch 6) |
 | GET | `/api/models/hardware` | Yes | Host CPU/RAM/VRAM detection; VRAM unknown unless nvidia-smi answers (Batch 7) |
 | GET | `/api/models/catalogue` | Yes | Built-in model catalogue estimates, embeddings marked non-runnable (Batch 7) |
-| POST | `/api/models/recommend` | Yes | Ranked fit/speed/quality/context recommendations (Batch 7) |
+| POST | `/api/models/recommend` | Yes | Ranked fit/speed/quality/context recommendations (Batch 7); Batch 13 adds shown per-use-case weights, weighted scores, bandwidth speed estimate, measured-benchmark override |
+| POST | `/api/models/route` | Yes | OmniRoute-style strategy choice (priority / cost-optimized / headroom / quota-weighted / round-robin / fail-closed) with reasons + session pinning (Batch 13) |
 | POST | `/api/models/benchmark` | Yes | Timed generation via provider stream; local-only unless allow_remote=true (Batch 7) |
 | GET | `/api/models/benchmarks` | Yes | Stored benchmark results, newest first (Batch 7) |
 | POST | `/api/models/ollama/pull` | Yes | Start an Ollama pull (202 + poll id) (Batch 7) |
@@ -1311,6 +1312,9 @@ WEB_SEARCH_MAX_RESULTS=5
 | DELETE | `/api/models/ollama/{model}` | Yes | Delete an Ollama model (Batch 7) |
 | POST | `/api/quality/lint` | Yes | Offline deterministic grammar/spell/repetition lint, candidate issues only (Batch 7) |
 | GET | `/api/quality/adhd-style` | Yes | Prompt-level ADHD style block; wired into chat behind adhdFriendly (Deep-read Wave-1) |
+| POST | `/api/quality/check` | Yes | Ponytail-shaped ranked findings (must-fix first, fix + if-skipped, not-checked footer); detect-only (Batch 13) |
+| POST | `/api/quality/humanize` | Yes | Natural rewrite for readability only; states it does not evade AI detectors (Batch 13) |
+| POST | `/api/quality/report` | Yes | Per-message quality report: readability, slop, structure, lint count, ADHD pre-send check (Batch 13) |
 | GET | `/api/diagrams/catalogue` | Yes | Editorial diagram templates (13 types) (Batch 7) |
 | POST | `/api/diagrams/lint` | Yes | Statically checkable style-guide issues only (Batch 7) |
 | GET | `/api/diagrams/brands` | Yes | Saved brand profiles (Batch 7) |
@@ -1328,7 +1332,10 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/code-graph/find-all` | Yes | Find all symbols matching a pattern (Deep-read Wave-2) |
 | GET | `/api/code-graph/repo-map` | Yes | Repository map: clusters/hubs/hotspots (Deep-read Wave-2) |
 | GET | `/api/code-graph/trace` | Yes | Trace calls in/out/both for a symbol (Deep-read Wave-2) |
-| GET | `/api/code-graph/affected` | Yes | Blast radius for a symbol (Deep-read Wave-2) |
+| GET | `/api/code-graph/affected` | Yes | Blast radius for a symbol (Deep-read Wave-2); Batch 13 adds an evidence block (sources + limitations) |
+| GET | `/api/code-graph/impact` | Yes | Cross-file impact analysis: callers, files touched, risk note, evidence (Batch 13) |
+| GET | `/api/code-graph/orphans` | Yes | Dead-code candidates (no caller, not exported, not main); candidates only, nothing deleted (Batch 13) |
+| POST | `/api/code-graph/explain-change` | Yes | Explain a unified diff via the graph: files, symbols, per-symbol impact (Batch 13) |
 | GET | `/api/code-graph/export` | Yes | Graph export, JSON or standalone HTML (Deep-read Wave-2) |
 | GET | `/api/code-graph/diagram` | Yes | Architecture diagram IR generated from the code graph (Deep-read Wave-2) |
 | GET | `/api/knowledge/graph/check` | Yes | Fingerprint drift vs the cached code graph (Deep-read Wave-2) |
@@ -1374,7 +1381,9 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/skills/personas` | Yes | File-based persona registry listing (Deep-read Wave-2) |
 | GET | `/api/skills/personas/suggest` | Yes | Task-based persona suggestions (Deep-read Wave-2) |
 | GET | `/api/skills/personas/validate` | Yes | Roster validation report (Deep-read Wave-2) |
-| POST | `/api/teams/council/deliberate` | Yes | Council Deliberate mode; splits returned, never manufactured consensus (Deep-read Wave-2) |
+| POST | `/api/teams/council/deliberate` | Yes | Council Deliberate mode; splits returned, never manufactured consensus (Deep-read Wave-2); Batch 13 adds panel/profile/manual members, domain-seat locking, Chairman synthesis, enforcement re-prompts, session metadata, verdict-specific kill criteria |
+| POST | `/api/teams/debate/scenarios` | Yes | Scenario branches: same debate under 1-3 injected variables, stated as assumptions (Batch 13) |
+| GET | `/api/teams/debate/jobs/{job_id}/report` | Yes | Closing report for a finished debate: position ledger, quoted disagreements, what would change it (Batch 13) |
 | POST | `/api/teams/debate/estimate` | Yes | Debate cost estimate before start (Deep-read Wave-2) |
 | POST | `/api/teams/debate/run` | Yes | Start a capped debate job (202 + poll id) (Deep-read Wave-2) |
 | GET | `/api/teams/debate/jobs/{job_id}` | Yes | Debate job status/result (Deep-read Wave-2) |

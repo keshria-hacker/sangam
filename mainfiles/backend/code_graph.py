@@ -104,7 +104,7 @@ class _PyVisitor(ast.NodeVisitor):
             pass
         return sig[:300]
 
-    def _record(self, node, kind: str):
+    def _record(self, node, kind: str, bases: list[str] | None = None):
         qn = ".".join([*self._stack, node.name])
         top_level = len(self._stack) == 0
         segment = None
@@ -122,6 +122,7 @@ class _PyVisitor(ast.NodeVisitor):
             "signature": self._signature(node) if kind in ("function", "method") else f"class {node.name}",
             "exported": exported,
             "body_hash": hashlib.sha256(segment.encode("utf-8")).hexdigest(),
+            "bases": bases or [],
         })
 
     def visit_FunctionDef(self, node):
@@ -134,7 +135,8 @@ class _PyVisitor(ast.NodeVisitor):
     visit_AsyncFunctionDef = visit_FunctionDef
 
     def visit_ClassDef(self, node):
-        self._record(node, "class")
+        bases = [self._name(b) for b in node.bases if self._name(b)]
+        self._record(node, "class", bases=bases)
         self._stack.append(node.name)
         self.generic_visit(node)
         self._stack.pop()
@@ -315,6 +317,7 @@ def build_graph(root: Path | str | None = None, max_files: int = 500) -> dict:
                    "kind": d["kind"], "file": rel, "line": d["line"],
                    "end_line": d["end_line"], "signature": d["signature"],
                    "exported": d["exported"], "body_hash": d["body_hash"],
+                   "bases": d.get("bases", []),
                    "calls": []}
             symbols[sid] = rec
             by_short.setdefault(d["name"], []).append({**rec, "id": sid})
@@ -325,10 +328,22 @@ def build_graph(root: Path | str | None = None, max_files: int = 500) -> dict:
     dropped: list[dict] = []
     dropped_ambiguous = 0
     dropped_unresolved = 0
+    dropped_extends = 0
     for rel, ext in raw.items():
         for d in ext["defs"]:
             edges.append({"from": _file_id(rel), "to": _symbol_id(rel, d["qualname"]),
                           "type": "contains", "confidence": "EXTRACTED", "file": rel})
+            # Batch 13: extends edges (Graft's implements/extends family,
+            # Python classes only — the JS scanner does not record bases).
+            # Same no-guessing rule as calls: unique resolution only.
+            for base in d.get("bases", []):
+                target, conf = _resolve_call(rel, base, by_short, {}, file_symbols)
+                if target is None:
+                    dropped_extends += 1
+                    continue
+                edges.append({"from": _symbol_id(rel, d["qualname"]), "to": target,
+                              "type": "extends", "confidence": conf, "file": rel,
+                              "line": d["line"]})
         for caller_qn, callee, line in ext["calls"]:
             caller_id = _symbol_id(rel, caller_qn) if caller_qn != MODULE_CALLER \
                 else f"{_file_id(rel)}#{MODULE_CALLER}"
@@ -379,6 +394,7 @@ def build_graph(root: Path | str | None = None, max_files: int = 500) -> dict:
             "edges": len(edges),
             "dropped_ambiguous": dropped_ambiguous,
             "dropped_unresolved": dropped_unresolved,
+            "dropped_extends": dropped_extends,
             "dropped": dropped,
             "languages": languages,
         },
@@ -406,7 +422,7 @@ def validate_graph(graph: dict) -> None:
                 errors.append(f"edge {i}: missing {field}")
         if e.get("confidence") not in VALID_CONFIDENCES:
             errors.append(f"edge {i}: invalid confidence {e.get('confidence')!r}")
-        if e.get("type") not in ("calls", "imports", "contains"):
+        if e.get("type") not in ("calls", "imports", "contains", "extends"):
             errors.append(f"edge {i}: bad type {e.get('type')!r}")
         if e.get("type") == "calls" and e.get("to") not in sym_ids:
             errors.append(f"edge {i}: calls target not a symbol: {e.get('to')!r}")

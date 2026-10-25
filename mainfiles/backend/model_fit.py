@@ -279,8 +279,90 @@ def fit_score(
     }
 
 
+# ------------------------------------------------------- Batch 13: weights
+# llmfit per-use-case weights (quality / speed / fit / context).
+# Weights are SHOWN in every recommend() row, so a ranking can be
+# audited — a different use case must be able to change the winner,
+# and the caller can see why.
+USE_CASE_WEIGHTS: dict[str, dict[str, float]] = {
+    "chat": {"quality": 0.45, "speed": 0.30, "fit": 0.15, "context": 0.10},
+    "general": {"quality": 0.45, "speed": 0.30, "fit": 0.15, "context": 0.10},
+    "code": {"quality": 0.50, "speed": 0.20, "fit": 0.15, "context": 0.15},
+    "reasoning": {"quality": 0.55, "speed": 0.15, "fit": 0.15, "context": 0.15},
+}
+
+ESTIMATION_CTX_CAP = 8192  # llmfit's estimation-context cap (see below)
+_SPEED_CLASS_SCORE = {"fast": 1.0, "balanced": 0.7, "moderate": 0.45,
+                      "slow": 0.25, "very-slow": 0.1}
+_QUALITY_CLASS_SCORE = {"basic": 0.25, "decent": 0.5, "good": 0.75, "high": 1.0}
+MEASURED_TOK_S_CAP = 10000.0  # llmfit plausibility cap; above it, ignore
+
+
+def estimate_speed_tok_s(params_b: float, quant: str,
+                         bandwidth_gb_s: float | None = None) -> dict:
+    """Bandwidth roofline speed ESTIMATE (labelled estimated, never
+    measured): tok/s ~= bandwidth * 0.55 efficiency / bytes-per-token,
+    where bytes-per-token is the weight bytes (params x bytes/param).
+    Default bandwidth is a conservative 50 GB/s DDR figure when no
+    GPU bandwidth is known — the estimate then describes CPU-class
+    speeds, and the row says so. MoE models use total params here
+    (active params per token are lower); the row carries a moe_note
+    instead of a silently smaller number."""
+    bpp = BYTES_PER_PARAM.get(quant, 0.59)
+    bandwidth = bandwidth_gb_s if bandwidth_gb_s else 50.0
+    tok_s = (bandwidth * 1e9 * 0.55) / max(params_b * bpp * 1e9, 1.0)
+    return {"tok_per_s": round(tok_s, 2),
+            "bandwidth_gb_s": bandwidth,
+            "bandwidth_source": ("caller-supplied" if bandwidth_gb_s
+                                 else "conservative DDR default (50 GB/s) — CPU-class estimate"),
+            "source": "estimated"}
+
+
+def weighted_score(entry: dict, fit: dict, weights: dict,
+                   requested_context: int,
+                   measured_tok_s: float | None = None) -> dict:
+    """Weighted quality/speed/fit/context score (0..1 per dimension).
+
+    - quality: from the param-count quality class (a class, not a
+      measured quality — the row says so).
+    - speed: measured tok/s when a plausible local benchmark exists
+      (scaled against 100 tok/s as 'fast'), else the bandwidth
+      estimate's speed class.
+    - fit: 1.0 when it fits, 0.0 when it does not, 0.5 when the budget
+      itself is unknown (no honest fits/does-not-fit verdict).
+    - context: catalogue context vs requested context, capped at 1.
+    A measured benchmark REPLACES the estimate and is marked
+    measured; an implausible measurement (>10000 tok/s) is ignored
+    and the estimate is used, with a note."""
+    quality = _QUALITY_CLASS_SCORE[fit["quality_class"]]
+    speed_source = "estimated"
+    speed_note = ""
+    if measured_tok_s is not None and 0 < measured_tok_s <= MEASURED_TOK_S_CAP:
+        speed = min(1.0, measured_tok_s / 100.0)
+        speed_source = "measured"
+    elif measured_tok_s is not None:
+        speed = _SPEED_CLASS_SCORE[fit["speed_class"]]
+        speed_note = (f"Measured {measured_tok_s} tok/s exceeds the "
+                      f"{MEASURED_TOK_S_CAP:.0f} tok/s plausibility cap — ignored, estimate used.")
+    else:
+        speed = _SPEED_CLASS_SCORE[fit["speed_class"]]
+    # Fit dimension: 1.0 when it fits, 0.0 when it does not, 0.5 when
+    # the budget itself is unknown (neither fits nor fails honestly).
+    fit_s = 1.0 if fit["fits"] else 0.0
+    if fit["bottleneck"].startswith("unknown"):
+        fit_s = 0.5
+    context_s = min(1.0, entry["context"] / max(requested_context, 1))
+    dims = {"quality": quality, "speed": round(speed, 3),
+            "fit": fit_s, "context": round(context_s, 3)}
+    total = sum(weights[d] * dims[d] for d in ("quality", "speed", "fit", "context"))
+    return {"dimensions": dims, "weights": weights,
+            "weighted_score": round(total, 4),
+            "speed_source": speed_source, "speed_note": speed_note}
+
+
 def recommend(
     hardware: dict, use_case: str | None = None, max_context: int | None = None,
+    benchmarks: dict[str, float] | None = None,
 ) -> list[dict]:
     """Rank the catalogue for this machine.
 
@@ -288,9 +370,22 @@ def recommend(
     a model with no fitting quant is still listed, labelled fits=False,
     ranked below every fitting model. Non-runnable embeddings models are
     only returned for use_case='embeddings', never for generation.
+
+    Batch 13: rows carry the llmfit weighted score (quality/speed/
+    fit/context x per-use-case weights, weights shown) and a
+    bandwidth speed estimate; a caller-supplied ``benchmarks``
+    mapping (model_id -> measured tok/s) replaces the estimate and
+    is marked measured. Sorting is fitting-first, then weighted
+    score descending — a different use case can now change the
+    winner, which fits-first-then-largest could not.
+    Estimation-context honesty: the KV figure uses the requested
+    context; when it exceeds llmfit's 8192-token estimation cap the
+    row says the figure is an upper bound, not a capped estimate.
     """
     budget = available_memory_gb(hardware)
     context = max_context or 8192
+    weights = USE_CASE_WEIGHTS.get(use_case or "general", USE_CASE_WEIGHTS["general"])
+    benchmarks = benchmarks or {}
     rows: list[dict] = []
     for entry in CATALOGUE:
         if use_case:
@@ -315,6 +410,11 @@ def recommend(
             quant = "Q4_K" if "Q4_K" in entry["quants"] else entry["quants"][0]
             chosen, chosen_score = quant, fit_score(
                 entry["params_b"], quant, entry["layers"], entry["hidden"], context, budget)
+        measured = benchmarks.get(entry["id"])
+        wscore = weighted_score(entry, chosen_score, weights, context,
+                                measured_tok_s=measured)
+        speed_est = estimate_speed_tok_s(entry["params_b"], chosen)
+        is_moe = "MoE" in entry["name"]
         rows.append({
             "id": entry["id"],
             "name": entry["name"],
@@ -331,8 +431,28 @@ def recommend(
             "fits_label": "fits on this machine" if chosen_score["fits"]
                           else "does not fit on this machine",
             "source_note": entry["source_note"],
+            "weights": weights,
+            "dimensions": wscore["dimensions"],
+            "weighted_score": wscore["weighted_score"],
+            "speed_estimate_tok_s": speed_est["tok_per_s"],
+            "speed_estimate_source": speed_est["source"],
+            "speed_source": wscore["speed_source"],
+            "speed_note": wscore["speed_note"] or speed_est["bandwidth_source"],
+            "measured_tok_s": measured if wscore["speed_source"] == "measured" else None,
+            "estimation_note": (
+                "KV estimated at the full requested context; llmfit caps "
+                "estimation at 8192 tokens, so this figure is an upper bound."
+                if context > ESTIMATION_CTX_CAP else
+                "KV estimated at the requested context (within the 8192-token estimation cap)."),
+            "moe_note": ("MoE: total params shown; active params per token "
+                         "are lower, so speed/quality figures are total-param "
+                         "approximations.") if is_moe else "",
+            "kernel_note": ("AWQ/GPTQ quant: some backends need a dequantising "
+                            "fallback kernel — llmfit penalises this; Sangam "
+                            "flags it instead of inventing a penalty.")
+            if chosen in ("AWQ-4bit", "GPTQ-4bit") else "",
         })
-    rows.sort(key=lambda r: (not r["fits"], -r["params_b"]))
+    rows.sort(key=lambda r: (not r["fits"], -r["weighted_score"], -r["params_b"]))
     return rows
 
 

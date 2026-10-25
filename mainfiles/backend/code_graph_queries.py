@@ -62,14 +62,77 @@ def _read_excerpt(root: Path | None, sym: dict, max_lines: int = 8) -> str:
 
 
 # ------------------------------------------------------------------ find_code
+# Batch 13: Graft's lexical half — IDF + BM25 over the symbol text
+# (name + qualname + signature + file) plus a test-path de-rank.
+# Honest scope note: full definition bodies are NOT stored in the
+# graph (only body_hash), so the "body field" here is the symbol
+# text above, not the function body — BM25 length normalisation
+# still stops a sprawling signature/file path from outranking a
+# tight name match by word count alone.
+BM25_K1 = 1.2
+BM25_B = 0.75
+TEST_DERANK = 0.35
+_TEST_PATH = re.compile(r"(^|/)(test_|tests?/|.*_test\.py|.*\.test\.[a-z]+)$")
+
+
+def _symbol_tokens(sym: dict) -> list[str]:
+    hay = " ".join([sym.get("name", ""), sym.get("qualname", ""),
+                    sym.get("signature", ""), sym.get("file", "")]).lower()
+    return re.findall(r"[a-z0-9_]+", hay)
+
+
+def _is_test_path(file: str) -> bool:
+    f = (file or "").replace("\\", "/")
+    return bool(_TEST_PATH.search(f)) or "/test/" in f or f.startswith("test_")
+
+
+def _bm25_scores(graph: dict, query: str) -> dict[str, float]:
+    """IDF + BM25 per symbol id. Returns {} when the query has no tokens."""
+    qtok = re.findall(r"[a-z0-9_]+", query.lower())
+    if not qtok:
+        return {}
+    docs: dict[str, list[str]] = {}
+    df: dict[str, int] = {}
+    for sid, sym in graph["symbols"].items():
+        toks = _symbol_tokens(sym)
+        docs[sid] = toks
+        for t in set(toks):
+            df[t] = df.get(t, 0) + 1
+    n_docs = len(docs) or 1
+    avg_len = sum(len(t) for t in docs.values()) / n_docs
+    scores: dict[str, float] = {}
+    for sid, toks in docs.items():
+        if not toks:
+            continue
+        tf: dict[str, int] = {}
+        for t in toks:
+            tf[t] = tf.get(t, 0) + 1
+        score = 0.0
+        for term in set(qtok):
+            if term not in tf:
+                continue
+            idf = math.log(1 + n_docs / (1 + df.get(term, 0)))
+            denom = tf[term] + BM25_K1 * (1 - BM25_B + BM25_B * len(toks) / max(avg_len, 1))
+            score += idf * tf[term] * (BM25_K1 + 1) / denom
+        if score > 0:
+            sym = graph["symbols"][sid]
+            if sym.get("name", "").lower() in qtok:
+                score += 0.5
+            if sym.get("qualname", "").lower() == query.lower().strip():
+                score += 1.0
+            if _is_test_path(sym.get("file", "")):
+                score *= TEST_DERANK
+            scores[sid] = score
+    return scores
+
+
 def _lexical_score(query: str, sym: dict) -> float:
-    """Token overlap over name + qualname + signature + file."""
+    """Back-compat wrapper: plain token overlap for a single symbol
+    (used by older callers/tests); find_code uses _bm25_scores."""
     qtok = set(re.findall(r"[a-z0-9_]+", query.lower()))
     if not qtok:
         return 0.0
-    hay = " ".join([sym.get("name", ""), sym.get("qualname", ""),
-                    sym.get("signature", ""), sym.get("file", "")]).lower()
-    htok = set(re.findall(r"[a-z0-9_]+", hay))
+    htok = set(_symbol_tokens(sym))
     overlap = len(qtok & htok)
     if overlap == 0:
         return 0.0
@@ -79,6 +142,39 @@ def _lexical_score(query: str, sym: dict) -> float:
     if sym.get("qualname", "").lower() == query.lower().strip():
         score += 1.0
     return score
+
+
+def evidence_block(graph: dict, results: list[dict] | None = None) -> dict:
+    """REA evidence discipline for code answers: sources with
+    file:line + body_hash, what was NOT searched (skipped dirs,
+    dropped ambiguous/unresolved calls, dropped extends, file cap),
+    and a freshness pointer. Unknown coverage is stated as unknown:
+    this block never claims the whole repo was searched when the
+    graph was capped or files were skipped."""
+    stats = graph.get("stats") or {}
+    sources = []
+    for r in results or []:
+        sym = graph["symbols"].get(r.get("symbol", ""), {}) if isinstance(r, dict) else {}
+        sources.append({"symbol": r.get("symbol") if isinstance(r, dict) else None,
+                        "file": r.get("file") if isinstance(r, dict) else None,
+                        "line": r.get("line") if isinstance(r, dict) else None,
+                        "body_hash": sym.get("body_hash")})
+    return {"sources": sources,
+            "limitations": {
+                "dropped_ambiguous_calls": stats.get("dropped_ambiguous", 0),
+                "dropped_unresolved_calls": stats.get("dropped_unresolved", 0),
+                "dropped_extends": stats.get("dropped_extends", 0),
+                "skipped_dirs": ["__pycache__", ".venv", "node_modules", ".git",
+                               "dist", "build", ".next"],
+                "files_scanned": stats.get("files_scanned"),
+                "files_capped": stats.get("files_capped", False),
+                "note": ("Symbols that were ambiguous or unresolvable were "
+                         "dropped, never guessed. Use /knowledge/graph/check "
+                         "for fingerprint drift vs this graph."),
+            },
+            "freshness": ("Graph fingerprint is stored on the graph; "
+                          "drift is reported by /knowledge/graph/check, "
+                          "not claimed here.")}
 
 
 def _personalised_pagerank(graph: dict, seeds: dict[str, float]) -> dict[str, float]:
@@ -109,17 +205,15 @@ def _personalised_pagerank(graph: dict, seeds: dict[str, float]) -> dict[str, fl
 
 def find_code(graph: dict, query: str, top_k: int = 10,
               root: Path | None = None) -> dict:
-    """Plain-words code search: lexical rank proposes, PageRank disposes."""
-    scored = []
-    for sid, sym in graph["symbols"].items():
-        lex = _lexical_score(query, sym)
-        if lex > 0:
-            scored.append((sid, lex))
-    if not scored:
-        return {"query": query, "results": []}
-    pr = _personalised_pagerank(graph, {sid: lex for sid, lex in scored})
+    """Plain-words code search: BM25/IDF lexical rank proposes,
+    PageRank disposes. ``lexical_score`` is now the BM25 score
+    (test paths de-ranked 0.35x); results carry an evidence block."""
+    bm25 = _bm25_scores(graph, query)
+    if not bm25:
+        return {"query": query, "results": [], "evidence": evidence_block(graph, [])}
+    pr = _personalised_pagerank(graph, bm25)
     results = []
-    for sid, lex in scored:
+    for sid, lex in bm25.items():
         sym = graph["symbols"][sid]
         results.append({
             "symbol": sid, "name": sym["name"], "kind": sym["kind"],
@@ -131,7 +225,8 @@ def find_code(graph: dict, query: str, top_k: int = 10,
             "excerpt": _read_excerpt(root, sym) if root is not None else "",
         })
     results.sort(key=lambda r: r["score"], reverse=True)
-    return {"query": query, "results": results[:top_k]}
+    results = results[:top_k]
+    return {"query": query, "results": results, "evidence": evidence_block(graph, results)}
 
 
 # ------------------------------------------------------------------ file_api
@@ -270,7 +365,144 @@ def affected(graph: dict, symbol: str) -> dict:
     return {"symbol": sid, "defining_file": sym["file"],
             "callers_transitive": caller_ids,
             "caller_count": len(caller_ids),
-            "importers_of_defining_file": importers}
+            "importers_of_defining_file": importers,
+            "evidence": evidence_block(graph, [{"symbol": sid, "file": sym["file"],
+                                                "line": sym["line"]}])}
+
+
+# ------------------------------------------------- Batch 13: impact/orphans
+def find_orphans(graph: dict) -> dict:
+    """Dead-code candidates (gstack deslop + code-graph depth): symbols
+    with no incoming ``calls`` edge, not exported, not a ``main``
+    entry point. Candidates only — a symbol can be a real entry
+    point (CLI, handler, test) without a caller in the graph, so
+    nothing here is deleted automatically."""
+    called = {e["to"] for e in graph["edges"] if e["type"] == "calls"}
+    orphans = []
+    for sid, sym in graph["symbols"].items():
+        if sid in called:
+            continue
+        if sym.get("exported"):
+            continue
+        if sym.get("name") in ("main", "__main__"):
+            continue
+        if sym.get("kind") not in ("function", "method"):
+            continue
+        orphans.append({"symbol": sid, "name": sym["name"], "kind": sym["kind"],
+                        "file": sym["file"], "line": sym["line"],
+                        "note": "No caller in the graph and not exported — "
+                                "verify it is not an entry point before removing."})
+    orphans.sort(key=lambda o: (o["file"], o["line"]))
+    return {"count": len(orphans), "orphans": orphans,
+            "evidence": evidence_block(graph, orphans)}
+
+
+def impact_analysis(graph: dict, symbol: str) -> dict:
+    """Cross-file impact analysis for one symbol: blast radius plus
+    the files touched and a plain-language risk note. This is the
+    'explain this code change' building block: call it for each
+    symbol a diff touches (see explain_change)."""
+    base = affected(graph, symbol)
+    if base.get("error"):
+        base["evidence"] = evidence_block(graph, [])
+        return base
+    caller_files = sorted({graph["symbols"][c]["file"]
+                           for c in base["callers_transitive"]
+                           if c in graph["symbols"]})
+    files_touched = sorted({base["defining_file"]} | set(caller_files))
+    count = base["caller_count"]
+    if count == 0:
+        risk = "No callers in the graph — change is locally contained (but see orphans: it may be dead code)."
+    elif len(files_touched) == 1:
+        risk = f"{count} caller(s) in the same file — change needs those call sites checked."
+    else:
+        risk = (f"{count} caller(s) across {len(files_touched)} files — "
+                "change needs every listed call site checked before merge.")
+    base["files_touched"] = files_touched
+    base["risk_note"] = risk
+    base["evidence"] = evidence_block(
+        graph, [{"symbol": base["symbol"], "file": base["defining_file"],
+                 "line": graph["symbols"][base["symbol"]]["line"]}])
+    return base
+
+
+def explain_change(graph: dict, diff_text: str) -> dict:
+    """Explain a code change from a unified diff: files touched,
+    symbols in those files, and each symbol's impact (callers).
+    Symbols are found by file, never guessed from diff prose: a file
+    with no graph symbols reports an empty symbol list with a
+    limitation note, not invented symbols. Added-line identifiers
+    that match a symbol name in a touched file are listed as
+    ``mentioned_symbols`` (candidates, not proof of change)."""
+    diff_text = diff_text or ""
+    files: list[str] = []
+    for m in re.finditer(r"^\+{3}\s+b/(.+)$", diff_text, re.MULTILINE):
+        files.append(m.group(1).strip())
+    files = sorted(set(files))
+    symbols_by_file: dict[str, list[str]] = {}
+    for sid, sym in graph["symbols"].items():
+        if sym["file"] in files:
+            symbols_by_file.setdefault(sym["file"], []).append(sid)
+    added_names: set[str] = set()
+    for m in re.finditer(r"^\+[^+].*$", diff_text, re.MULTILINE):
+        added_names.update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", m.group(0)))
+    mentioned: list[str] = []
+    for sid, sym in graph["symbols"].items():
+        if sym["file"] in files and sym["name"] in added_names:
+            mentioned.append(sid)
+    impacts = {}
+    for sid in mentioned:
+        impacts[sid] = impact_analysis(graph, sid)
+    return {"files": files, "symbols_in_touched_files": symbols_by_file,
+            "mentioned_symbols": sorted(mentioned), "impacts": impacts,
+            "limitations": ("Only symbols already in the graph are reported. "
+                            "New symbols added by this diff are not in the graph "
+                            "until it is rebuilt; mentioned_symbols matches "
+                            "added-line identifiers against existing symbols only."),
+            "evidence": evidence_block(graph, [])}
+
+
+def layering_check(graph: dict, layers: list[str]) -> dict:
+    """Layering violations for a caller-supplied layer order.
+
+    ``layers`` is ordered high -> low (e.g. ["app/", "domain/",
+    "infra/"]). A call is a violation when the callee sits in a
+    HIGHER layer than the caller (a lower layer depending upward).
+    Same-layer and downward calls are fine. Files matching no layer
+    are reported as unlayered, never assigned a layer by guessing."""
+    layers = [str(layer) for layer in (layers or [])]
+    if not layers:
+        return {"error": "layers must be a non-empty ordered list (high -> low)"}
+
+    def _layer_of(file: str) -> int | None:
+        for i, prefix in enumerate(layers):
+            if file.startswith(prefix):
+                return i
+        return None
+
+    violations: list[dict] = []
+    unlayered: set[str] = set()
+    for e in graph["edges"]:
+        if e["type"] != "calls":
+            continue
+        caller = graph["symbols"].get(e["from"], {})
+        callee = graph["symbols"].get(e["to"], {})
+        if not caller or not callee:
+            continue
+        cl, el = _layer_of(caller.get("file", "")), _layer_of(callee.get("file", ""))
+        if cl is None:
+            unlayered.add(caller.get("file", ""))
+        if el is None:
+            unlayered.add(callee.get("file", ""))
+        if cl is not None and el is not None and el < cl:
+            violations.append({"from": e["from"], "to": e["to"],
+                               "caller_file": caller["file"],
+                               "callee_file": callee["file"],
+                               "note": "Lower layer calls a higher layer."})
+    return {"layers": layers, "violations": violations,
+            "violation_count": len(violations),
+            "unlayered_files": sorted(unlayered),
+            "evidence": evidence_block(graph, [])}
 
 
 # ------------------------------------------------------------------ diff

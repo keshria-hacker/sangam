@@ -77,6 +77,83 @@ class DebateResult:
                 "stop_reason": self.stop_reason}
 
 
+MAX_SCENARIO_VARIABLES = 3
+
+
+def position_ledger(transcript: list[dict[str, Any]]) -> dict[str, Any]:
+    """Per-persona position ledger (MiroFish portable idea, capped).
+
+    A persona's stated positions are carried as a compact ledger so a
+    later round cannot silently contradict an earlier one: each entry
+    lists every round's statement plus the latest one, side by side.
+    This module does NOT judge contradiction — "these two statements
+    conflict" is a human/model judgment, and flagging it by keyword
+    overlap would invent disagreements. The ledger surfaces the
+    statements; the reader (or the closing report) judges."""
+    ledger: dict[str, Any] = {}
+    for turn in transcript or []:
+        persona = str(turn.get("persona", "?"))
+        entry = ledger.setdefault(persona, {"statements": [], "rounds_spoken": 0})
+        entry["statements"].append({"round": turn.get("round"),
+                                    "content": turn.get("content", "")})
+        entry["rounds_spoken"] += 1
+    for entry in ledger.values():
+        entry["latest"] = entry["statements"][-1]["content"] if entry["statements"] else ""
+    return ledger
+
+
+def scenario_branches(topic: str, variables: list[str]) -> list[dict[str, Any]]:
+    """Scenario branching: the same capped debate under 1-3 explicitly
+    injected variables, so the user can see what flips the synthesis.
+
+    Returns [{variable, topic}] where topic is the original topic plus
+    the injected variable, stated as an assumption — never a hidden
+    change to the question. Over-cap (0 or >3) is refused, not trimmed."""
+    topic = (topic or "").strip()
+    if not topic:
+        raise ValueError("Empty topic.")
+    variables = [v.strip() for v in (variables or []) if v and v.strip()]
+    if not variables or len(variables) > MAX_SCENARIO_VARIABLES:
+        raise ValueError(
+            f"Scenario variables must be 1..{MAX_SCENARIO_VARIABLES}, got {len(variables)}")
+    return [{"variable": v,
+             "topic": f"{topic} [scenario assumption: {v}]"} for v in variables]
+
+
+def closing_report(topic: str, synthesis: str,
+                   transcript: list[dict[str, Any]]) -> dict[str, Any]:
+    """ReportAgent-style closing report tied to the debate transcript.
+
+    {topic, synthesis, positions (the ledger), disagreements (lines
+    where a persona explicitly disagrees — quoted, not inferred),
+    assumptions, what_would_change_it}. ``what_would_change_it`` is
+    deliberately plain: it names the disagreements that would have to
+    resolve for the synthesis to change, and says so when the
+    transcript shows none — it never invents a decisive factor."""
+    ledger = position_ledger(transcript)
+    disagreements = []
+    for turn in transcript or []:
+        content = turn.get("content", "") or ""
+        if "disagree" in content.lower():
+            disagreements.append({"persona": turn.get("persona"),
+                                  "round": turn.get("round"),
+                                  "quote": content.strip()[:300]})
+    if disagreements:
+        what_changes = ("Resolve these stated disagreements and the "
+                        "synthesis would have to change: " +
+                        "; ".join(f"{d['persona']} (round {d['round']})"
+                                  for d in disagreements))
+    else:
+        what_changes = ("No explicit disagreement was stated in the "
+                        "transcript, so nothing in the transcript itself "
+                        "identifies what would change the synthesis.")
+    return {"topic": topic, "synthesis": synthesis, "positions": ledger,
+            "disagreements": disagreements,
+            "assumptions": ["Every persona saw the full transcript before speaking.",
+                            "No hidden state: the transcript is the whole debate."],
+            "what_would_change_it": what_changes}
+
+
 async def run_debate(topic: str, personas: list[Any], rounds: int,
                      completer: Completer, coordinator_prompt: str,
                      cost_per_call_usd: float = 0.0,

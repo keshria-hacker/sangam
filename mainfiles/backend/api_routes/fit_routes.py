@@ -69,13 +69,78 @@ class RecommendIn(BaseModel):
     max_context: int | None = None
 
 
+async def _latest_benchmarks(db: AsyncSession) -> dict[str, float]:
+    """Latest measured tok/s per model id (provider-usage or
+    estimated-words rows both count as stored measurements; the
+    route labels them measured because a real run produced them,
+    and model_fit marks the speed source accordingly)."""
+    try:
+        res = await db.execute(
+            select(ModelBenchmark).order_by(ModelBenchmark.created_at.desc()).limit(200)
+        )
+        out: dict[str, float] = {}
+        for row in res.scalars().all():
+            if row.model_id not in out and row.tok_per_s:
+                out[row.model_id] = row.tok_per_s
+        return out
+    except Exception:
+        return {}
+
+
 @router.post("/models/recommend")
-async def recommend_models(payload: RecommendIn, user=Depends(get_current_user)):
+async def recommend_models(payload: RecommendIn, db: AsyncSession = Depends(get_db),
+                           user=Depends(get_current_user)):
     hardware = detect_hardware()
+    benchmarks = await _latest_benchmarks(db)
     return {
         "hardware": hardware,
-        "recommendations": recommend(hardware, payload.use_case, payload.max_context),
+        "recommendations": recommend(hardware, payload.use_case, payload.max_context,
+                                     benchmarks=benchmarks),
+        "measured_from_benchmarks": sorted(benchmarks),
     }
+
+
+class RouteIn(BaseModel):
+    strategy: str = "priority"
+    candidates: list[str] | None = None
+    costs: dict[str, float] | None = None
+    billable: list[str] | None = None
+    session_id: str | None = None
+    pin: bool = False
+
+
+@router.post("/models/route")
+async def route_model(payload: RouteIn, user=Depends(get_current_user)):
+    """OmniRoute strategy choice over Sangam's provider registry:
+    returns the chosen provider + why (scores/inputs shown), or
+    available=false with a reason (fail-closed never bills).
+    With pin=true and a session_id, the session is pinned to the
+    chosen provider for subsequent chooses until unpinned — pass
+    pin=false with the same session_id to keep the pin unchanged;
+    unpinning is a client-side session reset (new session_id)."""
+    from ..providers.fallback_chain import STRATEGIES, get_fallback_chain
+
+    if payload.strategy not in STRATEGIES:
+        raise HTTPException(422, f"Unknown strategy: {payload.strategy!r} "
+                                 f"(known: {', '.join(STRATEGIES)})")
+    chain = get_fallback_chain()
+    if payload.pin and payload.session_id:
+        # Pin only after choosing, so a pin never forces a dead provider.
+        provider, reasons = chain.choose(payload.strategy, payload.candidates,
+                                         costs=payload.costs,
+                                         billable=set(payload.billable or []),
+                                         session_id=None)
+        if provider:
+            chain.pin_session(payload.session_id, provider)
+        return {"strategy": payload.strategy, "provider": provider,
+                "reasons": reasons, "pinned_session": payload.session_id if provider else None}
+    provider, reasons = chain.choose(payload.strategy, payload.candidates,
+                                     costs=payload.costs,
+                                     billable=set(payload.billable or []),
+                                     session_id=payload.session_id)
+    return {"strategy": payload.strategy, "provider": provider,
+            "reasons": reasons,
+            "pinned_provider": chain.pinned_provider(payload.session_id)}
 
 
 class BenchmarkIn(BaseModel):

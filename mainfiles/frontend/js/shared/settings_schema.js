@@ -96,7 +96,7 @@ export const SETTINGS_SCHEMA = [
     default: 'normal', category: 'voice_output' },
   { key: 'noSlop', label: 'No-slop cleanup', description: 'Removes named AI clichés (delve into, tapestry, crucial, furthermore…) from responses at save time. Edit only — use the De-slop preview Detect mode to audit without rewriting.', type: 'boolean',
     default: false, category: 'voice_output' },
-  { key: 'adhdFriendly', label: 'ADHD-friendly formatting', description: 'Post-hoc formatting only: strips throat-clearing openers, reflows paragraphs over 600 chars, caps lists at 5 items with a +N more note. Does not reorder content, number steps, or put the answer first — those need the prompt-level ADHD style (see /api/quality/adhd-style, not yet wired into chat).', type: 'boolean',
+  { key: 'adhdFriendly', label: 'ADHD-friendly formatting', description: 'Two parts, both wired into chat when on: the prompt-level ADHD style block (see /api/quality/adhd-style, injected into the chat system prompt when this is on) plus post-hoc formatting (strips throat-clearing openers, reflows paragraphs over 600 chars, caps lists at 5 items with a +N more note). The post-hoc pass never reorders content; per-message pre-send checks live on the Check writing button in Chat.', type: 'boolean',
     default: false, category: 'voice_output' },
   { key: 'formality', label: 'Formality', description: 'How formal replies should read.', type: 'select',
     options: [{ v: 'casual', l: 'Casual' }, { v: 'neutral', l: 'Neutral' }, { v: 'formal', l: 'Formal' }],
