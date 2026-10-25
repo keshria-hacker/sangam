@@ -1185,6 +1185,26 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/projects/{id}/context` | Yes | Project-scoped context (perfect-flow A3) |
 | GET | `/api/projects/{id}/retrieve` | Yes | Project-scoped hybrid retrieval (perfect-flow A3) |
 | GET | `/api/memory/dashboard` | Yes | Memory privacy dashboard (perfect-flow A3) |
+| POST | `/api/spec-v2` | Yes | Create spec pipeline v2 (perfect-flow A5) |
+| GET | `/api/spec-v2` | Yes | List spec pipelines v2 (perfect-flow A5) |
+| GET | `/api/spec-v2/{pid}` | Yes | Spec pipeline + artifacts (perfect-flow A5) |
+| GET | `/api/spec-v2/{pid}/artifacts` | Yes | Spec artifact store view (perfect-flow A5) |
+| POST | `/api/spec-v2/{pid}/advance` | Yes | Advance spec stage, gated (perfect-flow A5) |
+| POST | `/api/spec-v2/{pid}/tasks/{task_id}/evidence` | Yes | TDD RED+GREEN evidence (perfect-flow A5) |
+| POST | `/api/spec-v2/{pid}/verify-record` | Yes | GreenContract record (perfect-flow A5) |
+| POST | `/api/spec-v2/{pid}/review-package` | Yes | Diff review package (perfect-flow A5) |
+| POST | `/api/spec-v2/{pid}/review/{axis}` | Yes | Per-axis review verdict (perfect-flow A5) |
+| GET | `/api/spec-v2/{pid}/review-pr` | Yes | PR-style review artifact (perfect-flow A5) |
+| POST | `/api/spec-v2/{pid}/converge-report` | Yes | Convergence report + gaps (perfect-flow A5) |
+| GET | `/api/qa/levels` | Yes | GreenContract levels (perfect-flow A5) |
+| POST | `/api/qa/normalize` | Yes | Noise-normalize JSON body (perfect-flow A5) |
+| POST | `/api/qa/report` | Yes | Test report counts + markdown (perfect-flow A5) |
+| GET | `/api/code-graph/cycles` | Yes | Circular-import cycles (perfect-flow A5) |
+| GET | `/api/code-graph/architecture` | Yes | Architecture overview (perfect-flow A5) |
+| GET | `/api/code-graph/impact` | Yes | Change-impact callers (perfect-flow A5) |
+| GET | `/api/code-graph/search-v2` | Yes | Grep + graph search (perfect-flow A5) |
+| GET | `/api/deploy/connectors` | Yes | Deploy connectors status, deferred (perfect-flow A5) |
+| GET | `/api/deploy/permissions` | Yes | Deploy permission matrix (perfect-flow A5) |
 | GET | `/api/security/allowlist` | Yes | List target allowlist (Batch 2) |
 | POST | `/api/security/allowlist` | Yes | Add allowlist target (Batch 2) |
 | DELETE | `/api/security/allowlist/{target_id}` | Yes | Remove allowlist target (Batch 2) |
