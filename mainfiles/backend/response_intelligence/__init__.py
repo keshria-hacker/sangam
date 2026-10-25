@@ -27,6 +27,7 @@ from .classification import (
     classify_query_mode,
     detect_intent_signals,
 )
+from .pipeline import COMPOSER_MODES, TOOL_IDS, RouteDecision, route_message
 from .config import config, get_trigger_patterns
 from .prompt_injector import (
     build_system_prompt_additions,
@@ -42,6 +43,11 @@ from .schema import (
 __all__ = [
     # Main API
     "analyze_request",
+    # Auto pipeline (spec §4)
+    "route_message",
+    "RouteDecision",
+    "COMPOSER_MODES",
+    "TOOL_IDS",
     # Types
     "ResponseGuidance",
     "IntentSignal",

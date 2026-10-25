@@ -467,6 +467,7 @@ export function buildMessageNode(msg) {
         <button class="msg-action-btn save-msg-btn" aria-label="Save answer as a file"><i class="fa-regular fa-bookmark" aria-hidden="true"></i> Save</button>
         <button class="msg-action-btn workflow-msg-btn" aria-label="Turn this chat into a workflow"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Workflow</button>
         <button class="msg-action-btn inspect-msg-btn" aria-label="Inspect this message's evidence"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Inspect</button>
+        <button class="msg-action-btn view-run-btn" aria-label="View run history"><i class="fa-solid fa-list-check" aria-hidden="true"></i> View run</button>
         ${window.__sangamVoice ? '<button class="msg-action-btn speak-msg-btn" aria-label="Read aloud"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Speak</button>' : ''}
         <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
         <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
@@ -555,6 +556,17 @@ export function buildMessageNode(msg) {
     const { setSelectedMessage, isInspectorVisible, toggleInspector } = await import('../inspector/inspector.js');
     setSelectedMessage(msg);
     if (!isInspectorVisible()) toggleInspector();
+  });
+
+  // View run button (spec §3.2): run history lives in Agents → Run
+  // History; until the IA swap re-homes it, the live run-history
+  // surface is Work → Activity (the Runs centre), so that is where
+  // this opens — it never pretends a destination exists that does not.
+  const viewRunBtn = node.querySelector('.view-run-btn');
+  viewRunBtn?.addEventListener('click', async () => {
+    const { showToolSection } = await import('../tabs/tabs.js');
+    showToolSection('work', 'activity');
+    showToast({ type: 'info', title: 'Run history', message: 'Run history is in Work → Activity.' });
   });
 
   // Speak button (voice feature) — toggles to Stop while speaking

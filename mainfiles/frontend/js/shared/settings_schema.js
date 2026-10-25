@@ -45,6 +45,18 @@ export const SETTINGS_SCHEMA = [
     options: [{ v: 'chat', l: 'Chat' }, { v: 'think', l: 'Think' }, { v: 'agent', l: 'Agent' },
               { v: 'research', l: 'Research' }, { v: 'code', l: 'Code' }, { v: 'image', l: 'Image' }],
     default: 'chat', category: 'chat' },
+  // A2 composer modes (spec §3.2): Auto is the default; the pipeline
+  // decides answer/search/code/create/agent per message. Consumed by
+  // features/composer/popovers.js and features/chat/chat.js.
+  { key: 'composerMode', label: 'Composer mode', description: 'Mode for the composer. Auto (default) lets the response-intelligence pipeline decide whether to answer, search, code, create, or run an agent — no user action needed.', type: 'select',
+    options: [{ v: 'auto', l: 'Auto' }, { v: 'answer', l: 'Answer only' }, { v: 'research', l: 'Research' },
+              { v: 'code', l: 'Code' }, { v: 'create', l: 'Create' }, { v: 'agent', l: 'Agent' }],
+    default: 'auto', category: 'chat' },
+  { key: 'toolMode', label: 'Tool mode', description: 'Auto: the Tools popover shows what Auto chose and changes apply to this message only. Manual: Tools toggles stay on for every message.', type: 'select',
+    options: [{ v: 'auto', l: 'Auto' }, { v: 'manual', l: 'Manual' }],
+    default: 'auto', category: 'chat' },
+  { key: 'adaptiveDepth', label: 'Adaptive depth follow-ups', description: 'Offer "explain more" / "short version" follow-ups based on novice vs expert signals in your message.', type: 'boolean',
+    default: true, category: 'chat' },
   { key: 'defaultTemperature', label: 'Default temperature', type: 'number',
     default: 0.7, min: 0, max: 2, step: 0.1, category: 'chat',
     description: 'Creativity of responses.' },
@@ -108,7 +120,7 @@ export const SETTINGS_SCHEMA = [
     default: 'normal', category: 'voice_output' },
   { key: 'noSlop', label: 'No-slop cleanup', description: 'Removes named AI clichés (delve into, tapestry, crucial, furthermore…) from responses at save time. Edit only — use the De-slop preview Detect mode to audit without rewriting.', type: 'boolean',
     default: false, category: 'voice_output' },
-  { key: 'adhdFriendly', label: 'ADHD-friendly formatting', description: 'Post-hoc formatting only: strips throat-clearing openers, reflows paragraphs over 600 chars, caps lists at 5 items with a +N more note. Does not reorder content, number steps, or put the answer first — those need the prompt-level ADHD style (see /api/quality/adhd-style, not yet wired into chat).', type: 'boolean',
+  { key: 'adhdFriendly', label: 'ADHD-friendly formatting', description: 'Post-hoc formatting only: strips throat-clearing openers, reflows paragraphs over 600 chars, caps lists at 5 items with a +N more note. The prompt-level ADHD style block is also injected into chat when this is on (see /api/quality/adhd-style).', type: 'boolean',
     default: false, category: 'voice_output' },
   { key: 'formality', label: 'Formality', description: 'How formal replies should read.', type: 'select',
     options: [{ v: 'casual', l: 'Casual' }, { v: 'neutral', l: 'Neutral' }, { v: 'formal', l: 'Formal' }],

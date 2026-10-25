@@ -79,8 +79,17 @@ async def preview_quality(payload: QualityIn, user=Depends(get_current_user)):
 
 @router.post("/quality/lint")
 async def lint_quality(payload: LintIn, user=Depends(get_current_user)):
-    """Offline grammar/spell/repetition lint. Candidate issues only."""
-    return {"issues": lint_text(payload.text)}
+    """Offline grammar/spell/repetition lint. Candidate issues only.
+
+    `issues` is the pre-existing writing_lint shape (unchanged).
+    `harper` adds the Harper-class pass (response_quality/harper.py),
+    which blanks code fences / inline code / code-looking lines before
+    linting, so identifiers and error strings never produce issues.
+    Neither list rewrites the text.
+    """
+    from ..response_quality.harper import lint_harper
+
+    return {"issues": lint_text(payload.text), "harper": lint_harper(payload.text)}
 
 
 @router.get("/quality/adhd-style")
