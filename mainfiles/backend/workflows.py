@@ -23,6 +23,13 @@ third-party code execution); the closed node set is:
   ``loop`` (render a template per list item), ``crawl`` (same-host BFS,
   SSRF-guarded, capped pages/depth), ``extract`` (regex named groups or
   JSON path), ``prompt_transform`` (render system/user prompt parts).
+* ``approval`` (A4 human-approval node): the run input's ``__approvals``
+  map decides it — ``{"<node_id>": "approved"}`` passes, ``"denied"``
+  fails the run as a dead letter, and a missing entry pauses the run
+  with status ``waiting_approval`` (nodes after it are skipped, never
+  executed). A later run with the approval supplied re-runs from the
+  input. The agent runtime wires these approvals through its approval
+  queue (see backend/agent_runtime/).
   Any node may carry ``run_if``: a template that must render truthy or
   the node records ``skipped`` (reason run_if false) without failing.
 
@@ -61,7 +68,9 @@ NODE_TYPES = {"text", "transform", "retrieve", "memory_save", "http_fetch",
               # Batch 3 node library (engine unchanged: same validation,
               # timeouts, retries, dead letters, idempotency, replay).
               "llm", "agent", "tool", "code", "condition", "loop",
-              "crawl", "extract", "prompt_transform"}
+              "crawl", "extract", "prompt_transform",
+              # A4: human-approval node (see module docstring).
+              "approval"}
 TRANSFORM_OPS = {"upper", "lower", "reverse", "trim", "title"}
 # Tool node allowlist: read-only tools only. Write/execute tools are
 # excluded from workflows by design — a non-interactive run must never
@@ -498,6 +507,23 @@ async def _run_node(node: dict, run_input: dict, node_outputs: dict, db: Any = N
         if not out and config.get("template"):
             return render_template(config["template"], run_input, node_outputs)
         return out
+    if ntype == "approval":
+        # A4 human-approval node: the gate lives in the run input, so a
+        # workflow file alone can never approve itself. Missing approval
+        # raises with the approval_required: prefix, which
+        # run_workflow_row maps to status "waiting_approval" (not a
+        # failure): nodes after this one are skipped by the executor.
+        approvals = run_input.get("__approvals") or {}
+        decision = approvals.get(node["id"])
+        if decision == "approved":
+            return {"approval": "approved",
+                    "note": config.get("note", "")}
+        if decision == "denied":
+            raise WorkflowError(
+                f"approval_denied:{node['id']}: human approval denied")
+        raise WorkflowError(
+            f"approval_required:{node['id']}: human approval required "
+            "before this node passes")
     raise WorkflowError(f"unknown node type: {ntype}")
 
 
@@ -613,7 +639,12 @@ async def run_workflow_row(wf: Any, db: Any, run_input: dict,
     run.output_json = _json.dumps(outputs)
     run.node_results_json = _json.dumps(results)
     run.error = error
-    run.status = "failed" if error else "succeeded"
+    if error and error.startswith("approval_required:"):
+        # A4: waiting on a human is not a failure — the run pauses and
+        # a later run with __approvals supplied re-runs from the input.
+        run.status = "waiting_approval"
+    else:
+        run.status = "failed" if error else "succeeded"
     run.finished_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(run)

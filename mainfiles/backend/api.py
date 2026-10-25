@@ -242,6 +242,10 @@ from .api_routes.code_agent_routes import (  # noqa: F401
     chat_agent_run,
     code_agent_run,
 )
+# A4 (perfect-flow): importing this module registers the agent-runtime
+# routes (tasks, approvals, audit, notifications, scheduler tick,
+# security graph) on the shared router. This is the ONLY api.py change.
+from .api_routes import agent_runtime_routes  # noqa: F401
 # Batch 5: importing these modules registers their routes (engineering on
 # the shared router; skills v2 on the skills router) and pipeline tables.
 from .api_routes import engineering_routes  # noqa: F401
