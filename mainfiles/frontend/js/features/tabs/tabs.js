@@ -36,7 +36,7 @@ const SECTION_MAP = {
   'work:activity': ['agents', 'run-history'],
   'work:runs': ['agents', 'run-history'],
   'work:security': ['agents', 'security'],
-  'work:engineering': ['code', 'agent'],
+  'work:engineering': ['code', 'engineering'],
   'work:code': ['code', 'agent'],
   'agents:teams': ['agents', 'hub'],
   'agents:compare': ['agents', 'hub'],

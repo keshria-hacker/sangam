@@ -81,8 +81,9 @@ async function register(page: Page) {
 }
 
 async function openCreate(page: Page) {
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="create"]').click();
+  await page.locator('[data-nav="studio"]').click();
+  await page.waitForTimeout(2000);
+  await page.locator('[data-dest-section="create"]').click();
   await page.waitForTimeout(2000);
 }
 

@@ -85,8 +85,7 @@ test('Devices: section renders, pairing QR + code, approve/claim/revoke', async 
   attachGuards(page);
   await register(page);
 
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="settings"]').click();
+  await page.locator('[data-nav="settings"]').click();
   await expect(page.locator('.sp-cat[data-cat="devices"]')).toBeVisible({ timeout: 20000 });
   await page.locator('.sp-cat[data-cat="devices"]').click();
   await expect(page.locator('[data-devices-section]')).toBeVisible({ timeout: 20000 });

@@ -88,8 +88,7 @@ async function register(page: Page) {
 }
 
 async function openSettings(page: Page) {
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="settings"]').click();
+  await page.locator('[data-nav="settings"]').click();
   await page.waitForTimeout(2000);
 }
 

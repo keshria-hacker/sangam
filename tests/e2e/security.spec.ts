@@ -43,10 +43,9 @@ test('Security: section renders, allowlist add, pending run', async ({ page }) =
     await page.waitForTimeout(1500);
   }
 
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="work"]').click();
+  await page.locator('[data-nav="agents"]').click();
   await page.waitForTimeout(2000);
-  await page.locator('[data-worksection="security"]').click();
+  await page.locator('[data-dest-section="security"]').click();
   await expect(page.getByRole('heading', { name: 'Security' })).toBeVisible({ timeout: 20000 });
   await expect(page.locator('#secAllowForm')).toBeVisible();
   await expect(page.locator('#secCatalog')).not.toBeEmpty();

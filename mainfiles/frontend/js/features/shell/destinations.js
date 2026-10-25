@@ -280,6 +280,10 @@ export async function renderCodeDestination(bodyEl, opts = {}) {
     } },
     { id: 'spec', label: 'Spec & QA', render: renderSpecSegment },
     { id: 'graph', label: 'Code map', render: renderGraphSegment },
+    { id: 'engineering', label: 'Engineering', render: async (el) => {
+      const { renderEngineeringPage } = await import('../work/engineering.js');
+      await renderEngineeringPage(el);
+    } },
   ];
   return segmentedPage(bodyEl, 'code', sections, opts.section || 'agent');
 }

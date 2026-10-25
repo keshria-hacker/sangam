@@ -149,7 +149,7 @@ test.describe('Smoke (required gate)', () => {
 
     // 3. Composer popovers (back on chat view) — B4: Temp/Tokens pills deleted,
     // Tune is the single owner. Popovers: Mode, Tools, Tune.
-    await page.locator('#mainTab').click();
+    await page.locator('[data-nav="chat"]').click();
     await page.waitForTimeout(800);
     for (const btn of ['#modeBtn', '#toolsBtn', '#tuneBtn']) {
       const el = page.locator(btn);
@@ -173,7 +173,7 @@ test.describe('Smoke (required gate)', () => {
     await page.screenshot({ path: 'tests/e2e/screenshots/smoke-settings.png' });
 
     // 5. Send one chat message against the mock model
-    await page.locator('#mainTab').click();
+    await page.locator('[data-nav="chat"]').click();
     await page.waitForTimeout(800);
     // Select the mock model — it MUST exist (SANGAM_MOCK_PROVIDER=1).
     await page.locator('#modelSelectorBtn').click();
@@ -196,9 +196,8 @@ test.describe('Smoke (required gate)', () => {
     await page.screenshot({ path: 'tests/e2e/screenshots/smoke-chat.png' });
 
     // 6. Knowledge graph must load (not stuck, not error)
-    await page.locator('#mainTab').click();
-    await page.locator('#tabAdd').click();
-    await page.locator('[data-tab-tool="knowledge"]').click();
+    await page.locator('[data-nav="chat"]').click();
+    await page.locator('[data-nav="research"]').click();
     await page.waitForTimeout(4000);
     const graphText = await page.evaluate(() => document.body.innerText || '');
     expect(graphText, 'knowledge graph failed to load').not.toContain('Could not load graph');

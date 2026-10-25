@@ -87,16 +87,14 @@ async function register(page: Page) {
 }
 
 async function openLibrary(page: Page) {
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="library"]').click();
+  await page.locator('[data-nav="library"]').click();
   await page.waitForTimeout(3000);
 }
 
 async function openEngineering(page: Page) {
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="work"]').click();
+  await page.locator('[data-nav="code"]').click();
   await page.waitForTimeout(2000);
-  await page.locator('[data-worksection="engineering"]').click();
+  await page.locator('[data-dest-section="engineering"]').click();
   await page.waitForTimeout(2000);
 }
 

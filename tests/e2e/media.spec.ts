@@ -84,10 +84,9 @@ test('Media: create job, observe failure without an engine', async ({ page }) =>
   await register(page);
 
   // Batch 1: Media jobs now live in Create.
-  await page.locator('#tabAdd').click();
-  await page.locator('[data-tab-tool="create"]').click();
+  await page.locator('[data-nav="studio"]').click();
   await page.waitForTimeout(2000);
-  await page.locator('[data-createsub="media"]').click();
+  await page.locator('[data-dest-section="media"]').click();
   await page.waitForTimeout(3000);
 
   await expect(page.getByRole('heading', { name: 'Media jobs', exact: true })).toBeVisible();
