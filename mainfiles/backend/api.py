@@ -245,6 +245,9 @@ from .api_routes.code_agent_routes import (  # noqa: F401
 # Batch 5: importing these modules registers their routes (engineering on
 # the shared router; skills v2 on the skills router) and pipeline tables.
 from .api_routes import engineering_routes  # noqa: F401
+# A5 (spec v2 / QA / code-graph extensions / deploy interface):
+# importing this module registers its routes on the shared router.
+from .api_routes import spec_qa_routes  # noqa: F401
 from .api_routes import skills_v2_routes  # noqa: F401
 # Batch 6: importing this module registers the LAN device routes on the
 # shared router (host) and the claim route on the public router, plus the
