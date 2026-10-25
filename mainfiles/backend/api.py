@@ -242,16 +242,9 @@ from .api_routes.code_agent_routes import (  # noqa: F401
     chat_agent_run,
     code_agent_run,
 )
-# A4 (perfect-flow): importing this module registers the agent-runtime
-# routes (tasks, approvals, audit, notifications, scheduler tick,
-# security graph) on the shared router. This is the ONLY api.py change.
-from .api_routes import agent_runtime_routes  # noqa: F401
 # Batch 5: importing these modules registers their routes (engineering on
 # the shared router; skills v2 on the skills router) and pipeline tables.
 from .api_routes import engineering_routes  # noqa: F401
-# A5 (spec v2 / QA / code-graph extensions / deploy interface):
-# importing this module registers its routes on the shared router.
-from .api_routes import spec_qa_routes  # noqa: F401
 from .api_routes import skills_v2_routes  # noqa: F401
 # Batch 6: importing this module registers the LAN device routes on the
 # shared router (host) and the claim route on the public router, plus the
@@ -263,44 +256,12 @@ from .api_routes import devices_routes  # noqa: F401
 from .api_routes import code_graph_routes  # noqa: F401
 from .api_routes import deep_routes  # noqa: F401
 from .api_routes import goals_routes  # noqa: F401
-# A3 (perfect-flow Projects, Memory & Knowledge): one import+register
-# block for the projects module — all other A3 changes live in their
-# own modules (knowledge_routes, notebooks_routes, memory_routes,
-# chat_stream_routes, hybrid_retrieval, knowledge_graph, models,
-# goal_models, database) and need no api.py touch.
-from .api_routes.projects_routes import (  # noqa: F401
-    add_project_instruction,
-    add_project_source,
-    create_project,
-    create_project_chat,
-    create_project_task,
-    delete_project,
-    delete_project_source,
-    get_project,
-    get_project_context,
-    list_project_chats,
-    list_project_instructions,
-    list_project_sources,
-    list_project_tasks,
-    list_projects,
-    retrieve_project,
-    set_project_source_context,
-    update_project,
-    update_project_task,
-)
-# spec/a6-studio-skills: one import+register block for the A6 routes
-# (provider contract/capability registry, studio, marketplace, connector
-# health/permissions, blind compare) on the shared router.
-from .api_routes import a6_studio_routes  # noqa: F401
 # Doctor lives in its own module with its own router; include it on the
 # shared router so it is served (and authenticated) like /system/*.
 from .doctor import router as _doctor_router
 
 router.include_router(_doctor_router)
 from .api_routes.routing_routes import evaluate_routing  # noqa: F401
-# A2 (spec §4): Auto response-intelligence dry-run + Harper lint routes.
-# Importing registers them on the shared router (api_routes/common.py).
-from .api_routes import intelligence_routes  # noqa: F401
 from .config import settings  # noqa: F401
 from .database import AsyncSessionLocal, get_db  # noqa: F401
 from .document import extract_text, truncate_preview  # noqa: F401

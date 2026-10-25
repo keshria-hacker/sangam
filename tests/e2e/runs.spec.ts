@@ -46,10 +46,6 @@ function attachGuards(page: Page) {
 }
 
 async function register(page: Page) {
-  // Fresh login state per test: ctx is module-shared, and without this
-  // reset the pre-login /analytics/summary 401 (usage meter, expected
-  // before auth) from a later test would be mis-flagged as post-login.
-  ctx.loggedIn = false;
   const api = page.request;
   let resp = await api.post(`${BACKEND_URL}/api/auth/register`, {
     data: { username: USER, password: PASS },
@@ -88,10 +84,11 @@ test('Runs centre: tab, sections, labelled controls, screenshot', async ({ page 
   attachGuards(page);
   await register(page);
 
-  // A1: Runs is now Agents -> Run History (no tab picker anymore).
-  await page.locator('[data-nav="agents"]').click();
+  // Batch 1: Runs is now the Activity section inside Work.
+  await page.locator('#tabAdd').click();
+  await page.locator('[data-tab-tool="work"]').click();
   await page.waitForTimeout(2000);
-  await page.locator('[data-dest-section="run-history"]').click();
+  await page.locator('[data-worksection="activity"]').click();
   await page.waitForTimeout(3000);
 
   await expect(page.getByRole('heading', { name: 'Runs centre' })).toBeVisible();
@@ -124,23 +121,15 @@ test('Runs centre: tab, sections, labelled controls, screenshot', async ({ page 
   expect(ctx.pageErrors, `pageerror: ${JSON.stringify(ctx.pageErrors)}`).toEqual([]);
 });
 
-test('Runs centre: mobile 390px, no composer Runs button (perfect-flow A2)', async ({ page }) => {
+test('Runs centre: mobile 390px via composer Runs button', async ({ page }) => {
   test.setTimeout(180000);
   ctx.badResponses = []; ctx.consoleErrors = []; ctx.pageErrors = [];
   attachGuards(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await register(page);
-  // Perfect-flow A2: the composer Runs button is removed by spec — the
-  // composer must offer Auto mode instead, and run history lives in
-  // Agents → Run History (A1 new IA).
-  await expect(page.locator('#runsBtn')).toHaveCount(0);
-  // Mobile (tabs-on-top): no drawer — the Agents tab in the top tab
-  // bar is tapped directly, and it must not linger over content.
-  await expect(page.locator('#mobileSidebarToggle')).toHaveCount(0);
-  await expect(page.locator('#sidebar')).toHaveCount(0);
-  await page.locator('[data-nav="agents"]').click();
-  await page.waitForTimeout(2000);
-  await page.locator('[data-dest-section="run-history"]').click();
+  // Phase 1 remainder composition: the composer Runs pill opens the
+  // Runs tab without the tab picker — the chat -> runs path.
+  await page.locator('#runsBtn').click();
   await page.waitForTimeout(3000);
   await expect(page.getByRole('heading', { name: 'Runs centre' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh runs and artifacts' })).toBeVisible();

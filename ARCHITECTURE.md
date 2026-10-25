@@ -17,7 +17,6 @@
 13. [Configuration Reference](#13-configuration-reference)
 14. [Data Flow Diagram](#data-flow-diagram-complete)
 15. [Recent Additions (Phase 6)](#15-recent-additions-phase-6-2026-10-09)
-16. [Perfect-Flow Program (2026-10-25)](#16-perfect-flow-program-2026-10-25)
 
 ---
 
@@ -276,52 +275,41 @@ The frontend is a vanilla JS SPA served as static files. There is no build step,
 | DOMPurify | 3.2.4 | HTML sanitization |
 | KaTeX | 0.16.9 | LaTeX math rendering (with SRI integrity hashes) |
 
-### 4.2 Layout Structure (perfect-flow IA, 2026-10-25)
+### 4.2 Layout Structure
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│ TAB BAR (top): [Chat📌] [Projects] [Studio] [Code] [Research] │
-│ [Agents] [Library] [Settings] …  New chat │ Ctrl K │ Usage │ 👤│
-├───────────────────────────────────────────────────────────────┤
-│ DESTINATION CONTENT (one of 8, URL-addressable):               │
-│ Chat / Projects / Studio / Code / Research / Agents / Library │
-│ / Settings                                                     │
-│ Sub-navigation inside a destination is a segmented control,    │
-│ never a second sidebar. Breadcrumb in content, only at depth   │
-│ > 1. COMPOSER (Chat only): [Attach] [Textarea] [Send]          │
-│ [Mode: Auto] [Tools] [Tune]. INSPECTOR (right, Ctrl+Shift+I).  │
-└───────────────────────────────────────────────────────────────┘
+┌──────┬───────────────────────────────────────────────────┐
+│ RAIL │  TAB STRIP                                         │
+│      │  [Main Chat*] [Knowledge] [Create] ... [+]         │
+│ Home ├───────────────────────────────────────────────────┤
+│ Chat │                                                    │
+│Agents│  ACTIVE TAB CONTENT                                │
+│ Know │  (chat, knowledge graph, create hub, etc.)         │
+│Create│                                                    │
+│ Code ├───────────────────────────────────────────────────┤
+│ Learn│  COMPOSER (chat tab only)                          │
+│ Lib  │  [Attach] [Textarea] [Send] [Mode] [Tools] [Tune] │
+│ ...  └───────────────────────────────────────────────────┘
+│      │  INSPECTOR (right, Ctrl+Shift+I) │ ACTIVITY TRAY   │
+└──────┴───────────────────────────────────────────────────┘
 ```
 
-The **tab bar** (top) is the map of the app: exactly the 8
-destinations above, in that order, as switchable, closable tabs —
-Chat pinned first and never closable. There is NO sidebar and NO
-sidebar destination button (both removed in the 2026-10-25 tabs-on-top
-correction; see FIX_LOG.md — the perfect-flow spec's "no destination
-opens another destination as a tab" contradicted the user's standing
-tab vision and was followed without flagging it). Tabs remember their
-param/section/URL, closing the active tab falls back to the most
-recently used tab (else Chat), and tab switches push URL state so
-back/forward moves between tabs. The old Work/Create/Knowledge/Home
-destinations redirect (`work → /agents`, `create → /studio`,
-`knowledge → /research`, `home → /chat`) and unknown routes render a
-404 page with "Back to Chat". The main chat is pinned and never
-closes. The Inspector (right panel) shows contextual details. The
-Runs centre (Agents → Run History) is the single Activity feed; the
-old composer Runs button is removed.
+The **chat-focused sidebar** (left) provides searchable history, New Chat, profile
+actions, and compact collapsed behavior. The main chat tab is pinned and never
+closes. Tool tabs open side-by-side for stateful work. The Inspector (right panel)
+shows contextual details. The Activity Tray (bottom) tracks background jobs.
 
 ### 4.3 Module Organization
 
 The frontend uses a **feature-based module structure** under `frontend/js/` — each
-feature owns its own DOM, state, and logic. 69 modules total (verified by
-`scripts/check_frontend_modules.mjs` after the tabs-on-top correction
-deleted `core/nav.js`).
+feature owns its own DOM, state, and logic. 50 modules total (verified by
+`scripts/check_frontend_modules.mjs`).
 
 **Core** (`js/core/`):
 | Module | Responsibility |
 |--------|----------------|
 | `state.js` | Central signal store — `[get, set]` pairs for providers, models, chats, messages, selectedModel, temperature, maxTokens, reasoningEffort, webSearchEnabled, settings, etc. Also `createComputed` / `createSyncedSignal` helpers |
-| *(nav.js deleted 2026-10-25)* | The old sidebar rail module was deleted with the sidebar in the tabs-on-top correction; navigation lives in `features/tabs/tabs.js` |
+| `nav.js` | Compatibility hook for future tool navigation; the current UI keeps the sidebar focused on chat history |
 | `jobs.js` | Background job tracking for the Activity Tray |
 
 **Shared** (`js/shared/`):
@@ -345,8 +333,8 @@ deleted `core/nav.js`).
 | `chat/` | SSE streaming orchestration, send/regenerate, file attachments, clarification cards, agent mode |
 | `models/` | Model selector dropdown, provider status badges |
 | `settings/` | `settings.js` (legacy modal: theme, API keys) + `settings_page.js` (schema-driven full page) |
-| `sidebar/` | Chat-list fetching (feeds the command palette) + usage meter + new-chat binding; the `<aside>` element itself was removed in the tabs-on-top correction — all DOM lookups here are null-safe |
-| `tabs/` | Tab bar shell: mount-once persistent views, one tab per destination, Chat pinned, MRU close fallback, URL-synced tab state |
+| `sidebar/` | Chat history list (bucketed by date), new chat, delete chat |
+| `tabs/` | Mount-once persistent tab manager (main chat pinned) |
 | `agents/` | Agent Hub: custom agent CRUD, run with streaming, approval cards |
 | `teams/` | Multi-agent team UI |
 | `knowledge/` | Knowledge graph (SVG), search, MCP manager, memory browser |
@@ -1178,80 +1166,6 @@ WEB_SEARCH_MAX_RESULTS=5
 | GET | `/api/connectors/{name}/callback` | Yes | OAuth callback, token stored encrypted (Phase 5) |
 | DELETE | `/api/connectors/{name}` | Yes | Disconnect an OAuth connector (Phase 5) |
 | GET | `/api/system/backup` | Yes | Download backup zip (DB + uploads) (Phase 5) |
-| POST | `/api/projects` | Yes | Create project workspace (perfect-flow A3) |
-| GET | `/api/projects` | Yes | List projects (perfect-flow A3) |
-| GET | `/api/projects/{id}` | Yes | Project home summary (perfect-flow A3) |
-| PUT | `/api/projects/{id}` | Yes | Update project (perfect-flow A3) |
-| DELETE | `/api/projects/{id}` | Yes | Soft/hard delete project (perfect-flow A3) |
-| POST | `/api/projects/{id}/instructions` | Yes | New instruction version (perfect-flow A3) |
-| GET | `/api/projects/{id}/instructions` | Yes | Instruction current + history (perfect-flow A3) |
-| POST | `/api/projects/{id}/sources` | Yes | Add project source (perfect-flow A3) |
-| GET | `/api/projects/{id}/sources` | Yes | List project sources (perfect-flow A3) |
-| PUT | `/api/projects/{id}/sources/{sid}/context` | Yes | Source context control (perfect-flow A3) |
-| DELETE | `/api/projects/{id}/sources/{sid}` | Yes | Soft-delete source (perfect-flow A3) |
-| POST | `/api/projects/{id}/tasks` | Yes | Project task (reuses goals Task) (perfect-flow A3) |
-| GET | `/api/projects/{id}/tasks` | Yes | List project tasks (perfect-flow A3) |
-| PATCH | `/api/projects/{id}/tasks/{tid}` | Yes | Update project task (perfect-flow A3) |
-| POST | `/api/projects/{id}/chats` | Yes | Scoped chat in project (perfect-flow A3) |
-| GET | `/api/projects/{id}/chats` | Yes | List project chats (perfect-flow A3) |
-| GET | `/api/projects/{id}/context` | Yes | Project-scoped context (perfect-flow A3) |
-| GET | `/api/projects/{id}/retrieve` | Yes | Project-scoped hybrid retrieval (perfect-flow A3) |
-| GET | `/api/memory/dashboard` | Yes | Memory privacy dashboard (perfect-flow A3) |
-| POST | `/api/spec-v2` | Yes | Create spec pipeline v2 (perfect-flow A5) |
-| GET | `/api/spec-v2` | Yes | List spec pipelines v2 (perfect-flow A5) |
-| GET | `/api/spec-v2/{pid}` | Yes | Spec pipeline + artifacts (perfect-flow A5) |
-| GET | `/api/spec-v2/{pid}/artifacts` | Yes | Spec artifact store view (perfect-flow A5) |
-| POST | `/api/spec-v2/{pid}/advance` | Yes | Advance spec stage, gated (perfect-flow A5) |
-| POST | `/api/spec-v2/{pid}/tasks/{task_id}/evidence` | Yes | TDD RED+GREEN evidence (perfect-flow A5) |
-| POST | `/api/spec-v2/{pid}/verify-record` | Yes | GreenContract record (perfect-flow A5) |
-| POST | `/api/spec-v2/{pid}/review-package` | Yes | Diff review package (perfect-flow A5) |
-| POST | `/api/spec-v2/{pid}/review/{axis}` | Yes | Per-axis review verdict (perfect-flow A5) |
-| GET | `/api/spec-v2/{pid}/review-pr` | Yes | PR-style review artifact (perfect-flow A5) |
-| POST | `/api/spec-v2/{pid}/converge-report` | Yes | Convergence report + gaps (perfect-flow A5) |
-| GET | `/api/qa/levels` | Yes | GreenContract levels (perfect-flow A5) |
-| POST | `/api/qa/normalize` | Yes | Noise-normalize JSON body (perfect-flow A5) |
-| POST | `/api/qa/report` | Yes | Test report counts + markdown (perfect-flow A5) |
-| GET | `/api/code-graph/cycles` | Yes | Circular-import cycles (perfect-flow A5) |
-| GET | `/api/code-graph/architecture` | Yes | Architecture overview (perfect-flow A5) |
-| GET | `/api/code-graph/impact` | Yes | Change-impact callers (perfect-flow A5) |
-| GET | `/api/code-graph/search-v2` | Yes | Grep + graph search (perfect-flow A5) |
-| GET | `/api/deploy/connectors` | Yes | Deploy connectors status, deferred (perfect-flow A5) |
-| GET | `/api/deploy/permissions` | Yes | Deploy permission matrix (perfect-flow A5) |
-| GET | `/api/providers/capability-registry` | Yes | Per-model capability registry (perfect-flow A6) |
-| GET | `/api/providers/contract-check` | Yes | Adapter contract check (perfect-flow A6) |
-| POST | `/api/providers/preflight` | Yes | Model capability pre-flight warnings (perfect-flow A6) |
-| POST | `/api/providers/cost-ranked` | Yes | Cost-ranked routing (perfect-flow A6) |
-| GET | `/api/studio/catalog` | Yes | Studio catalogue + engine status (perfect-flow A6) |
-| POST | `/api/studio/documents/proof` | Yes | Document proof: generate + parse back (perfect-flow A6) |
-| POST | `/api/diagrams/export` | Yes | Node/edge spec to SVG/HTML (perfect-flow A6) |
-| POST | `/api/studio/classroom/generate` | Yes | Classroom slides + quiz + HTML + PBL (perfect-flow A6) |
-| GET | `/api/marketplace/sources` | Yes | Marketplace sources, registry labelled stub (perfect-flow A6) |
-| POST | `/api/marketplace/packs/{pack}/dry-run` | Yes | Pack dry-run preview (perfect-flow A6) |
-| POST | `/api/marketplace/packs/{pack}/install` | Yes | Hash-verified pack install (perfect-flow A6) |
-| GET | `/api/connectors/{name}/health` | Yes | Connector health, no token value (perfect-flow A6) |
-| GET | `/api/connectors/{name}/permissions` | Yes | Connector permissions (perfect-flow A6) |
-| POST | `/api/compare/blind` | Yes | Blind model comparison (perfect-flow A6) |
-| POST | `/api/compare/blind/vote` | Yes | Blind vote into leaderboard (perfect-flow A6) |
-| POST | `/api/intelligence/route` | Yes | Response pipeline dry-run routing (perfect-flow A2) |
-| POST | `/api/intelligence/harper` | Yes | Offline grammar/spell lint (perfect-flow A2) |
-| GET | `/api/intelligence/modes` | Yes | Composer modes list (perfect-flow A2) |
-| POST | `/api/agent-tasks` | Yes | Create durable agent task (perfect-flow A4) |
-| GET | `/api/agent-tasks` | Yes | List agent tasks (perfect-flow A4) |
-| GET | `/api/agent-tasks/{task_id}` | Yes | Agent task detail (perfect-flow A4) |
-| POST | `/api/agent-tasks/{task_id}/run` | Yes | Execute/resume agent task (perfect-flow A4) |
-| POST | `/api/agent-tasks/{task_id}/pause` | Yes | Pause agent task (perfect-flow A4) |
-| POST | `/api/agent-tasks/{task_id}/cancel` | Yes | Cancel agent task (perfect-flow A4) |
-| POST | `/api/agent-tasks/{task_id}/record-usage` | Yes | Record usage, enforce budget (perfect-flow A4) |
-| GET | `/api/agent-tasks/{task_id}/audit` | Yes | Agent task audit trail (perfect-flow A4) |
-| GET | `/api/agent-tasks/{task_id}/notifications` | Yes | Agent task notifications (perfect-flow A4) |
-| POST | `/api/agent-tasks/scheduler/tick` | Yes | Run due tasks + workflows (perfect-flow A4) |
-| POST | `/api/agent-tasks/security-graph` | Yes | Pentest graph as runtime task (perfect-flow A4) |
-| POST | `/api/agent-tasks/{task_id}/event` | Yes | Event trigger for task (perfect-flow A4) |
-| POST | `/api/agent-tasks/{task_id}/webhook` | Yes | Token webhook for task (perfect-flow A4) |
-| GET | `/api/agent-approvals` | Yes | Approval queue (perfect-flow A4) |
-| POST | `/api/agent-tasks/{task_id}/approvals/{approval_id}/decide` | Yes | Decide approval (perfect-flow A4) |
-| GET | `/api/agent-notifications` | Yes | In-app notifications (perfect-flow A4) |
-| POST | `/api/agent-notifications/{notification_id}/read` | Yes | Mark notification read (perfect-flow A4) |
 | GET | `/api/security/allowlist` | Yes | List target allowlist (Batch 2) |
 | POST | `/api/security/allowlist` | Yes | Add allowlist target (Batch 2) |
 | DELETE | `/api/security/allowlist/{target_id}` | Yes | Remove allowlist target (Batch 2) |
@@ -1685,81 +1599,3 @@ This bootstrap behavior is intentional: first-time setup is friction-free, and t
 - `scripts/check_frontend_modules.mjs`: Validates ES module imports/exports via V8
 - Run: `node --experimental-vm-modules scripts/check_frontend_modules.mjs`
 - Catches bugs that `node --check` misses (e.g. wrong relative import paths)
-
-## 16. Perfect-Flow Program (2026-10-25)
-
-The spec (`~/workspace/user/files/prompt.txt`) replaced the
-7-destination IA with 8 destinations, made Auto the default mode
-with a unified response-intelligence pipeline, and rebuilt Settings
-as a searchable control center. Merges, one at a time with tests
-after each: A3 Projects/Memory/Knowledge, A5 Code/Spec/QA, A6
-Studio/Skills/Integrations, A2 Composer/Response Intelligence, A4
-Agent Runtime, A1 IA & Shell, plus coordinator follow-ups (shell
-fixes, Engineering re-mount, browser-gate fixes). Full detail lives
-in `docs/`; this section is the index.
-
-### New IA
-
-Chat / Projects / Studio / Code / Research / Agents / Library /
-Settings — see `docs/INFORMATION_ARCHITECTURE.md`. Work and Create
-are flattened, not containers. Router:
-`frontend/js/features/shell/router.js`; navigation + tab bar:
-`frontend/js/features/tabs/tabs.js` (the old `core/nav.js` rail module
-was deleted with the sidebar in the 2026-10-25 tabs-on-top correction).
-
-### Response-intelligence pipeline
-
-`backend/response_intelligence/` — intake → intent → context →
-complexity → capability → mode → routing → execution → events →
-validation → post-actions. Rule-first intent; deterministic keyword
-scorer labelled as such; LLM classifier only when ambiguous. Golden
-set 50/50 intent+mode agreement. See `docs/RESPONSE_PIPELINE.md`.
-
-### Agent runtime
-
-`backend/agent_runtime/` wraps `code_agent`/`automations`/
-`workflows`/`security` (planner, state machine, scheduler,
-approval gate, budget meter, circuit breaker, audit log,
-restart-safe tables). Scheduler opt-in via
-`SANGAM_AGENT_SCHEDULER=1`. See `docs/AGENT_RUNTIME.md`.
-
-### Memory / knowledge / projects
-
-Project workspaces with scoped retrieval (no cross-project leakage,
-tested); provenance labels (`verified`/`inferred`); memory privacy
-dashboard in Settings → Memory & Knowledge. See `docs/MEMORY.md`.
-
-### Studio / skills
-
-Documents (docx/pdf/pptx/xlsx round-trip), 44-type diagram
-catalogue (SVG/HTML export; PNG honestly 422), image ops, voice
-(TTS/STT/dub/dictation — no cloning), classroom. Skill marketplace
-with SKILL.md contract, SHA-256 + lockfile, dry-run preview;
-first packs Engineering / Science (5-skill curated slice) /
-Creative-Design. See `docs/STUDIO.md` and `docs/SKILLS.md`.
-
-### Settings control center
-
-17 sections, searchable, every row with label/description/default/
-current/reset/requires-restart. `.env`-only options listed read-only
-in Advanced. See `docs/SETTINGS.md`.
-
-### Events / runs
-
-Agents → Run History is the single Activity feed (chat, agent-task,
-workflow, media job kinds). Telemetry default OFF. See
-`docs/EVENTS.md`.
-
-### Decisions / attributions / trees
-
-`docs/DECISIONS.md` (nine user-approved defaults, out-of-scope
-list), `docs/ATTRIBUTIONS.md` (every reference project + what was
-borrowed), `docs/TREE.md`, `docs/CODE_TREE.md`.
-
-### Verification for this program
-
-Full pytest suite, frontend module check (70/70), smoke gate (3/3),
-and 25 Playwright spec tests green across shell, smoke, runs,
-workflows, security, devices, fit, diagrams, media, knowledge,
-notebooks, skills — see `docs/TESTING.md` for totals and the
-retire-or-keep decision on the live-network websearch test.

@@ -303,8 +303,8 @@ async def _full_source_text(
     if source.kind == "file":
         if q:
             try:
-                from ..rag import retrieve_hybrid_chunks
-                chunks = retrieve_hybrid_chunks(q, [source.ref], top_k=10)
+                from ..rag import retrieve_relevant_chunks
+                chunks = retrieve_relevant_chunks(q, [source.ref], top_k=10)
                 texts = [c.get("text", "") for c in chunks if c.get("text")]
                 if texts:
                     return "\n\n".join(texts), None
@@ -335,8 +335,8 @@ async def _full_source_text(
     if source.file_id:
         if q:
             try:
-                from ..rag import retrieve_hybrid_chunks
-                chunks = retrieve_hybrid_chunks(q, [source.file_id], top_k=10)
+                from ..rag import retrieve_relevant_chunks
+                chunks = retrieve_relevant_chunks(q, [source.file_id], top_k=10)
                 texts = [c.get("text", "") for c in chunks if c.get("text")]
                 if texts:
                     return "\n\n".join(texts), None
@@ -718,20 +718,6 @@ async def set_source_context(
     await _get_notebook(db, user.id, nb_id)
     row = await _get_source(db, user.id, nb_id, source_id)
     row.context_mode = payload.context_mode
-    # A3 fix: a URL source added while excluded skipped ingest (no
-    # network call for a hidden row), so switching it back to
-    # summary/full used to leave it with no retrievable text —
-    # retrieve listed only a note. Ingest on un-exclude (and retry a
-    # previously failed ingest) so the mode switch actually restores
-    # the source. Best-effort: a failed fetch records failed status,
-    # it never blocks the mode change itself.
-    if (row.kind == "url" and payload.context_mode != "excluded"
-            and row.file_id is None
-            and row.ingest_status in ("skipped", "failed")):
-        file_id, status, error = await _ingest_url_for_source(db, user.id, row.ref)
-        row.file_id = file_id
-        row.ingest_status = status
-        row.ingest_error = error
     await db.commit()
     await db.refresh(row)
     return _source_out(row)

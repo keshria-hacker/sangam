@@ -16,7 +16,7 @@ console.log('[Module] learn.js loaded');
 let currentLesson = '';
 
 export async function initLearn() {
-  // Navigation via the tab bar — no per-button wiring needed.
+  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
   let enabled = false;
   try {
     const data = await (await apiFetch('/features')).json();

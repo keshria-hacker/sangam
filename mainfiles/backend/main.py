@@ -214,15 +214,9 @@ def create_app() -> FastAPI:
         from .workflows import start_workflow_scheduler
 
         _scheduler_task = _asyncio.create_task(start_workflow_scheduler())
-        # Perfect-flow A4: agent-runtime scheduler loop (opt-in via
-        # SANGAM_AGENT_SCHEDULER=1, off in tests), next to the workflow loop.
-        from .agent_runtime.scheduler import start_agent_scheduler
-
-        _agent_scheduler_task = _asyncio.create_task(start_agent_scheduler())
         logger.info("Application startup complete")
         yield
         _scheduler_task.cancel()
-        _agent_scheduler_task.cancel()
         # Cleanup auto-started Ollama process (if any)
         from .llm import _cleanup_ollama
         _cleanup_ollama()

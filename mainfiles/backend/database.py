@@ -90,16 +90,6 @@ async def _add_missing_columns(conn: Any) -> None:
     from sqlalchemy import text
 
     needed: dict[str, dict[str, str]] = {
-        # A3 (perfect-flow Projects): scoping columns on existing
-        # tables — NULL means unscoped/legacy, so old rows are valid.
-        "chats": {
-            "project_id":
-                "ALTER TABLE chats ADD COLUMN project_id VARCHAR(32)",
-        },
-        "tasks": {
-            "project_id":
-                "ALTER TABLE tasks ADD COLUMN project_id VARCHAR(32)",
-        },
         "custom_agents": {
             "approval_policy":
                 "ALTER TABLE custom_agents ADD COLUMN approval_policy VARCHAR(20) DEFAULT 'default'",

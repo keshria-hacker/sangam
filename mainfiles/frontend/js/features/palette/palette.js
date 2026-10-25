@@ -1,29 +1,17 @@
 /**
- * Command palette (Ctrl/Cmd+K, Ctrl+P alias) — A1 perfect-flow shell (§3.3).
+ * Command palette (Ctrl/Cmd+P) — quick actions for everything in the app.
  *
- * The discoverability layer: it reaches every destination, every
- * settings section, every installed skill, and every saved prompt, plus
- * new chat/project/artifact, switch model, toggle Auto, install a
- * skill, open a settings section, run a saved prompt, and search
- * conversations. The searchable index itself is the pure module in
- * shell/palette_index.js (unit-tested from Node); this file only
- * builds it from live data and runs the chosen action.
- *
- * "Run a saved prompt" prefills the composer with the prompt body and
- * focuses it — it never auto-sends, so the user edits first (the same
- * contract as the slash-command starters).
+ * open-webui-style quick launcher: fuzzy-filtered list of actions covering
+ * chat, skills, teams, learn, analytics, settings, and export. Feature-gated
+ * actions appear only when their backend flag is on.
  */
 
 import { apiFetch } from '../../shared/http.js';
 import { escapeHtml } from '../../shared/utils.js';
-import { getActiveChatId, getChats, getModels } from '../../core/state.js';
-import { DESTINATIONS } from '../shell/router.js';
-import { buildPaletteIndex, searchPaletteIndex } from '../shell/palette_index.js';
-import { SETTING_CATEGORIES } from '../../shared/settings_schema.js';
-import { PROMPT_TEMPLATES } from '../library/library.js';
-
+import { getActiveChatId } from '../../core/state.js';
 console.log('[Module] palette.js loaded');
 
+let flags = {};
 let paletteEl = null;
 let selectedIndex = 0;
 let visibleActions = [];
@@ -32,109 +20,60 @@ function app() {
   return window.sangamApp || {};
 }
 
-async function loadSkills() {
+async function loadFlags() {
   try {
-    const data = await (await apiFetch('/extensions')).json();
-    const exts = data.extensions || [];
-    return exts.filter((e) => e.kind === 'skill').map((e) => ({ name: e.name }));
+    const data = await (await apiFetch('/features')).json();
+    flags = (data && data.features) || {};
   } catch {
-    return [];
+    flags = {};
   }
 }
 
-async function buildIndex() {
-  const skills = await loadSkills();
-  const models = (getModels() || []).map((m) => ({ id: m.id, label: m.name || m.id }));
-  const chats = (getChats() || []).map((c) => ({ id: c.id, title: c.title }));
-  return buildPaletteIndex({
-    destinations: DESTINATIONS,
-    settingsSections: SETTING_CATEGORIES,
-    skills,
-    prompts: PROMPT_TEMPLATES,
-    models,
-    chats,
-  });
-}
-
-async function runAction(action) {
+function buildActions() {
   const a = app();
-  switch (action.type) {
-    case 'navigate': {
-      const { navigate } = await import('../tabs/tabs.js');
-      navigate(action.dest, { section: action.section || null });
-      return;
-    }
-    case 'settings': {
-      const { navigate } = await import('../tabs/tabs.js');
-      navigate('settings', { section: action.section });
-      return;
-    }
-    case 'new-chat':
-      a.startNewChat?.();
-      {
-        const { navigate } = await import('../tabs/tabs.js');
-        navigate('chat');
-      }
-      return;
-    case 'new-project': {
-      const { navigate } = await import('../tabs/tabs.js');
-      navigate('projects');
-      setTimeout(() => document.getElementById('pjName')?.focus(), 300);
-      return;
-    }
-    case 'new-artifact': {
-      const { navigate } = await import('../tabs/tabs.js');
-      navigate('studio', { section: 'create' });
-      return;
-    }
-    case 'switch-model': {
-      const model = (getModels() || []).find((m) => m.id === action.modelId);
-      if (model) a.selectModel?.(model);
-      else a.openModelDropdown?.();
-      return;
-    }
-    case 'toggle-auto': {
-      const store = await import('../../shared/settings_store.js');
-      const pop = await import('../composer/popovers.js');
-      const cur = store.getSetting('composerMode');
-      const next = cur === 'auto' ? 'answer' : 'auto';
-      pop.setMode(next);
-      store.setSetting('composerMode', next);
-      a.showToast?.({ type: 'info', title: next === 'auto' ? 'Auto mode on' : 'Auto mode off (Answer only)' });
-      return;
-    }
-    case 'install-skill': {
-      const { navigate } = await import('../tabs/tabs.js');
-      navigate('library', { section: 'skills' });
-      return;
-    }
-    case 'run-prompt': {
-      const { navigate } = await import('../tabs/tabs.js');
-      navigate('chat');
-      const ta = document.getElementById('messageInput');
-      if (ta) {
-        ta.value = action.body || '';
-        ta.focus();
-      }
-      return;
-    }
-    case 'open-chat': {
-      const { navigate } = await import('../tabs/tabs.js');
-      navigate('chat');
-      const { openChat } = await import('../sidebar/sidebar.js');
-      await openChat(action.chatId);
-      return;
-    }
-    case 'command':
-      if (action.command === 'theme') toggleTheme();
-      else if (action.command === 'websearch') await toggleWebSearch();
-      else if (action.command === 'export') await exportChat();
-      else if (action.command === 'copy') copyLast();
-      else if (action.command === 'regen') a.regenerate?.();
-      return;
-    default:
-      return;
+  const actions = [
+    { id: 'new-chat', label: 'New chat', hint: 'Ctrl+K', run: () => a.startNewChat?.() },
+    { id: 'skills', label: 'Open Library', run: () => a.openSkillsTab?.() },
+    { id: 'settings', label: 'Open Settings', hint: 'Ctrl+,', run: () => a.openSettings?.() },
+    { id: 'models', label: 'Switch model', hint: 'Ctrl+M', run: () => a.openModelDropdown?.() },
+    {
+      id: 'export', label: 'Export current chat as Markdown', run: () => exportChat(),
+    },
+    { id: 'theme', label: 'Toggle theme', hint: 'Ctrl+Shift+T', run: () => toggleTheme() },
+    { id: 'websearch', label: 'Toggle web search', hint: 'Alt+W', run: () => toggleWebSearch() },
+    { id: 'copy', label: 'Copy last response', hint: 'Ctrl+Shift+C', run: () => copyLast() },
+    { id: 'regen', label: 'Regenerate last response', hint: 'Ctrl+Shift+R', run: () => a.regenerate?.() },
+  ];
+  // Phase 8 B7: merged pages — deep-link into sub-views.
+  actions.push({
+    id: 'teams', label: 'Open Agent teams',
+    run: () => import('../tabs/tabs.js').then((m) => m.showToolSub('agents', 'data-agentsub', 'teams')),
+  });
+  actions.push({
+    id: 'compare', label: 'Compare models',
+    run: () => import('../tabs/tabs.js').then((m) => m.showToolSub('agents', 'data-agentsub', 'compare')),
+  });
+  actions.push({
+    id: 'runs', label: 'Open Activity feed',
+    run: () => import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'activity')),
+  });
+  if (flags.learning) {
+    // Batch 1: this used to open the bare Settings landing page. Learn now
+    // lives as the Study section inside Knowledge — go there for real.
+    actions.push({
+      id: 'learn', label: 'Open Learn mode',
+      run: () => import('../tabs/tabs.js').then((m) => { m.showToolSection('knowledge', 'study'); }),
+    });
   }
+  if (flags.analytics) {
+    // Batch 1: Usage now renders as its own section in Settings > Agents &
+    // Safety instead of landing the user on the Settings front page.
+    actions.push({
+      id: 'usage', label: 'Open Usage analytics',
+      run: () => import('../tabs/tabs.js').then((m) => { m.showToolSection('settings', 'usage'); }),
+    });
+  }
+  return actions;
 }
 
 async function exportChat() {
@@ -168,11 +107,8 @@ function toggleTheme() {
   });
 }
 
-async function toggleWebSearch() {
-  const { isToolEnabled, setToolEnabled } = await import('../composer/popovers.js');
-  const on = !isToolEnabled('web_search');
-  setToolEnabled('web_search', on);
-  app().showToast?.({ type: 'info', title: on ? 'Web search on' : 'Web search off' });
+function toggleWebSearch() {
+  document.getElementById('webSearchToggle')?.click();
 }
 
 function copyLast() {
@@ -194,10 +130,10 @@ function ensurePalette() {
     <div class="modal palette-modal" role="dialog" aria-modal="true" aria-label="Command palette">
       <div class="palette-input-wrap">
         <i class="fa-solid fa-terminal"></i>
-        <input id="paletteInput" placeholder="Go to, run, switch, search…" autocomplete="off" aria-label="Command search">
+        <input id="paletteInput" placeholder="Type a command…" autocomplete="off" aria-label="Command search">
       </div>
       <div class="palette-list" id="paletteList" role="listbox"></div>
-      <div class="palette-hint"><kbd>↑↓</kbd> navigate · <kbd>↵</kbd> run · <kbd>esc</kbd> close · <kbd>Ctrl/Cmd+K</kbd> open</div>
+      <div class="palette-hint"><kbd>↑↓</kbd> navigate · <kbd>↵</kbd> run · <kbd>esc</kbd> close</div>
     </div>`;
   document.body.appendChild(paletteEl);
   const input = paletteEl.querySelector('#paletteInput');
@@ -211,12 +147,14 @@ function ensurePalette() {
   return paletteEl;
 }
 
-let fullIndex = [];
+function matches(action, query) {
+  return action.label.toLowerCase().includes(query.toLowerCase());
+}
 
 function renderList(query = '') {
   const list = paletteEl.querySelector('#paletteList');
   const q = query.trim();
-  visibleActions = searchPaletteIndex(fullIndex, q);
+  visibleActions = buildActions().filter((a) => !q || matches(a, q));
   selectedIndex = Math.min(selectedIndex, Math.max(0, visibleActions.length - 1));
   if (!visibleActions.length) {
     list.innerHTML = '<div class="palette-empty">No matching commands.</div>';
@@ -226,7 +164,7 @@ function renderList(query = '') {
     <button class="palette-item${i === selectedIndex ? ' selected' : ''}" type="button"
             data-idx="${i}" role="option" aria-selected="${i === selectedIndex}">
       <span>${escapeHtml(a.label)}</span>
-      <span class="palette-group">${escapeHtml(a.group)}</span>
+      ${a.hint ? `<kbd>${escapeHtml(a.hint)}</kbd>` : ''}
     </button>`).join('');
   list.querySelectorAll('.palette-item').forEach((btn) => {
     btn.addEventListener('click', () => { selectedIndex = Number(btn.dataset.idx); runSelected(); });
@@ -250,15 +188,17 @@ function runSelected() {
   const action = visibleActions[selectedIndex];
   closePalette();
   if (action) {
-    runAction(action.action).catch((err) => {
+    try {
+      action.run();
+    } catch (err) {
       app().showToast?.({ type: 'error', title: 'Command failed', message: err?.message || String(err) });
-    });
+    }
   }
 }
 
 export async function openPalette() {
   ensurePalette();
-  fullIndex = await buildIndex();
+  await loadFlags();
   paletteEl.classList.remove('hidden');
   selectedIndex = 0;
   const input = paletteEl.querySelector('#paletteInput');
@@ -276,16 +216,15 @@ export function isPaletteOpen() {
 }
 
 export async function initPalette() {
+  await loadFlags();
   document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd+K is the palette (spec §3.3); Ctrl+P stays as an alias.
-    // app.js no longer binds Ctrl+K to New chat, so there is no double action.
-    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'k' || e.key.toLowerCase() === 'p')) {
-      // Palette from anywhere, including the composer: Ctrl+K has no
-      // text-editing meaning in this app, so it always toggles.
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
       e.preventDefault();
       isPaletteOpen() ? closePalette() : openPalette();
     } else if (e.key === 'Escape' && isPaletteOpen()) {
       closePalette();
     }
   });
+  // Phase 8 B5: the topbar terminal button is removed (redundant with Ctrl+P).
+  // The palette stays available via Ctrl+P / Cmd+P.
 }

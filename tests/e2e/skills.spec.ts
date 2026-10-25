@@ -49,11 +49,6 @@ function attachGuards(page: Page) {
 }
 
 async function register(page: Page) {
-  // Fresh login state per test: ctx is module-shared, and without this
-  // reset the pre-login /analytics/summary 401 (usage meter, expected
-  // before auth) from a later test would be mis-flagged as post-login
-  // (same latent bug fixed in runs.spec.ts).
-  ctx.loggedIn = false;
   const api = page.request;
   let resp = await api.post(`${BACKEND_URL}/api/auth/register`, {
     data: { username: USER, password: PASS },
@@ -92,14 +87,16 @@ async function register(page: Page) {
 }
 
 async function openLibrary(page: Page) {
-  await page.locator('[data-nav="library"]').click();
+  await page.locator('#tabAdd').click();
+  await page.locator('[data-tab-tool="library"]').click();
   await page.waitForTimeout(3000);
 }
 
 async function openEngineering(page: Page) {
-  await page.locator('[data-nav="code"]').click();
+  await page.locator('#tabAdd').click();
+  await page.locator('[data-tab-tool="work"]').click();
   await page.waitForTimeout(2000);
-  await page.locator('[data-dest-section="engineering"]').click();
+  await page.locator('[data-worksection="engineering"]').click();
   await page.waitForTimeout(2000);
 }
 

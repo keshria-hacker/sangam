@@ -10,10 +10,10 @@ import { openSettings } from './features/settings/open.js';
 import { applyAppearance, initAppearance } from './features/settings/appearance.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
 import { initTabs, openToolTab, showTool, showToolSection, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
-import { renderProjectsDestination, renderStudioDestination, renderCodeDestination, renderResearchDestination, renderAgentsDestination, renderLibraryDestination, renderSettingsDestination } from './features/shell/destinations.js';
 import { trapFocus } from './shared/focus_trap.js';
 import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';
+import { renderRail, registerNavHandler } from './core/nav.js';
 import { initPopovers } from './features/composer/popovers.js';
 import { initInspector } from './features/inspector/inspector.js';
 import { initElements as initSidebarElements, initSidebar, openMobileSidebar, closeMobileSidebar, toggleSidebarCollapse, loadChatList as sidebarLoadChatList, renderChatHistory as sidebarRenderChatHistory, openChat as sidebarOpenChat, deleteChat as sidebarDeleteChat } from './features/sidebar/sidebar.js';
@@ -116,9 +116,6 @@ function initDOM() {
     authResetSubmit: $('#authResetSubmit'),
     authForgotBack: $('#authForgotBack'),
     authResetBack: $('#authResetBack'),
-    paletteHintBtn: $('#paletteHintBtn'),
-    helpBtn: $('#helpBtn'),
-    usageMeter: $('#usageMeter'),
     skillsBtn: $('#skillsBtn'),
     codeBtn: $('#codeBtn'),
     designBtn: $('#designBtn'),
@@ -141,20 +138,57 @@ function initDOM() {
  * Set up global event listeners that cross modules.
  */
 /**
- * Tabs-on-top (2026-10-25 user correction): the sidebar rail is gone
- * and so is its module (core/nav.js, deleted). Navigation lives in
- * features/tabs/tabs.js, which renders the tab bar during initTabs()
- * — there is nothing to initialise here anymore. (openSettings() now
- * calls tabs.js navigate() directly; feature toggles live in Settings.)
+ * Initialize the studio rail (intent-grouped navigation).
+ * A9: only registers handlers here. The rail itself renders in
+ * loadRailFeatures(), called post-auth when /features returns real state.
  */
+async function initRail() {
+  const container = document.getElementById('railNav');
+  if (!container) return;
+  // Register nav handlers
+  registerNavHandler('home', () => {
+    openToolTab('home');
+  });
+  registerNavHandler('chat', () => {
+    const { switchTab } = window.__sangamTabs || {};
+    // Fallback: main tab is the chat
+    document.getElementById('mainTab')?.click();
+  });
+  registerNavHandler('settings', () => {
+    openToolTab('settings');
+  });
+  // Load features and render
+  // (moved to loadRailFeatures — called post-auth from startApplication)
+  // Re-render rail when features change
+  document.addEventListener('sangam:features-changed', async (e) => {
+    renderRail(container, e.detail?.features || {});
+  });
+}
+
+/**
+ * A9: Fetch /features and render the rail. Called once post-auth from
+ * startApplication, so the rail never shows stale "Turn on" badges.
+ */
+async function loadRailFeatures() {
+  const container = document.getElementById('railNav');
+  if (!container) return;
+  try {
+    const { apiFetch } = await import('./shared/http.js');
+    const data = await (await apiFetch('/features')).json();
+    renderRail(container, data.features || {});
+  } catch {
+    renderRail(container, {});
+  }
+}
 
 function initGlobalListeners() {
-  // Keyboard shortcuts.
-  // NOTE (A1): Ctrl/Cmd+K is the command palette, owned by palette.js
-  // (initPalette) — it is deliberately NOT bound to New chat here, so
-  // the two handlers cannot double-fire. New chat lives on the sidebar
-  // button and on the palette's "New chat" action.
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd+K - New chat
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      chatStartNewChat();
+    }
     // Escape - Close modals, dropdowns
     if (e.key === 'Escape') {
       closeModelDropdown();
@@ -245,14 +279,8 @@ function initGlobalListeners() {
   // These buttons used to call showTool() with ids that no longer exist in
   // TOOL_DEFS, so they silently did nothing. They now open the real views.
   elements.skillsBtn?.addEventListener('click', () => showToolSub('library', 'data-libtab', 'skills'));
-  elements.codeBtn?.addEventListener('click', () => showToolSection('code', 'agent'));
-  elements.designBtn?.addEventListener('click', () => showToolSub('studio', 'data-dest-section', 'design'));
-  // Sidebar footer (A1): palette hint opens the palette, help opens
-  // the shortcuts modal. Usage meter rendering lives in sidebar.js.
-  elements.paletteHintBtn?.addEventListener('click', () => {
-    import('./features/palette/palette.js').then((m) => m.openPalette()).catch(() => {});
-  });
-  elements.helpBtn?.addEventListener('click', () => openShortcutsModal());
+  elements.codeBtn?.addEventListener('click', () => showToolSection('work', 'code'));
+  elements.designBtn?.addEventListener('click', () => showToolSub('create', 'data-createsub', 'design'));
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 
@@ -266,7 +294,7 @@ function initGlobalListeners() {
       : `<i class="fa-solid fa-chevron-down"></i> Show details`;
   });
 
-  // (Footer Settings button removed in Phase 8 B1 — the tab bar Settings tab is the single entry.)
+  // (Footer Settings button removed in Phase 8 B1 — rail Settings is the single entry.)
 
 }
 
@@ -343,19 +371,12 @@ export async function startApplication() {
   // Set up global namespace for inline handlers
   setupGlobalNamespace();
 
-  // Load providers and models from backend.
-  // Shell first: the tab bar and the command palette must never wait
-  // on provider/model probing — without Ollama, /models burns ~13s on
-  // auto-start retries, and awaiting it first left the whole shell
-  // (tab bar, palette) unrendered while the app looked booted. The
-  // tab bar renders in initTabs() and the palette reads models lazily
-  // at open, so neither waits on the probe.
+  // Load providers and models from backend
   try {
-    // Command palette (Ctrl+K / Ctrl+P) — also shell, also independent
-    // of providers; init early so it works during the model probe.
-    import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
     await loadProvidersAndModels();
     await sidebarLoadChatList();
+    // A9: render the rail now that /features returns authenticated state.
+    await loadRailFeatures();
     elements.backendDownState?.classList.add('hidden');
     chatStartNewChat();
     // Voice: show mic/speak UI only when the backend flag is on.
@@ -368,8 +389,8 @@ export async function startApplication() {
     import('./features/learn/learn.js').then((m) => m.initLearn()).catch(() => {});
     // Analytics: show the usage button only when the flag is on.
     import('./features/analytics/analytics.js').then((m) => m.initAnalytics()).catch(() => {});
-    // (Command palette is imported above, before the model probe, so
-    // Ctrl+K works while providers are still loading.)
+    // Command palette (Ctrl+P).
+    import('./features/palette/palette.js').then((m) => m.initPalette()).catch(() => {});
     // Batch 1: guided first-run setup in Chat when no provider is ready.
     import('./features/setup/setup.js').then((m) => m.maybeShowFirstRunSetup()).catch(() => {});
     // Note: no "Connected" toast on every load — the topbar connection pulse
@@ -416,20 +437,41 @@ async function init() {
   initSidebar();
   initGlobalListeners();
   initTabs();
+  initRail();
   initPopovers();
   initInspector();
-  // A1: the 8 destinations, each a real page (shell/destinations.js).
-  // Chat has no renderer — it is the pinned chat view itself. Old
-  // destinations (home/work/create/knowledge) are NOT registered: their
-  // ids redirect in tabs.js, and their old page modules (home.js,
-  // work.js) stay in the tree unmounted rather than as dead UI.
-  registerTabRenderer('projects', renderProjectsDestination);
-  registerTabRenderer('studio', renderStudioDestination);
-  registerTabRenderer('code', renderCodeDestination);
-  registerTabRenderer('research', renderResearchDestination);
-  registerTabRenderer('agents', renderAgentsDestination);
-  registerTabRenderer('library', renderLibraryDestination);
-  registerTabRenderer('settings', renderSettingsDestination);
+  // Batch 1: only the 6 consolidated destinations have renderers.
+  // Agents/Code/Workflows/Activity are Work sections; Media is a Create
+  // section; Skills is a Library sub-view; Study is a Knowledge section;
+  // Usage is a Settings section.
+  registerTabRenderer('home', async (bodyEl) => {
+    const { renderHome } = await import('./features/home/home.js');
+    renderHome(bodyEl);
+  });
+  registerTabRenderer('settings', async (bodyEl) => {
+    const { renderSettingsPage } = await import('./features/settings/settings_page.js');
+    renderSettingsPage(bodyEl);
+  });
+  registerTabRenderer('knowledge', async (bodyEl) => {
+    const { renderKnowledgeTab } = await import('./features/knowledge/knowledge.js');
+    renderKnowledgeTab(bodyEl);
+  });
+  registerTabRenderer('agents', async (bodyEl) => {
+    const { renderAgentsPage } = await import('./features/agents/hub.js');
+    renderAgentsPage(bodyEl);
+  });
+  registerTabRenderer('create', async (bodyEl) => {
+    const { renderCreateHub } = await import('./features/create/hub.js');
+    renderCreateHub(bodyEl);
+  });
+  registerTabRenderer('library', async (bodyEl) => {
+    const { renderLibrary } = await import('./features/library/library.js');
+    renderLibrary(bodyEl);
+  });
+  registerTabRenderer('work', async (bodyEl) => {
+    const { renderWorkPage } = await import('./features/work/work.js');
+    renderWorkPage(bodyEl);
+  });
 
 
   // Initialize auth flow (this will call startApplication on success)

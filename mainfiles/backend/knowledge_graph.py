@@ -178,17 +178,7 @@ def build_knowledge_graph(
     # Cross-links: memories mentioning document names, etc. (keyword-based)
     _link_by_keywords(nodes, edges, seen)
 
-    # Backlinks visibility (cheap reverse index over the edges above):
-    # backlinks[node_id] = ids of nodes that link TO it, so a node
-    # detail view can show "linked from" without rebuilding the graph.
-    backlinks: dict[str, list[str]] = {}
-    for edge in edges:
-        backlinks.setdefault(edge["to"], []).append(edge["from"])
-    for node_id in backlinks:
-        backlinks[node_id] = sorted(set(backlinks[node_id]))
-
     return {
-        "backlinks": backlinks,
         "nodes": nodes,
         "edges": edges,
         "stats": {

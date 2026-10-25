@@ -66,16 +66,6 @@ class ChatStreamRequest(BaseModel):
     web_search_max_results: int = Field(default=5, ge=1, le=10)
     reasoning_effort: str | None = Field(default=None, description="Reasoning effort: low, medium, high, etc.")
     media_ids: list[str] = Field(default_factory=list, max_length=10, description="Media attachment IDs (image/audio)")
-    # A2 composer: resolved by the frontend Auto mode selector. "auto"
-    # (default) lets response_intelligence decide; any other value is an
-    # explicit user mode. Unknown values are coerced to "auto" in the
-    # stream path so older clients never break.
-    composer_mode: str = Field(default="auto", description="Composer mode: auto, answer, research, code, create, agent")
-    # Per-message tool overrides from the Tools popover (Auto: override
-    # for this message only; Manual: the persistent toggle set). Keys
-    # outside the pipeline tool vocabulary are ignored server-side.
-    tool_overrides: dict[str, bool] = Field(default_factory=dict, description="Per-message tool toggles")
-    adaptive_depth: bool = Field(default=True, description="Offer explain-more / short-version post-actions")
 
     @model_validator(mode="after")
     def final_message_must_be_user(self) -> "ChatStreamRequest":

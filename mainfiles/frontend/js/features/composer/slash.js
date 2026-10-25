@@ -16,19 +16,6 @@ import { escapeHtml } from '../../shared/utils.js';
 
 console.log('[Module] composer/slash.js loaded');
 
-// Prompt-starter commands (spec §3.2): these prefill an editable starter
-// in the composer and let Auto route it — they never send anything by
-// themselves and never fabricate output. /video is the exception: video
-// is SKIPPED this round upstream, so it shows a plain not-available
-// note and does nothing else.
-function prefill(starter) {
-  return (ta) => {
-    if (!ta) return;
-    ta.value = starter;
-    ta.focus();
-  };
-}
-
 const COMMANDS = [
   { cmd: 'chat', label: 'Chat', desc: 'Normal conversation mode', run: () => setMode('chat') },
   { cmd: 'think', label: 'Think', desc: 'Deep reasoning, shows thinking', run: () => setMode('think') },
@@ -36,25 +23,13 @@ const COMMANDS = [
   { cmd: 'code', label: 'Code', desc: 'Code agent mode with file tools', run: () => setMode('code') },
   { cmd: 'research', label: 'Research', desc: 'Web research with citations', run: () => setMode('research') },
   { cmd: 'image', label: 'Image', desc: 'Generate images', run: () => setMode('image') },
-  { cmd: 'grill', label: 'Grill an idea', desc: 'Prefill a hard-questions starter (you edit, then send)', run: prefill('Grill this idea with hard questions before we build it: ') },
-  { cmd: 'spec', label: 'Write a spec', desc: 'Prefill a spec starter in Code mode', run: async (ta) => { await setMode('code'); prefill('Write a spec for: ')(ta); } },
-  { cmd: 'council', label: 'Council deliberation', desc: 'Prefill a multi-viewpoint deliberation starter', run: prefill('Council deliberation — argue from multiple viewpoints and give a verdict with dissent: ') },
-  { cmd: 'review', label: 'Review code', desc: 'Prefill a code-review starter in Code mode', run: async (ta) => { await setMode('code'); prefill('Review this code: ')(ta); } },
-  { cmd: 'plan', label: 'Plan a build', desc: 'Prefill a planning starter', run: prefill('Plan how to build: ') },
-  { cmd: 'diagram', label: 'Make a diagram', desc: 'Prefill a diagram starter in Create mode', run: async (ta) => { await setMode('create'); prefill('Make a diagram of: ')(ta); } },
-  { cmd: 'podcast', label: 'Podcast script', desc: 'Prefill a podcast-script starter (you edit, then send)', run: prefill('Write a podcast script about: ') },
-  { cmd: 'video', label: 'Video (not available)', desc: 'Video production is not available this round', run: () => showToast({ type: 'info', title: 'Video not available', message: 'Video production is not available this round — try /diagram, or ask for a script instead.' }) },
   { cmd: 'search', label: 'Search the web', desc: 'Turn on web search + Research mode', run: async () => { const { setToolEnabled } = await import('./popovers.js'); setToolEnabled('web_search', true); setMode('research'); } },
-  { cmd: 'runs', label: 'Open Runs', desc: 'Live runs, history, and artifacts (Agents → Run History)', run: () => openSection('agents', 'run-history') },
-  { cmd: 'workflows', label: 'Open Workflows', desc: 'Build and run automations (Agents → Workflows)', run: () => openSection('agents', 'workflows') },
-  { cmd: 'agents', label: 'Open Agents', desc: 'Agent teams, tasks, and run history', run: () => openSection('agents', 'hub') },
+  { cmd: 'runs', label: 'Open Runs', desc: 'Live runs, history, and artifacts (Work → Activity)', run: () => openSection('work', 'activity') },
+  { cmd: 'workflows', label: 'Open Workflows', desc: 'Build and run automations (Work → Workflows)', run: () => openSection('work', 'workflows') },
+  { cmd: 'agents', label: 'Open Agents', desc: 'Agent teams and runs (Work → Agents)', run: () => openSection('work', 'agents') },
   { cmd: 'library', label: 'Open Library', desc: 'Skills, tools, extensions, templates', run: () => openTool('library') },
-  { cmd: 'projects', label: 'Open Projects', desc: 'Persistent workspaces with scoped memory', run: () => openTool('projects') },
-  { cmd: 'studio', label: 'Open Studio', desc: 'Documents, diagrams, images, voice, design', run: () => openTool('studio') },
-  { cmd: 'code', label: 'Open Code', desc: 'Code agent, spec pipeline, code map', run: () => openTool('code') },
-  { cmd: 'research', label: 'Open Research', desc: 'Search, knowledge graph, notebooks, study', run: () => openTool('research') },
-  { cmd: 'knowledge', label: 'Open Research', desc: 'Memory, files, and retrieval (now Research)', run: () => openTool('research') },
-  { cmd: 'create', label: 'Open Studio', desc: 'Make images, audio, documents, designs (now Studio)', run: () => openTool('studio') },
+  { cmd: 'knowledge', label: 'Open Knowledge', desc: 'Memory, files, and retrieval', run: () => openTool('knowledge') },
+  { cmd: 'create', label: 'Open Create', desc: 'Make images, audio, documents, designs', run: () => openTool('create') },
   { cmd: 'settings', label: 'Open Settings', desc: 'Providers, appearance, devices', run: () => openSettings() },
 ];
 
@@ -132,7 +107,7 @@ export function initSlashMenu(textarea) {
     close();
     textarea.focus();
     try {
-      await command.run(textarea);
+      await command.run();
     } catch (err) {
       showToast({ type: 'error', title: `/${command.cmd} failed`, message: err?.message || String(err) });
     }

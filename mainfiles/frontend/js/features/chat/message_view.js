@@ -467,7 +467,6 @@ export function buildMessageNode(msg) {
         <button class="msg-action-btn save-msg-btn" aria-label="Save answer as a file"><i class="fa-regular fa-bookmark" aria-hidden="true"></i> Save</button>
         <button class="msg-action-btn workflow-msg-btn" aria-label="Turn this chat into a workflow"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Workflow</button>
         <button class="msg-action-btn inspect-msg-btn" aria-label="Inspect this message's evidence"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Inspect</button>
-        <button class="msg-action-btn view-run-btn" aria-label="View run history"><i class="fa-solid fa-list-check" aria-hidden="true"></i> View run</button>
         ${window.__sangamVoice ? '<button class="msg-action-btn speak-msg-btn" aria-label="Read aloud"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Speak</button>' : ''}
         <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
         <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
@@ -517,7 +516,7 @@ export function buildMessageNode(msg) {
   // runnable workflow via the existing POST /workflows endpoint — a
   // single llm node whose prompt is the last user question (or, if the
   // chat has none, the canvas default {{input.q}} template) — then opens
-  // Agents → Workflows with the new workflow listed.
+  // Work → Workflows with the new workflow listed.
   const wfBtn = node.querySelector('.workflow-msg-btn');
   wfBtn?.addEventListener('click', async () => {
     if (wfBtn.disabled) return;
@@ -538,9 +537,9 @@ export function buildMessageNode(msg) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || `Workflow creation failed (${res.status})`);
-      showToast({ type: 'success', title: 'Workflow created', message: `"${name}" is ready in Agents → Workflows.` });
+      showToast({ type: 'success', title: 'Workflow created', message: `"${name}" is ready in Work → Workflows.` });
       const { showToolSection } = await import('../tabs/tabs.js');
-      showToolSection('agents', 'workflows');
+      showToolSection('work', 'workflows');
     } catch (err) {
       showToast({ type: 'error', title: 'Workflow failed', message: err?.message || String(err) });
     } finally {
@@ -556,14 +555,6 @@ export function buildMessageNode(msg) {
     const { setSelectedMessage, isInspectorVisible, toggleInspector } = await import('../inspector/inspector.js');
     setSelectedMessage(msg);
     if (!isInspectorVisible()) toggleInspector();
-  });
-
-  // View run button (spec §3.2, A1 re-homing): run history lives in
-  // Agents → Run History.
-  const viewRunBtn = node.querySelector('.view-run-btn');
-  viewRunBtn?.addEventListener('click', async () => {
-    const { showToolSection } = await import('../tabs/tabs.js');
-    showToolSection('agents', 'run-history');
   });
 
   // Speak button (voice feature) — toggles to Stop while speaking

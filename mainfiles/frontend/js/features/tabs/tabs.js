@@ -1,87 +1,68 @@
 /**
- * Shell navigation — tabs on top (2026-10-25 user correction).
+ * Browser-like tab system (mount-once).
  *
- * The tab bar at the top of the app IS the navigation. There is no
- * sidebar and no sidebar destination button: the perfect-flow spec's
- * "no destination opens another destination as a tab" contradicted
- * the user's standing vision (Chat pinned as the only chat, everything
- * else opening as separate tool tabs) and was followed without
- * flagging it. This module restores that vision.
- *
- * There are exactly 8 destinations (see shell/router.js), each a real
- * page rendered into the main view; Chat is pinned first, never
- * closable, never duplicated. Every other destination opens as a
- * switchable, closable tab: navigating to a destination that already
- * has a tab focuses it (restoring that tab's stored param/section/
- * URL) instead of duplicating it. Closing a tab activates the most
- * recently used remaining tab, falling back to Chat; closing can
- * never leave a blank screen. Tabs start as the full destination set
- * (so the bar is also the map of the app) and closed tabs disappear
- * until reopened via the palette, a deep link, or a composer action.
- * With many tabs open the bar scrolls horizontally, never wraps.
- * Sub-navigation inside a destination is a segmented control at the
- * top of that destination's content area.
- *
- * Navigation stays URL-addressable: /chat, /projects/:id,
- * /studio/:artifact, /code/:repo, /research/:notebook, /agents/:id,
- * /library, /settings/:section (plus ?section= for in-destination
- * segments). Tab switches push URL state, so browser back/forward
- * moves between tabs, and a deep link opens (or focuses) the right
- * tab on load. Unknown routes render a 404 page with a "back to Chat"
- * action. Old destination ids (home/work/create/knowledge/…) REDIRECT
- * through router.js instead of 404ing, so old palette actions, slash
- * commands, and specs keep resolving.
- *
- * Compatibility: the tab API (showTool, showToolSection, showToolSub,
- * openToolTab, switchTab, closeTab, registerTabRenderer,
- * registerSectionActivator, getActiveViewTool, getActiveTabId) is
- * preserved — those functions now open/focus/close real tabs.
+ * - The "main" tab is the only chat. It is pinned: always open, never closable.
+ * - Tool tabs open as separate tabs so they never block chat.
+ * - Each tool view is mounted ONCE and hidden/shown on switch — state
+ *   (running logs, results, form input) survives tab switches.
+ * - The "+" picker respects feature flags.
  */
-import { DESTINATIONS, parseRoute, urlFor, resolveLegacyId, breadcrumbText } from '../shell/router.js';
+import { apiFetch } from '../../shared/http.js';
 
-const TOOL_DEFS = Object.fromEntries(DESTINATIONS.map((d) => [d.id, d]));
+/**
+ * Consolidated destinations (Batch 1 UX consolidation). Chat is the pinned
+ * main tab and is NOT in this map. Everything else is one of these six;
+ * older tab ids survive only as aliases below, so existing palette actions,
+ * composer pills and specs keep resolving instead of silently dying.
+ */
+const TOOL_DEFS = {
+  home:      { title: 'Home',      icon: 'fa-house',               desc: 'Continue where you left off, and see what is ready.' },
+  work:      { title: 'Work',      icon: 'fa-briefcase',            desc: 'Agents, code, workflows, and everything they did (Activity).' },
+  create:    { title: 'Create',    icon: 'fa-wand-magic-sparkles', desc: 'Make things: documents, images, audio, web pages, media jobs.' },
+  knowledge: { title: 'Knowledge', icon: 'fa-brain',               desc: 'Everything the app remembers and knows, plus Study.' },
+  library:   { title: 'Library',   icon: 'fa-book',               desc: 'Plug things in: skills, tools, extensions, templates.' },
+  settings:  { title: 'Settings',  icon: 'fa-gear',               desc: 'Configure the app, providers, features, and devices.' },
+};
 
-/** Old (destination, section) pairs -> new (destination, segment). */
-const SECTION_MAP = {
-  'work:agents': ['agents', 'hub'],
-  'work:teams': ['agents', 'hub'],
-  'work:compare': ['agents', 'hub'],
-  'work:workflows': ['agents', 'workflows'],
-  'work:activity': ['agents', 'run-history'],
-  'work:runs': ['agents', 'run-history'],
-  'work:security': ['agents', 'security'],
-  'work:engineering': ['code', 'engineering'],
-  'work:code': ['code', 'agent'],
-  'agents:teams': ['agents', 'hub'],
-  'agents:compare': ['agents', 'hub'],
-  'agents:runs': ['agents', 'run-history'],
-  'create:media': ['studio', 'media'],
-  'create:image': ['studio', 'create'],
-  'create:voice': ['studio', 'create'],
-  'create:design': ['studio', 'design'],
-  'knowledge:study': ['research', 'explore'],
-  'knowledge:notebooks': ['research', 'notebooks'],
-  'library:skills': ['library', 'skills'],
-  'library:mcp': ['library', 'mcp'],
-  'library:extensions': ['library', 'extensions'],
-  'library:templates': ['library', 'templates'],
-  'settings:usage': ['settings', 'data'],
-  'settings:models': ['settings', 'models'],
+/** Old tab ids -> { destination, section inside it }. */
+const ALIASES = {
+  agents:    { dest: 'work',      section: 'agents' },
+  teams:     { dest: 'work',      section: 'agents' },
+  compare:   { dest: 'work',      section: 'agents' },
+  code:      { dest: 'work',      section: 'code' },
+  workflows: { dest: 'work',      section: 'workflows' },
+  runs:      { dest: 'work',      section: 'activity' },
+  media:     { dest: 'create',    section: 'media' },
+  images:    { dest: 'create',    section: 'image' },
+  voice:     { dest: 'create',    section: 'voice' },
+  design:    { dest: 'create',    section: 'design' },
+  skills:    { dest: 'library',   section: 'skills' },
+  learn:     { dest: 'knowledge', section: 'study' },
+  analytics: { dest: 'settings',  section: 'usage' },
 };
 
 /** Section activators registered by destination modules on render:
- *  dest -> fn(section) that switches the destination's segmented control. */
+ *  dest -> fn(section) that switches/ scrolls to the section. */
 const sectionActivators = new Map();
 export function registerSectionActivator(dest, fn) {
   sectionActivators.set(dest, fn);
 }
 
+function resolveTool(tool) {
+  if (TOOL_DEFS[tool]) return { dest: tool, section: null };
+  const alias = ALIASES[tool];
+  if (alias) return { ...alias };
+  return null;
+}
+
+/** Activate a section inside an already-shown destination (polls briefly
+ *  for async renders, then falls back to known section-button attributes). */
 function activateSection(dest, section) {
   if (!section) return;
   const tryActivate = () => {
     const fn = sectionActivators.get(dest);
     if (fn) { try { fn(section); } catch {} return true; }
-    for (const attr of ['data-dest-section', 'data-agentsub', 'data-libtab', 'data-worksection', 'data-createsub']) {
+    for (const attr of ['data-worksection', 'data-createsub', 'data-libtab']) {
       const btn = document.querySelector(`[${attr}="${section}"]`);
       if (btn) { btn.click(); return true; }
     }
@@ -94,328 +75,212 @@ function activateSection(dest, section) {
   }, 120);
 }
 
+/** Show a destination and, if given, its section. */
+export function showToolSection(dest, section) {
+  showTool(dest);
+  activateSection(dest, section);
+}
+
+const openTabs = []; // [{ id, tool, title, icon, mounted }]
+let activeTabId = 'main';
 let renderers = {};
+let featureCache = null;
+
 export function registerTabRenderer(tool, fn) {
   renderers[tool] = fn;
-}
-/** Alias with the new name; renderers are per-destination. */
-export function registerDestinationRenderer(dest, fn) {
-  renderers[dest] = fn;
 }
 
 function $(sel) { return document.querySelector(sel); }
 
-/** Refresh the cached flags (call after a toggle in Settings). No-op now:
- *  the old tab picker (the only feature-flag consumer) is gone. Kept
- *  so existing callers do not break. */
-export function invalidateFeatureCache() { /* no-op */ }
-
-const viewCache = new Map(); // dest -> { container, lastParam, lastSection }
-let activeDest = 'chat';
-let activeParam = null;
-let activeSection = null;
-let currentParsed = null;
-
-export function getActiveViewTool() { return activeDest === 'chat' ? null : activeDest; }
-export function getActiveDestination() { return activeDest; }
-export function getActiveTabId() { return activeDest === 'chat' ? 'main' : `view-${activeDest}`; }
-
-/* ------------------------------------------------------------------ */
-/* Tab-bar state. One tab per destination (keyed by destination id);  */
-/* each tab remembers the param/section/URL it was last left at, so   */
-/* switching back restores where the user was instead of resetting   */
-/* to the destination landing page. Chat is always first and can     */
-/* never be closed. `mru` is most-recently-used first, and decides   */
-/* which tab activates when the active tab is closed.                */
-/* ------------------------------------------------------------------ */
-let openTabs = DESTINATIONS.map((d) => ({ dest: d.id, param: null, section: null, url: d.path }));
-let activeTab = 'chat';
-let mru = ['chat'];
-let lastTabBarSignature = null;
-
-function tabEntry(dest) {
-  return openTabs.find((t) => t.dest === dest) || null;
+function closeTabPicker() {
+  const picker = $('#tabPicker');
+  const addButton = $('#tabAdd');
+  picker?.remove();
+  addButton?.setAttribute('aria-expanded', 'false');
 }
 
-function touchMru(dest) {
-  mru = [dest, ...mru.filter((d) => d !== dest)];
-}
-
-/** Ensure a tab exists for a destination and make it active. */
-function ensureTab(dest, { param = null, section = null, url = null } = {}) {
-  let entry = tabEntry(dest);
-  if (!entry) {
-    entry = { dest, param, section, url };
-    openTabs.push(entry);
-  } else {
-    entry.param = param;
-    entry.section = section;
-    entry.url = url;
-  }
-  activeTab = dest;
-  touchMru(dest);
-  return entry;
-}
-
-/**
- * Render the tab bar. Skips rebuilding the DOM when nothing changed
- * (same tab set, same active tab) so focus is never stolen by a
- * re-render during ordinary navigation.
- */
-function renderTabBar() {
-  const scroll = $('#tabBarScroll');
-  if (!scroll) return;
-  const signature = openTabs.map((t) => `${t.dest}@${t.url || ''}`).join('|') + `#${activeTab}`;
-  if (signature === lastTabBarSignature) return;
-  lastTabBarSignature = signature;
-  scroll.innerHTML = '';
-  for (const tab of openTabs) {
-    const def = TOOL_DEFS[tab.dest];
-    if (!def) continue;
-    const item = document.createElement('div');
-    item.className = 'tab-item';
-    item.dataset.tab = tab.dest;
-    item.setAttribute('role', 'tab');
-    const selected = activeTab === tab.dest;
-    item.setAttribute('aria-selected', String(selected));
-    if (selected) item.classList.add('active');
-    const label = document.createElement('button');
-    label.type = 'button';
-    label.className = 'tab-item-label';
-    // data-nav keeps every existing [data-nav="…"] caller (specs,
-    // composer actions) working: clicking a tab label focuses it.
-    label.dataset.nav = tab.dest;
-    label.title = def.title;
-    label.setAttribute('aria-label', `${def.title} tab`);
-    label.innerHTML = `<i class="fa-solid ${def.icon}" aria-hidden="true"></i><span>${def.title}</span>`
-      + (tab.dest === 'chat' ? '<i class="fa-solid fa-thumbtack tab-pin" aria-hidden="true" title="Pinned"></i>' : '');
-    label.addEventListener('click', () => {
-      const entry = tabEntry(tab.dest);
-      navigate(tab.dest, {
-        param: entry ? entry.param : null,
-        section: entry ? entry.section : null,
-      });
-    });
-    item.appendChild(label);
-    if (tab.dest !== 'chat') {
-      const close = document.createElement('button');
-      close.type = 'button';
-      close.className = 'tab-item-close';
-      close.dataset.tabClose = tab.dest;
-      close.setAttribute('aria-label', `Close ${def.title} tab`);
-      close.title = `Close ${def.title}`;
-      close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-      close.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeTabByDest(tab.dest);
-      });
-      item.appendChild(close);
-      // Middle-click closes, like a browser tab.
-      item.addEventListener('auxclick', (e) => {
-        if (e.button === 1) {
-          e.preventDefault();
-          closeTabByDest(tab.dest);
-        }
-      });
-    }
-    scroll.appendChild(item);
-  }
-}
-
-/** Close a destination tab. Chat can never be closed. */
-export function closeTabByDest(dest) {
-  if (dest === 'chat' || !tabEntry(dest)) return;
-  const wasActive = activeTab === dest;
-  openTabs = openTabs.filter((t) => t.dest !== dest);
-  mru = mru.filter((d) => d !== dest);
-  if (!wasActive) {
-    // Inactive tab closed: active tab and URL are untouched, but the
-    // bar must still re-render (signature changed).
-    lastTabBarSignature = null;
-    renderTabBar();
+function openTabPicker() {
+  const addButton = $('#tabAdd');
+  if (!addButton) return;
+  if ($('#tabPicker')) {
+    closeTabPicker();
     return;
   }
-  // Active tab closed: fall back to the most recently used remaining
-  // tab, else Chat. This can never blank the screen: Chat always
-  // exists and always renders.
-  const next = mru[0] || 'chat';
-  const entry = tabEntry(next);
-  navigate(next, {
-    param: entry ? entry.param : null,
-    section: entry ? entry.section : null,
+
+  const picker = document.createElement('div');
+  picker.id = 'tabPicker';
+  picker.className = 'tool-picker-menu tab-picker-menu';
+  picker.setAttribute('role', 'menu');
+  picker.innerHTML = Object.entries(TOOL_DEFS).map(([tool, def]) => `
+    <button type="button" role="menuitem" data-tab-tool="${tool}">
+      <i class="fa-solid ${def.icon}" aria-hidden="true"></i><span>${def.title}</span>
+      <span class="tool-picker-desc">${def.desc}</span>
+    </button>
+  `).join('');
+
+  document.body.appendChild(picker);
+  const buttonRect = addButton.getBoundingClientRect();
+  picker.style.top = `${buttonRect.bottom + 6}px`;
+  picker.style.left = `${Math.max(12, buttonRect.right - 190)}px`;
+  addButton.setAttribute('aria-expanded', 'true');
+  picker.querySelectorAll('[data-tab-tool]').forEach((button) => {
+    button.addEventListener('click', () => {
+      openToolTab(button.dataset.tabTool, { newTab: true });
+      closeTabPicker();
+    });
   });
 }
 
-/** Slim contextual breadcrumb INSIDE the content area, depth > 1 only.
- *  There is no top bar and no repeated title bar anywhere else. */
-function renderBreadcrumb(parsed) {
-  const crumb = $('#destBreadcrumb');
-  if (!crumb) return;
-  const text = breadcrumbText(parsed);
-  if (!text) {
-    crumb.classList.add('hidden');
-    crumb.textContent = '';
-    return;
+async function getFeatures() {
+  if (featureCache) return featureCache;
+  try {
+    const data = await (await apiFetch('/features')).json();
+    featureCache = data.features || {};
+  } catch {
+    featureCache = {};
   }
-  crumb.classList.remove('hidden');
-  crumb.textContent = text;
+  return featureCache;
 }
 
-function renderNotFound(path) {
-  const body = $('#toolViewBody');
-  if (!body) return;
-  activeDest = null;
-  activeTab = null;
-  renderTabBar();
-  $('#chatView')?.classList.add('hidden');
-  $('#toolView')?.classList.remove('hidden');
-  renderBreadcrumb(null);
-  document.querySelectorAll('#toolViewBody .tool-tab-body').forEach((el) => el.classList.add('hidden'));
-  let page = document.getElementById('destNotFound');
-  if (!page) {
-    page = document.createElement('div');
-    page.id = 'destNotFound';
-    page.className = 'tool-tab-body dest-notfound';
-    body.appendChild(page);
+/** Refresh the cached flags (call after a toggle in Settings). */
+export function invalidateFeatureCache() { featureCache = null; }
+
+function renderTabStrip() {
+  const list = $('#toolTabList');
+  if (!list) return;
+  list.innerHTML = '';
+  for (const t of openTabs) {
+    const el = document.createElement('div');
+    el.className = 'tab' + (t.id === activeTabId ? ' tab-active' : '');
+    el.setAttribute('role', 'tab');
+    el.setAttribute('aria-selected', t.id === activeTabId);
+    el.setAttribute('tabindex', t.id === activeTabId ? '0' : '-1');
+    el.dataset.tabId = t.id;
+    el.innerHTML = `<i class="fa-solid ${t.icon}"></i><span>${t.title}</span>
+      <button class="tab-close" aria-label="Close ${t.title} tab" tabindex="-1"><i class="fa-solid fa-xmark"></i></button>`;
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.tab-close')) {
+        closeTab(t.id);
+      } else {
+        switchTab(t.id);
+      }
+    });
+    list.appendChild(el);
   }
-  page.classList.remove('hidden');
-  page.innerHTML = `<h2>Page not found</h2>
-    <p class="settings-hint">There is no page at “${path}”. It may be an old link — the destinations are Chat, Projects, Studio, Code, Research, Agents, Library, and Settings.</p>
-    <button type="button" class="btn-primary" id="notFoundBack">Back to Chat</button>`;
-  page.querySelector('#notFoundBack')?.addEventListener('click', () => navigate('chat'));
+  const mainTab = $('#mainTab');
+  if (mainTab) {
+    mainTab.classList.toggle('tab-active', activeTabId === 'main');
+    mainTab.setAttribute('aria-selected', activeTabId === 'main');
+    mainTab.setAttribute('tabindex', activeTabId === 'main' ? '0' : '-1');
+  }
 }
 
-/**
- * Navigate to a destination. opts: { param, section, push }.
- * push=false is used for popstate / initial load (URL already correct).
- */
-export function navigate(dest, { param = null, section = null, push = true } = {}) {
-  if (!TOOL_DEFS[dest]) return;
-  const url = urlFor(dest, { param, section });
-  if (push && window.location.pathname + window.location.search !== url) {
-    window.history.pushState({ dest, param, section }, '', url);
+/** Arrow-key navigation for the tab strip (WAI-ARIA tabs pattern). */
+function initTabKeyboard() {
+  const strip = $('#tabStrip');
+  if (!strip || strip.dataset.kbWired) return;
+  strip.dataset.kbWired = '1';
+  strip.addEventListener('keydown', (e) => {
+    const tabs = [...strip.querySelectorAll('[role="tab"]')];
+    const cur = document.activeElement;
+    const i = tabs.indexOf(cur);
+    if (i === -1) return;
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (i + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = tabs.length - 1;
+    else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      cur.click();
+      return;
+    } else return;
+    e.preventDefault();
+    tabs[next].focus();
+    // Activate on focus (automatic activation)
+    tabs[next].click();
+  });
+}
+
+/** Open (or focus) a tool tab. Old ids resolve through ALIASES to their
+ *  destination + section, so they never silently do nothing. Returns the tab id. */
+export function openToolTab(tool, { newTab = false } = {}) {
+  const resolved = resolveTool(tool);
+  if (!resolved) return null;
+  const { dest, section } = resolved;
+  const def = TOOL_DEFS[dest];
+  if (!newTab && section) {
+    // Aliases open in the main view (rail navigation), not as strip tabs.
+    showToolSection(dest, section);
+    return `view-${dest}`;
   }
-  activeDest = dest;
-  activeParam = param;
-  activeSection = section;
-  currentParsed = parseRoute(url);
-  // Tab state follows navigation: the destination's tab is created
-  // (if it was closed) or focused, remembering this param/section/
-  // URL for the next switch back. There is no sidebar drawer anymore
-  // — nothing can linger over content after a navigation.
-  ensureTab(dest, { param, section, url });
-  renderTabBar();
-  document.dispatchEvent(new CustomEvent('sangam:destination-changed', {
-    detail: { dest, param, section },
-  }));
-
-  if (dest === 'chat') {
-    $('#toolView')?.classList.add('hidden');
-    $('#chatView')?.classList.remove('hidden');
-    renderBreadcrumb(currentParsed);
-    return;
+  let tab = newTab ? null : openTabs.find((t) => t.tool === dest);
+  if (!tab) {
+    const suffix = newTab ? `-${Date.now()}-${openTabs.length}` : '';
+    tab = { id: `tool-${dest}${suffix}`, tool: dest, title: def.title, icon: def.icon, mounted: false };
+    openTabs.push(tab);
   }
+  switchTab(tab.id);
+  if (section) activateSection(dest, section);
+  return tab.id;
+}
 
-  $('#chatView')?.classList.add('hidden');
-  $('#toolView')?.classList.remove('hidden');
-  renderBreadcrumb(currentParsed);
+// ---------------------------------------------------------------------------
+// Main-view navigation (Phase 8 B6).
+//
+// Rail items REPLACE the main view — one page at a time, no strip tab.
+// The strip tabs remain only for explicit "open beside chat" split views
+// (max 2, enforced above). Main-view containers are mount-once like tabs.
+// ---------------------------------------------------------------------------
 
+const viewCache = new Map(); // tool -> container
+let activeViewTool = null;
+
+/** Show a tool in the main view (rail navigation). Mount-once per tool.
+ *  Aliases resolve to their destination + section. The pinned main tab
+ *  always says "Chat" — it is never renamed to the active tool. */
+export function showTool(requested) {
+  const resolved = resolveTool(requested);
+  if (!resolved) return;
+  const { dest: tool, section } = resolved;
+  const def = TOOL_DEFS[tool];
+  activeViewTool = tool;
+  activeTabId = 'main'; // strip shows main active; the rail owns the highlight
   const body = $('#toolViewBody');
-  if (!body) return;
-  let entry = viewCache.get(dest);
-  if (!entry || !entry.container.isConnected) {
-    const container = document.createElement('div');
-    container.id = `viewbody-${dest}`;
+  let container = viewCache.get(tool);
+  if (!container || !container.isConnected) {
+    container = document.createElement('div');
+    container.id = `viewbody-${tool}`;
     container.className = 'tool-tab-body';
-    container.dataset.tool = dest;
+    container.dataset.tool = tool;
     body.appendChild(container);
-    entry = { container, lastParam: null, lastSection: null, rendered: false };
-    viewCache.set(dest, entry);
+    const render = renderers[tool];
+    if (render) {
+      try { render(container); } catch (err) { console.error('view render failed', tool, err); }
+    } else {
+      container.innerHTML = `<p class="settings-hint">Loading ${def.title}…</p>`;
+    }
+    viewCache.set(tool, container);
   }
   document.querySelectorAll('#toolViewBody .tool-tab-body').forEach((el) => {
-    el.classList.toggle('hidden', el !== entry.container);
+    el.classList.toggle('hidden', el !== container);
   });
-  const render = renderers[dest];
-  const paramChanged = entry.lastParam !== param;
-  const isSettings = dest === 'settings';
-  // First render (including a direct landing before app.js registered
-  // renderers — the later navigation then renders, it does not stay
-  // blank), or a detail-param change, re-renders. Anything else is a
-  // segment switch, handled by the destination's section activator so
-  // mount-once state (forms, scroll) survives.
-  if (render && (!entry.rendered || paramChanged)) {
-    entry.rendered = true;
-    entry.lastParam = param;
-    entry.lastSection = section;
-    try {
-      const out = render(entry.container, { param, section });
-      if (out && typeof out.catch === 'function') {
-        out.catch((err) => {
-          console.error('destination render failed', dest, err);
-          entry.container.innerHTML = `<p class="settings-hint">Could not load ${TOOL_DEFS[dest].title}: ${err?.message || err}</p>`;
-        });
-      }
-    } catch (err) {
-      console.error('destination render failed', dest, err);
-      entry.container.innerHTML = `<p class="settings-hint">Could not load ${TOOL_DEFS[dest].title}: ${err?.message || err}</p>`;
-    }
-  } else if (render && isSettings && section && section !== entry.lastSection) {
-    // Settings section switches are handled by its section activator below.
-    entry.lastSection = section;
-  } else {
-    entry.lastParam = param;
-    entry.lastSection = section;
-  }
-  if (section) activateSection(dest, section);
+  $('#chatView')?.classList.add('hidden');
+  $('#toolView')?.classList.remove('hidden');
+  const titleEl = $('#toolViewTitle');
+  if (titleEl) titleEl.innerHTML = `<i class="fa-solid ${def.icon}"></i> ${def.title}`;
+  renderTabStrip();
+  if (section) activateSection(tool, section);
 }
 
-/** Show a destination by id, old id, or URL path. */
-export function showTool(requested, opts = {}) {
-  if (!requested) return;
-  if (typeof requested === 'string' && requested.startsWith('/')) {
-    routeFromLocation(requested);
-    return;
-  }
-  const redirect = resolveLegacyId(requested);
-  if (redirect && !TOOL_DEFS[requested]) {
-    // Genuinely old id only: current ids must NOT fall through to
-    // routeFromLocation, which navigates with push:false and would
-    // render the destination without updating the URL (rail clicks
-    // silently stopped changing the address bar).
-    routeFromLocation(redirect);
-    return;
-  }
-  if (TOOL_DEFS[requested]) {
-    navigate(requested, opts);
-  }
-}
-
-/** Show a destination and, if given, its segment. Old pairs remap. */
-export function showToolSection(dest, section) {
-  const mapped = SECTION_MAP[`${dest}:${section}`];
-  if (mapped) {
-    navigate(mapped[0], { section: mapped[1] });
-    return;
-  }
-  if (TOOL_DEFS[dest]) {
-    navigate(dest, { section: section || null });
-    return;
-  }
-  const redirect = resolveLegacyId(dest);
-  if (redirect) routeFromLocation(redirect);
-}
+/** Which tool (if any) is currently shown in the main view. */
+export function getActiveViewTool() { return activeViewTool; }
 
 /**
- * Deep-link into a destination's sub-view: shows the destination, then
- * clicks its sub-control (polls briefly for async renders).
+ * Phase 8 B7: deep-link into a merged page's sub-view.
+ * Shows the tool, then clicks its sub-tab (polls briefly for async renders).
  */
 export function showToolSub(tool, subAttr, subId) {
-  // Legacy attribute names map onto destination segments where known.
-  const mapped = SECTION_MAP[`${tool}:${subId}`];
-  if (mapped) {
-    navigate(mapped[0], { section: mapped[1] });
-    return;
-  }
   showTool(tool);
   const tryClick = () => {
     const btn = document.querySelector(`[${subAttr}="${subId}"]`);
@@ -429,62 +294,81 @@ export function showToolSub(tool, subAttr, subId) {
   }, 120);
 }
 
-/**
- * Open (or focus, if already open) a destination tab. Returns the view
- * id, or null. Kept for every existing caller (palette, composer,
- * slash commands, nav handlers).
- */
-export function openToolTab(tool, _opts = {}) {
-  if (!tool) return null;
-  showTool(tool);
-  return activeDest ? `view-${activeDest}` : null;
-}
-
-/**
- * Close a tab by id: 'main' (Chat, never closable), 'view-<dest>', or
- * a bare destination id. Closing the active tab falls back to the
- * most recently used remaining tab (else Chat).
- */
 export function closeTab(tabId) {
-  if (tabId === 'main' || tabId === 'chat') return;
-  const dest = String(tabId).startsWith('view-') ? String(tabId).slice(5) : tabId;
-  closeTabByDest(dest);
+  if (tabId === 'main') return;
+  const i = openTabs.findIndex((t) => t.id === tabId);
+  if (i >= 0) {
+    // Remove the mounted container so a reopen starts fresh
+    document.getElementById(`tabbody-${tabId}`)?.remove();
+    openTabs.splice(i, 1);
+  }
+  if (activeTabId === tabId) switchTab('main');
+  else renderTabStrip();
 }
 
-/** Focus a tab by id ('main', 'view-<dest>', or a destination id). */
+/** Mount the tool view once into its own persistent container. */
+function mountTab(tab) {
+  if (tab.mounted) return;
+  const body = $('#toolViewBody');
+  const container = document.createElement('div');
+  container.id = `tabbody-${tab.id}`;
+  container.className = 'tool-tab-body';
+  container.dataset.tool = tab.tool;
+  body.appendChild(container);
+  const render = renderers[tab.tool];
+  if (render) {
+    try { render(container); } catch (err) { console.error('tab render failed', tab.tool, err); }
+  } else {
+    container.innerHTML = `<p class="settings-hint">Loading ${tab.title}…</p>`;
+  }
+  tab.mounted = true;
+}
+
 export function switchTab(tabId) {
-  if (tabId === 'main' || tabId === 'chat') navigate('chat');
-  else if (TOOL_DEFS[tabId]) {
-    const entry = tabEntry(tabId);
-    navigate(tabId, {
-      param: entry ? entry.param : null,
-      section: entry ? entry.section : null,
-    });
-  } else showTool(tabId);
+  activeTabId = tabId;
+  activeViewTool = null; // leaving the rail view (if any)
+  const isMain = tabId === 'main';
+  $('#chatView')?.classList.toggle('hidden', !isMain);
+  $('#toolView')?.classList.toggle('hidden', isMain);
+  if (isMain) {
+    // Restore the pinned tab's chat label after a rail view renamed it.
+    const mainTab = $('#mainTab');
+    if (mainTab) mainTab.innerHTML = `<i class="fa-solid fa-message" aria-hidden="true"></i><span>Chat</span>`;
+  }
+  if (!isMain) {
+    const tab = openTabs.find((t) => t.id === tabId);
+    if (tab) {
+      $('#toolViewTitle').innerHTML = `<i class="fa-solid ${tab.icon}"></i> ${tab.title}`;
+      mountTab(tab); // mount once
+      // Show this tab's container, hide the others
+      document.querySelectorAll('#toolViewBody .tool-tab-body').forEach((el) => {
+        el.classList.toggle('hidden', el.id !== `tabbody-${tabId}`);
+      });
+    }
+  }
+  renderTabStrip();
 }
 
-/** Route the current (or given) URL: redirects, destinations, or 404. */
-export function routeFromLocation(url = null) {
-  const raw = url || (window.location.pathname + window.location.search);
-  const parsed = parseRoute(raw);
-  if (parsed.redirect) {
-    if (!url) window.history.replaceState({}, '', parsed.redirect);
-    const target = parseRoute(parsed.redirect);
-    navigate(target.dest, { param: target.param, section: target.section, push: false });
-    return;
-  }
-  if (parsed.notFound) {
-    renderNotFound(parsed.path);
-    return;
-  }
-  navigate(parsed.dest, { param: parsed.param, section: parsed.section, push: false });
+export function getActiveTabId() {
+  return activeTabId;
 }
 
 export function initTabs() {
-  window.addEventListener('popstate', () => routeFromLocation());
-  // First paint: render the bar (Chat pinned + the destination set),
-  // then honour the URL the user arrived on (deep link or '/') — the
-  // deep-linked destination's tab is focused, Chat stays pinned.
-  renderTabBar();
-  routeFromLocation();
+  const mainTab = $('#mainTab');
+  mainTab?.addEventListener('click', () => switchTab('main'));
+  if (mainTab && !mainTab.hasAttribute('tabindex')) mainTab.setAttribute('tabindex', '0');
+  initTabKeyboard();
+  $('#tabAdd')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openTabPicker();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#tabAdd, #tabPicker')) closeTabPicker();
+  });
+  $('#toolViewClose')?.addEventListener('click', () => {
+    // Closing a rail view returns to chat; closing a strip tab closes it.
+    if (activeViewTool) switchTab('main');
+    else closeTab(activeTabId);
+  });
+  renderTabStrip();
 }

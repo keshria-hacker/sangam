@@ -7,12 +7,9 @@ Pipeline (Graphify's shape, not its code — no NetworkX):
 extractor version + schema version + grammar fingerprint.
 
 Languages: Python via stdlib ``ast``; JS/TS via the pure-Python
-scanner in :mod:`code_extract_js`; Go, Rust, and Java via the
-hand-written regex scanners in :mod:`code_extract_extra`. No
-tree-sitter, no 160-language claim: exactly Python, JavaScript /
-TypeScript, Go, Rust, and Java are extracted, each with a test
-(see tests/test_a5_spec_qa.py). The cache namespace records the
-extractor ids so a grammar swap invalidates.
+scanner in :mod:`code_extract_js` (tree-sitter wheels are unavailable
+in this environment — see that module's header; the cache namespace
+records the extractor id so a future grammar swap invalidates).
 
 Build-time resolution (Graft's rule, never guessed):
   same-file unique match  -> EXTRACTED
@@ -46,18 +43,15 @@ import ast
 import hashlib
 from pathlib import Path
 
-from .code_extract_extra import EXTRA_EXTRACTOR_ID, EXTRACTORS, LANGUAGE_FOR_SUFFIX
 from .code_extract_js import JS_EXTRACTOR_ID, extract_js_file
 
 SCHEMA_VERSION = 1
-EXTRACTOR_VERSION = "codegraph-v3"
-CACHE_NAMESPACE = (f"v{SCHEMA_VERSION}-{EXTRACTOR_VERSION}-js:{JS_EXTRACTOR_ID}"
-                     f"-extra:{EXTRA_EXTRACTOR_ID}")
+EXTRACTOR_VERSION = "codegraph-v2"
+CACHE_NAMESPACE = f"v{SCHEMA_VERSION}-{EXTRACTOR_VERSION}-js:{JS_EXTRACTOR_ID}"
 VALID_CONFIDENCES = {"EXTRACTED", "INFERRED", "AMBIGUOUS"}
 
 JS_SUFFIXES = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}
 PY_SUFFIXES = {".py"}
-EXTRA_SUFFIXES = set(EXTRACTORS)
 SKIP_DIRS = {"__pycache__", ".venv", "node_modules", ".git", "dist", "build", ".next"}
 
 MODULE_CALLER = "<module>"
@@ -198,8 +192,7 @@ def discover_files(root: Path) -> list[Path]:
             continue
         if any(part in SKIP_DIRS for part in p.parts):
             continue
-        if p.suffix in PY_SUFFIXES or p.suffix in JS_SUFFIXES \
-                or p.suffix in EXTRA_SUFFIXES:
+        if p.suffix in PY_SUFFIXES or p.suffix in JS_SUFFIXES:
             found.append(p)
     return found
 
@@ -212,8 +205,6 @@ def _extract_file(path: Path, rel: str) -> dict | None:
     try:
         if path.suffix in PY_SUFFIXES:
             return _extract_python(rel, text)
-        if path.suffix in EXTRA_SUFFIXES:
-            return EXTRACTORS[path.suffix](rel, text)
         return extract_js_file(rel, text)
     except (SyntaxError, ValueError, RecursionError):
         return None
@@ -272,16 +263,14 @@ def _resolve_import(module: str, importer_file: str, file_index: dict) -> str | 
         base = posixpath.dirname(importer_file)
         cand = posixpath.normpath(posixpath.join(base, module))
         for tail in ("", "/__init__", "/index"):
-            for ext in (".py", ".js", ".ts", ".tsx", ".jsx", ".mjs",
-                        ".go", ".rs", ".java"):
+            for ext in (".py", ".js", ".ts", ".tsx", ".jsx", ".mjs"):
                 hit = file_index.get(cand + tail + ext)
                 if hit:
                     return hit
         return None
     dotted = module.replace(".", "/")
     for tail in ("", "/__init__", "/index"):
-        for ext in (".py", ".js", ".ts", ".tsx", ".jsx", ".mjs",
-                    ".go", ".rs", ".java"):
+        for ext in (".py", ".js", ".ts", ".tsx", ".jsx", ".mjs"):
             hit = file_index.get(dotted + tail + ext)
             if hit:
                 return hit
@@ -295,7 +284,7 @@ def _resolve_import(module: str, importer_file: str, file_index: dict) -> str | 
 
 # ------------------------------------------------------------------ build
 def build_graph(root: Path | str | None = None, max_files: int = 500) -> dict:
-    """Build the symbol graph for Python + JS/TS + Go/Rust/Java files under root.
+    """Build the symbol graph for Python + JS/TS files under root.
 
     Extract -> validate -> build. Raises ValueError only if the
     finished graph fails the schema gate (a bug, not a data problem:
@@ -318,8 +307,7 @@ def build_graph(root: Path | str | None = None, max_files: int = 500) -> dict:
     by_short: dict[str, list[dict]] = {}
     file_symbols: dict[str, list[str]] = {}
     for rel, ext in raw.items():
-        lang = ("python" if rel.endswith(".py") else
-                LANGUAGE_FOR_SUFFIX.get(Path(rel).suffix, "javascript"))
+        lang = "python" if rel.endswith(".py") else "javascript"
         file_nodes.append({"id": _file_id(rel), "path": rel, "language": lang})
         for d in ext["defs"]:
             sid = _symbol_id(rel, d["qualname"])
@@ -372,9 +360,8 @@ def build_graph(root: Path | str | None = None, max_files: int = 500) -> dict:
 
     languages: dict[str, int] = {}
     for rel in raw:
-        _lang = ("python" if rel.endswith(".py") else
-                 LANGUAGE_FOR_SUFFIX.get(Path(rel).suffix, "javascript"))
-        languages[_lang] = languages.get(_lang, 0) + 1
+        languages["python" if rel.endswith(".py") else "javascript"] = \
+            languages.get("python" if rel.endswith(".py") else "javascript", 0) + 1
 
     graph = {
         "files": len(raw),

@@ -482,9 +482,7 @@ const ARTIFACT_TEMPLATES = [
   { name: 'HTML prototype', icon: 'fa-brands fa-html5', body: '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>{{title}}</title></head>\n<body>\n\n</body>\n</html>\n' },
 ];
 
-// Exported for the command palette (A1): saved prompts are these
-// templates — the palette prefills the composer with the body.
-export const PROMPT_TEMPLATES = [
+const PROMPT_TEMPLATES = [
   { name: 'Code review', body: 'Review the following code for bugs, style, and performance. Be specific:\n\n```\n{{code}}\n```' },
   { name: 'Explain simply', body: 'Explain the following like I\'m a beginner, with a concrete example:\n\n{{topic}}' },
   { name: 'Test plan', body: 'Write a test plan for:\n\n{{feature}}\n\nCover happy path, edge cases, and failure modes.' },

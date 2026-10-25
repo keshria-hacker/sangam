@@ -78,7 +78,8 @@ test('Notebooks: create, note, retrieve, backlinks', async ({ page }) => {
   attachGuards(page);
   await register(page);
 
-  await page.locator('[data-nav="research"]').click();
+  await page.locator('#tabAdd').click();
+  await page.locator('[data-tab-tool="knowledge"]').click();
   await page.waitForTimeout(3000);
 
   await expect(page.getByRole('heading', { name: 'Notebooks' })).toBeVisible();

@@ -31,7 +31,6 @@ import {
   showMediaInNode,
   bindChatActions,
 } from './message_view.js';
-import { getComposerMode, consumeMessageToolOverrides } from '../composer/popovers.js';
 import {
   initAutoscroll,
   nearBottomDist,
@@ -55,42 +54,6 @@ let elements = {};
 // pause in one runGeneration() from resetting the button while a
 // newer generation is already in progress.
 let _genCounter = 0;
-
-// Interrupted-generation state for the Continue button (spec §3.2):
-// null, or { partial: true } when a partial response was kept, or
-// { partial: false } when nothing was generated. Cleared by any new
-// send, regenerate, or successful completion.
-let _interrupted = null;
-
-function setContinueVisible(show) {
-  const btn = document.getElementById('continueBtn');
-  if (btn) btn.style.display = show ? '' : 'none';
-}
-
-/**
- * Continue an interrupted generation. With a partial response kept,
- * this sends a "Continue" follow-up turn, so the pipeline continues
- * the previous answer without re-stating context. With nothing
- * generated, it retries the last user message (same as Retry).
- */
-export function continueGeneration() {
-  if (getIsGenerating() || !getLastUserText()) return;
-  if (!getSelectedModel()) {
-    showToast({ type: 'info', title: 'Model required', message: 'Select a model before continuing.' });
-    return;
-  }
-  const wasPartial = _interrupted?.partial === true;
-  _interrupted = null;
-  setContinueVisible(false);
-  if (wasPartial) {
-    const userMsg = { role: 'user', content: 'Continue', created_at: new Date().toISOString() };
-    setMessages([...getMessages(), userMsg]);
-    elements.messages?.appendChild(buildMessageNode(userMsg));
-    runGeneration({ content: 'Continue', fileIds: [], mediaIds: [], regenerate: false });
-  } else {
-    runGeneration({ content: getLastUserText(), fileIds: [], regenerate: true });
-  }
-}
 
 /**
  * Initialize DOM references.
@@ -255,13 +218,6 @@ export async function handleSend() {
     showToast({ type: 'info', message: 'Still uploading a file — one moment.' });
     return;
   }
-  // A new send supersedes any interrupted generation.
-  _interrupted = null;
-  setContinueVisible(false);
-  // Composer mode + per-message tool overrides (Auto: this message
-  // only — consumeMessageToolOverrides clears them after this read).
-  const composerMode = getComposerMode();
-  const toolOverrides = consumeMessageToolOverrides();
 
   // New send stops any voice I/O (speech or dictation)
   document.dispatchEvent(new CustomEvent('sangam:before-send'));
@@ -341,7 +297,7 @@ export async function handleSend() {
     return;
   }
 
-  runGeneration({ content: userMsg.content, fileIds, mediaIds, regenerate: false, composerMode, toolOverrides });
+  runGeneration({ content: userMsg.content, fileIds, mediaIds, regenerate: false });
 }
 
 /**
@@ -353,8 +309,6 @@ export function regenerate() {
     showToast({ type: 'info', title: 'Model required', message: 'Select a model before regenerating.' });
     return;
   }
-  _interrupted = null;
-  setContinueVisible(false);
 
   // Remove last assistant message
   const msgs = getMessages();
@@ -371,7 +325,7 @@ export function regenerate() {
 /**
  * Core generation logic with SSE streaming.
  */
-export async function runGeneration({ content, fileIds, mediaIds, regenerate, composerMode, toolOverrides }) {
+export async function runGeneration({ content, fileIds, mediaIds, regenerate }) {
   const model = getSelectedModel();
   if (!model) {
     showToast({ type: 'info', title: 'Model required', message: 'Select a model before sending a message.' });
@@ -434,11 +388,6 @@ export async function runGeneration({ content, fileIds, mediaIds, regenerate, co
   const controller = new AbortController();
   setAbortController(controller);
 
-  // Composer mode + per-message overrides (spec §3.2). An explicit
-  // web_search override wins over the global toggle; Research mode
-  // always searches; otherwise the backend Auto pipeline decides.
-  const mode = composerMode || getComposerMode();
-  const overrides = toolOverrides || {};
   const body = {
     chat_id: getActiveChatId(),
     model: model.id,
@@ -449,12 +398,7 @@ export async function runGeneration({ content, fileIds, mediaIds, regenerate, co
     max_tokens: getMaxTokens() === 'auto' ? null : parseInt(getMaxTokens(), 10),
     reasoning_effort: getReasoningEffort() === 'none' ? null : getReasoningEffort(),
     regenerate,
-    composer_mode: mode,
-    tool_overrides: overrides,
-    adaptive_depth: getSetting('adaptiveDepth') !== false,
-    web_search: overrides.web_search !== undefined
-      ? overrides.web_search
-      : (getWebSearchEnabled() || mode === 'research'),
+    web_search: getWebSearchEnabled(),
     web_search_max_results: getSetting('webSearchMaxResults'),
   };
 
@@ -773,8 +717,6 @@ export async function runGeneration({ content, fileIds, mediaIds, regenerate, co
     } else if (aborted) {
       // Aborted (Stop pressed or chat switched): preserve partial response if content was generated
       if (collected && sawFirstToken) {
-        _interrupted = { partial: true };
-        setContinueVisible(true);
         // Save chat ID on success
         if (newChatId && !getActiveChatId()) {
           setActiveChatId(newChatId);
@@ -798,14 +740,9 @@ export async function runGeneration({ content, fileIds, mediaIds, regenerate, co
       } else {
         // No content generated, just remove the typing indicator
         typingNode.remove();
-        _interrupted = { partial: false };
-        setContinueVisible(true);
         showToast({ type: 'info', title: 'Generation stopped' });
       }
     } else if (collected) {
-      // Successful completion clears any interrupted state.
-      _interrupted = null;
-      setContinueVisible(false);
       // Save chat ID on success
       if (newChatId && !getActiveChatId()) {
         setActiveChatId(newChatId);
@@ -883,8 +820,6 @@ export async function startNewChat() {
     getAbortController().abort();
   }
   resetChatState();
-  _interrupted = null;
-  setContinueVisible(false);
   setSendButtonState(false);
   const sidebarModule = await import('../sidebar/sidebar.js');
   sidebarModule.renderChatHistory(document.getElementById('searchChats')?.value || '');
@@ -924,8 +859,6 @@ export function initChatEvents() {
 
   // Stop button — always aborts the current generation.
   elements.stopBtn?.addEventListener('click', stopGeneration);
-  // Continue button — appears only after an interrupted generation.
-  document.getElementById('continueBtn')?.addEventListener('click', continueGeneration);
   elements.retryBtn?.addEventListener('click', () => {
     elements.errorState?.classList.add('hidden');
     if (!getSelectedModel()) {

@@ -499,10 +499,7 @@ button:active, .model-option:active, .suggestion-card:active,
 .app-logo{display:block; width:100%; height:100%; object-fit:contain; object-position:center; filter:var(--logo-filter);}
 
 /* ---------- App shell ---------- */
-/* Tabs-on-top (2026-10-25): the shell is a column — tab bar on top,
-   main panel below it at full width. There is no sidebar anymore;
-   the .sidebar rules below are dead until the next CSS cleanup. */
-.app-shell{display:flex; flex-direction:column; height:100vh; overflow:hidden;}
+.app-shell{display:flex; height:100vh; overflow:hidden;}
 
 /* ---------- Sidebar ---------- */
 .sidebar{
@@ -704,7 +701,7 @@ a.sidebar-footer-btn{text-decoration:none; cursor:pointer;}
 .sidebar-scrim.show{opacity:1; visibility:visible; pointer-events:auto;}
 
 /* ---------- Main panel ---------- */
-.main-panel{flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; position:relative;}
+.main-panel{flex:1; display:flex; flex-direction:column; min-width:0; position:relative;}
 
 /* Topbar — solid surface, no heavy glass */
 /* ============ TAB STRIP (browser-like) ============ */
@@ -3110,6 +3107,7 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
   margin-bottom:8px;
 }
 .sidebar-search input{font-size:13px;}
+.rail-nav{display:none;}
 .chat-history-label{padding-top:10px; padding-bottom:5px;}
 
 /* ---------- Phase 1 remainder: Runs centre responsive ---------- */
@@ -3244,67 +3242,3 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .insp-ev-item { padding: 6px 0; border-top: 1px solid var(--border, #ddd); font-size: 13px; }
 .insp-ev-item pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; margin: 4px 0 0; max-height: 160px; overflow-y: auto; }
 .insp-ev-item span { color: var(--text-tertiary, #666); margin-left: 6px; }
-
-/* ---------- A1 perfect-flow shell (§3, §6.2) ---------- */
-/* Slim contextual breadcrumb INSIDE the content area, depth > 1 only.
-   There is no top bar and no repeated title bar anywhere else. */
-.dest-breadcrumb{font-size:var(--text-sm,13px);color:var(--text-secondary);padding:12px 20px 0}
-.dest-breadcrumb.hidden{display:none}
-/* Segmented sub-navigation at the top of a destination's content area. */
-.dest-segments{margin-bottom:16px}
-.dest-section-body{margin-top:4px}
-.dest-detail{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius-md,14px);margin-bottom:16px}
-.empty-state{padding:24px 16px;border:1px dashed var(--border-strong);border-radius:var(--radius-md,14px);text-align:center}
-/* Sidebar footer (persistent): usage meter, palette hint, help. */
-.sidebar-usage{font-size:11px;color:var(--text-tertiary);padding:6px 12px}
-.sidebar-footer-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:transparent;border:0;color:var(--text-secondary);cursor:pointer;text-align:left;border-radius:8px}
-.sidebar-footer-btn:hover{background:var(--bg-hover)}
-.sidebar-footer-btn .kbd-hint{margin-left:auto}
-/* First-run labelled sample: never mistaken for a model response. */
-.setup-sample{border:1px dashed var(--border-strong);border-radius:var(--radius-md,14px);padding:12px 16px;margin:12px 0}
-/* Palette: group label per item. */
-.palette-group{font-size:11px;color:var(--text-tertiary);margin-left:auto;padding-left:12px}
-.palette-item{display:flex;align-items:center;gap:8px}
-
-/* ---------- Tabs on top (2026-10-25 user correction) ---------- */
-/* The tab bar IS the navigation: pinned Chat first, then one tab per
-   open destination. Many tabs scroll horizontally, never wrap. The
-   right cluster holds the relocated sidebar-footer items in compact
-   form: New chat, the palette hint (plain text, not a button), the
-   usage meter, and the avatar menu. */
-.tab-bar{display:flex; align-items:stretch; gap:8px; flex:none;
-  padding:8px 12px 0; border-bottom:1px solid var(--border-soft);
-  background:var(--surface-panel);}
-.tab-bar-scroll{display:flex; align-items:stretch; gap:4px; flex:1 1 auto;
-  min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin;}
-.tab-item{display:flex; align-items:stretch; flex:none;
-  border:1px solid transparent; border-bottom:none;
-  border-radius:10px 10px 0 0; background:transparent;}
-.tab-item.active{background:var(--bg-hover); border-color:var(--border-soft);
-  box-shadow:inset 0 2px 0 var(--accent);}
-.tab-item-label{display:flex; align-items:center; gap:7px; padding:8px 10px;
-  background:none; border:none; cursor:pointer; font-size:13px;
-  color:var(--text-secondary); white-space:nowrap;}
-.tab-item.active .tab-item-label{color:var(--text-primary); font-weight:600;}
-.tab-item-label:hover{color:var(--text-primary);}
-.tab-item-label i{font-size:12px;}
-.tab-pin{font-size:9px; opacity:.55;}
-.tab-item-close{display:flex; align-items:center; padding:0 8px 0 2px;
-  background:none; border:none; cursor:pointer; font-size:11px;
-  color:var(--text-tertiary); opacity:.6;}
-.tab-item-close:hover{opacity:1; color:var(--text-primary);}
-.tab-bar-right{margin-left:auto; display:flex; align-items:center; gap:10px;
-  flex:none; padding-bottom:8px;}
-.tabbar-kbd-hint{font-size:11px; color:var(--text-tertiary);
-  border:1px solid var(--border-soft); border-radius:6px; padding:2px 6px;
-  white-space:nowrap;}
-.tabbar-usage{font-size:12px; color:var(--text-tertiary); white-space:nowrap;}
-.tabbar-avatar{display:flex; align-items:center; gap:8px; background:none;
-  border:none; cursor:pointer; padding:2px 6px; border-radius:999px;
-  color:var(--text-primary); font-size:13px;}
-.tabbar-avatar:hover{background:var(--bg-hover);}
-.tabbar-avatar .profile-avatar{width:28px; height:28px; font-size:12px;}
-@media (max-width:720px){
-  .tabbar-kbd-hint, .tabbar-usage, .tabbar-avatar .profile-name{display:none;}
-  .tab-bar{padding:6px 8px 0;}
-}

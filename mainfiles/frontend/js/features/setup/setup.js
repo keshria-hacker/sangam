@@ -8,12 +8,9 @@
  * work targets. The stepped version shows exactly one obvious next
  * action per step, with visible progress:
  *
- *   Step 1 of 3 — pick ONE path (cloud key / local Ollama / look around)
- *   Step 2 of 3 — only that path's single action (save+test a key,
- *                  list + test Ollama models, or a labelled sample)
- *   Step 3 of 3 — one guided first prompt: "What do you want to get
- *                  done today?" -> Auto answers (or, on the look-around
- *                  path, an honest "connect a provider first" note).
+ *   Step 1 of 2 — pick ONE path (cloud key / local Ollama / look around)
+ *   Step 2 of 2 — only that path's single action (save+test a key,
+ *                  check Ollama, or confirm exploring)
  *
  * The skip path for power users is kept on both steps ("I'll configure
  * later" → dismissible banner, never a dead chat box). Completion is
@@ -102,10 +99,10 @@ export async function maybeShowFirstRunSetup() {
   panel.id = 'firstRunSetup';
   panel.className = 'setup-panel';
   panel.innerHTML = `
-    <div class="setup-progress" role="progressbar" aria-valuemin="1" aria-valuemax="3" aria-valuenow="1" aria-label="Setup progress">
-      <div class="setup-progress-bar" id="setupProgressBar" style="width:33%"></div>
+    <div class="setup-progress" role="progressbar" aria-valuemin="1" aria-valuemax="2" aria-valuenow="1" aria-label="Setup progress">
+      <div class="setup-progress-bar" id="setupProgressBar" style="width:50%"></div>
     </div>
-    <p class="setup-step-label" id="setupStepLabel">Step 1 of 3 — choose how to connect</p>
+    <p class="setup-step-label" id="setupStepLabel">Step 1 of 2 — choose how to connect</p>
     <h2>Let's get your first answer</h2>
     <p class="settings-hint">Sangam is your private AI workspace. This takes under two minutes.</p>
     <div id="setupStepBody"></div>
@@ -119,78 +116,8 @@ export async function maybeShowFirstRunSetup() {
 
   function setStep(step, labelText) {
     label.textContent = labelText;
-    bar.style.width = step === 1 ? '33%' : step === 2 ? '66%' : '100%';
+    bar.style.width = step === 1 ? '50%' : '100%';
     panel.querySelector('.setup-progress').setAttribute('aria-valuenow', String(step));
-  }
-
-  // Step 3 of 3 — the one guided first prompt. On a connected path it
-  // sends through the normal composer (Auto mode decides the rest);
-  // on the look-around path there is no provider, so it says so and
-  // offers the way back to connecting instead of faking an answer.
-  function renderStep3(path, suggestedModel) {
-    setStep(3, 'Step 3 of 3 — your first prompt');
-    if (path === 'tour') {
-      body.innerHTML = `
-        <h3>What do you want to get done today?</h3>
-        <p class="settings-hint">That is the question to start with once a provider is connected. Right now chat cannot answer — the banner at the top will remind you — so this step ends at connecting, not at a fake reply.</p>
-        <div class="setup-step-actions">
-          ${backButton()}
-          <button type="button" class="btn-primary" id="setupConnect">Connect a provider</button>
-        </div>`;
-      body.querySelector('#setupBack').addEventListener('click', renderStep1);
-      body.querySelector('#setupConnect').addEventListener('click', renderStep1);
-      return;
-    }
-    body.innerHTML = `
-      <h3>What do you want to get done today?</h3>
-      ${suggestedModel ? `<p class="settings-hint">✓ Connected — suggested model: ${escapeHtml(suggestedModel)}.</p>` : ''}
-      <p class="settings-hint">Type one thing you want done. Auto answers — no settings needed.</p>
-      <input type="text" id="setupFirstPrompt" class="provider-key-input" placeholder="What do you want to get done today?" aria-label="What do you want to get done today?" style="width:100%">
-      <div class="setup-step-actions">
-        ${backButton()}
-        <button type="button" class="btn-primary" id="setupAsk">Ask Sangam</button>
-      </div>
-      <p class="settings-hint" id="setupAskStatus"></p>`;
-    body.querySelector('#setupBack').addEventListener('click', renderStep1);
-    body.querySelector('#setupAsk').addEventListener('click', async () => {
-      const input = body.querySelector('#setupFirstPrompt');
-      const text = input.value.trim();
-      if (!text) {
-        body.querySelector('#setupAskStatus').textContent = 'Type what you want to get done first.';
-        input.focus();
-        return;
-      }
-      const ta = document.getElementById('messageInput');
-      if (!ta) { markDone(); return; }
-      ta.value = text;
-      markDone();
-      try {
-        const { handleSend } = await import('../chat/chat.js');
-        await handleSend();
-      } catch (err) {
-        showToast({ type: 'info', title: 'Prompt ready in the composer', message: 'Press Send when you are ready.' });
-      }
-    });
-  }
-
-  // After a provider connects, refresh the model list and pre-select
-  // the suggested model so step 3's Ask actually sends. Returns the
-  // suggested model name (or '' when nothing could be selected).
-  async function refreshAndSelectModel(matchProvider) {
-    try {
-      const modelsMod = await import('../models/models.js');
-      await modelsMod.loadProvidersAndModels();
-      const { getModels } = await import('../../core/state.js');
-      const models = getModels() || [];
-      const match = models.find((m) => m.provider === matchProvider || m.provider_id === matchProvider)
-        || models.find((m) => String(m.id || '').toLowerCase().includes(String(matchProvider || '').toLowerCase()))
-        || models[0];
-      if (match) {
-        try { modelsMod.selectModel(match, { silent: true }); } catch {}
-        return match.name || match.id || '';
-      }
-    } catch { /* selection is best-effort; step 3 still works via the picker */ }
-    return '';
   }
 
   function backButton() {
@@ -199,7 +126,7 @@ export async function maybeShowFirstRunSetup() {
 
   // --- Step 1: one choice, three buttons, each the only action on it.
   function renderStep1() {
-    setStep(1, 'Step 1 of 3 — choose how to connect');
+    setStep(1, 'Step 1 of 2 — choose how to connect');
     body.innerHTML = `
       <div class="setup-paths">
         <button type="button" class="btn-primary setup-path" data-path="cloud">Use a cloud provider</button>
@@ -214,7 +141,7 @@ export async function maybeShowFirstRunSetup() {
 
   // --- Step 2: only the chosen path's single action.
   function renderStep2(path) {
-    setStep(2, `Step 2 of 3 — ${path === 'cloud' ? 'paste one API key' : path === 'ollama' ? 'check Ollama' : 'start exploring'}`);
+    setStep(2, `Step 2 of 2 — ${path === 'cloud' ? 'paste one API key' : path === 'ollama' ? 'check Ollama' : 'start exploring'}`);
     if (path === 'cloud') {
       body.innerHTML = `
         <p class="settings-hint">Paste one API key. Sangam tests it before you continue.</p>
@@ -243,10 +170,8 @@ export async function maybeShowFirstRunSetup() {
           if (!save.ok) throw new Error((await save.json().catch(() => ({}))).detail || `Save failed (${save.status})`);
           const test = await apiFetch(`/settings/providers/${encodeURIComponent(pid)}/models/refresh`);
           if (!test.ok) throw new Error('The key was saved but the provider rejected it — check for a missing character.');
-          status.innerHTML = '✓ <strong>Provider connected.</strong> Finding a suggested model…';
-          const suggested = await refreshAndSelectModel(pid);
-          showToast({ type: 'success', title: 'Provider connected', message: suggested ? `Suggested model: ${suggested}` : 'You can start chatting.' });
-          renderStep3('cloud', suggested);
+          showToast({ type: 'success', title: 'Provider connected', message: 'You can start chatting.' });
+          markDone();
         } catch (err) {
           status.textContent = err?.message || String(err);
         }
@@ -268,11 +193,8 @@ export async function maybeShowFirstRunSetup() {
           const data = await res.json().catch(() => ({}));
           const models = data.models || data || [];
           if (res.ok && Array.isArray(models) && models.length) {
-            const names = models.map((m) => (typeof m === 'string' ? m : (m.id || m.name))).filter(Boolean);
-            status.innerHTML = `✓ <strong>Ollama ready.</strong> ${names.length} local model(s) found: ${escapeHtml(names.slice(0, 5).join(', '))}${names.length > 5 ? '…' : ''} — using ${escapeHtml(names[0])} first.`;
-            showToast({ type: 'success', title: 'Ollama ready', message: `${names.length} local model(s) found.` });
-            const suggested = await refreshAndSelectModel('ollama');
-            renderStep3('ollama', suggested || names[0]);
+            showToast({ type: 'success', title: 'Ollama ready', message: `${models.length} local model(s) found.` });
+            markDone();
           } else if (res.ok) {
             status.textContent = 'Ollama is reachable but has no models yet. Pull one (e.g. ollama pull llama3.1), then check again.';
           } else {
@@ -285,17 +207,12 @@ export async function maybeShowFirstRunSetup() {
     } else {
       body.innerHTML = `
         <p class="settings-hint">Explore the app now. Chat won't answer until a provider is connected — the banner at the top will remind you.</p>
-        <div class="setup-sample" role="note" aria-label="Labelled sample, not a model response">
-          <p><strong>SAMPLE — not a real model response.</strong> This is what an answer looks like, so you can judge the layout before connecting anything.</p>
-          <p><em>You:</em> What is Sangam?</p>
-          <p><em>Sample answer:</em> Sangam is your private AI workspace — one interface for every model, with projects, artifacts, knowledge, and agents in one place.</p>
-        </div>
         <div class="setup-step-actions">
           ${backButton()}
-          <button type="button" class="btn-primary" id="setupTour">Continue</button>
+          <button type="button" class="btn-primary" id="setupTour">Start exploring</button>
         </div>`;
       body.querySelector('#setupBack').addEventListener('click', renderStep1);
-      body.querySelector('#setupTour').addEventListener('click', () => renderStep3('tour', ''));
+      body.querySelector('#setupTour').addEventListener('click', skipSetup);
     }
   }
 

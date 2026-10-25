@@ -13,7 +13,6 @@ from .adhd import (
     adhd_style_text,
     apply_adhd_style_to_messages,
 )
-from .harper import harper_suggestions, lint_harper
 from .slop import detect_slop, remove_slop, remove_slop_with_changes
 
 
@@ -59,8 +58,6 @@ __all__ = [
     "apply_adhd_style_to_messages",
     "apply_quality",
     "detect_slop",
-    "harper_suggestions",
-    "lint_harper",
     "register_quality_extension",
     "remove_slop",
     "remove_slop_with_changes",

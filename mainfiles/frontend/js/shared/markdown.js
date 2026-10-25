@@ -185,37 +185,6 @@ export function parseMarkdown(markdown) {
 }
 
 /**
- * Close off constructs that are still open in a partial stream chunk,
- * so the renderer does not drop or re-lay-out content mid-stream:
- * - an odd number of ``` fences means a code block is still open — the
- *   unclosed fence used to swallow the rest of the message into a code
- *   block (and then pop it back out), which is the visible flicker;
- * - a table row missing its closing pipe is completed, so a partial
- *   table renders as a table instead of collapsing to a paragraph and
- *   jumping back. This only touches the streaming render; the final
- *   render uses the complete text unchanged.
- */
-export function stabilizePartialMarkdown(markdown) {
-  if (!markdown) return markdown;
-  let out = markdown;
-  const fences = (out.match(/```/g) || []).length;
-  if (fences % 2 === 1) out += '\n```';
-  const lines = out.split('\n');
-  let lastIdx = lines.length - 1;
-  while (lastIdx >= 0 && !lines[lastIdx].trim()) lastIdx--;
-  if (lastIdx > 0) {
-    const last = lines[lastIdx].trim();
-    const earlier = lines.slice(0, lastIdx);
-    const hasSeparator = earlier.some((l) => /^\|?[\s:]*-{3,}[\s:]*(\|[\s:]*-{3,}[\s:]*)+\|?\s*$/.test(l.trim()));
-    if (hasSeparator && last.startsWith('|') && !last.endsWith('|')) {
-      lines[lastIdx] = lines[lastIdx] + '|';
-      out = lines.join('\n');
-    }
-  }
-  return out;
-}
-
-/**
  * Render markdown to HTML for streaming incremental updates.
  * Used during SSE streaming for visually stable updates.
  */
@@ -226,8 +195,6 @@ export function renderMarkdownStream(markdown) {
   // Preprocess for KaTeX and Mermaid
   let processed = preprocessKaTeX(markdown);
   processed = preprocessMermaid(processed);
-  // Stabilize partial constructs before parsing (see above).
-  processed = stabilizePartialMarkdown(processed);
 
   // Convert to HTML using marked
   const html = marked.parse(processed);

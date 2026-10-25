@@ -21,7 +21,7 @@ export function isImageGenEnabled() {
 }
 
 export async function initImage() {
-  // Navigation via the tab bar — no per-button wiring needed.
+  // Navigation via studio rail (core/nav.js) — no per-button wiring needed.
   const studioBtn = document.getElementById('imagesBtn');
   if (studioBtn && !studioBtn.dataset.wired) {
     studioBtn.dataset.wired = '1';
@@ -53,7 +53,7 @@ async function loadStyles() {
 
 function openImageDialog() {
   // Composer image button now opens the Image Studio tab (no popup).
-  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('studio'));
+  import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('images'));
   return;
   const existing = document.getElementById('imageGenOverlay');
   if (existing) {

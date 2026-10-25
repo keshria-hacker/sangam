@@ -189,47 +189,6 @@ class BaseProvider(ABC):
         """Stream a completion from the provider."""
         pass
 
-    # ------------------------------------------------ adapter contract
-    # (spec/a6-studio-skills): every adapter must answer the same six
-    # questions, so the frontend never sees provider-specific shapes.
-    # capabilities()/tools()/reasoning()/citations() are per-model: they
-    # read the ModelInfo's capability flags when a model is given, and
-    # report "unknown" (False + capabilities_known=False via the
-    # contract module) when no model is known — never an invented True.
-    def capabilities(self, model: ModelInfo | None = None) -> ModelCapabilities:
-        """Capability flags for one model (or the adapter default)."""
-        if model is not None and model.capabilities is not None:
-            return model.capabilities
-        return ModelCapabilities(streaming=True)
-
-    def supports(self, capability: str, model: ModelInfo | None = None) -> bool:
-        """True when this adapter+model supports the named capability."""
-        caps = self.capabilities(model)
-        return bool(getattr(caps, capability, False))
-
-    def tools(self, model: ModelInfo | None = None) -> bool:
-        """Whether tool/function calling is supported for this model."""
-        return self.supports("tools", model)
-
-    def reasoning(self, model: ModelInfo | None = None) -> bool:
-        """Whether reasoning output is supported for this model."""
-        return self.supports("reasoning", model)
-
-    def citations(self, model: ModelInfo | None = None) -> bool:
-        """Whether citation output is supported for this model."""
-        return self.supports("citations", model)
-
-    async def stream(self, model_id: str, messages: list[dict], **kwargs: Any) -> AsyncGenerator[str | ProviderStreamChunk]:
-        """Contract alias for stream_completion (same stream, one name)."""
-        async for chunk in self.stream_completion(model_id, messages, **kwargs):
-            yield chunk
-
-    def normalize_error(self, exc: BaseException, model: str | None = None) -> Any:
-        """Normalize an adapter failure to the canonical error envelope."""
-        from ..response_events import normalize_error as _normalize
-
-        return _normalize(exc, provider=self.config.provider_id, model=model)
-
     def prepare_headers(self, api_key: str) -> dict[str, str]:
         """Build authentication headers for the provider."""
         headers = {"Accept": "application/json"}

@@ -26,47 +26,6 @@ from .common import router
 
 # ---------------------------------------------------------- corrective RAG
 
-async def graph_expansion_for_query(
-    db: AsyncSession, user_id: str, query: str, limit: int = 10,
-) -> list[dict]:
-    """A3: entity + graph-traversal signal for hybrid retrieval.
-
-    One hop over the memory entity graph (relations true right now):
-    a relation is included when a token of its subject or object
-    appears in the query (same tokenizer as BM25, so the signal is
-    consistent with the keyword side). These are NOT chunk citations
-    — they carry ``provenance: "inferred"`` and are returned
-    separately as ``graph_expansion``, never merged into chunk
-    scores, because a graph edge is evidence about an entity, not
-    proof that a chunk answers the query. Best-effort: any failure
-    yields an empty expansion, never a failed retrieval.
-    """
-    try:
-        from datetime import UTC, datetime as _dt
-
-        from ..hybrid_retrieval import tokenize
-        from ..memory.graph import query_as_of, relation_out
-
-        terms = set(tokenize(query))
-        if not terms:
-            return []
-        rows = await query_as_of(db, user_id, _dt.now(UTC))
-        out: list[dict] = []
-        for row in rows:
-            rel = relation_out(row)
-            if (set(tokenize(rel.get("subject", ""))) & terms) or (
-                    set(tokenize(rel.get("object", ""))) & terms):
-                rel["provenance"] = "inferred"
-                out.append(rel)
-                if len(out) >= limit:
-                    break
-        return out
-    except Exception:  # noqa: BLE001 — expansion is advisory, never fatal
-        return []
-
-
-# ---------------------------------------------------------- corrective RAG
-
 def grade_results(results: list[dict], threshold: float = 0.35) -> tuple[str, float]:
     """Deterministic evidence grade: the top hybrid score against
     the threshold. Empty results grade "weak" with score 0.0 —
@@ -270,10 +229,7 @@ async def retrieve_knowledge(
                     "citation": {"file_id": "", "filename": "",
                                  "chunk_index": None,
                                  "excerpt": (hit.snippet or "")[:200],
-                                 "source": "web",
-                                 # A3: a web snippet is not a stored,
-                                 # verified chunk — label it inferred.
-                                 "provenance": "inferred"},
+                                 "source": "web"},
                     "source": "web", "score": 0.0,
                 })
             if web_results:
@@ -283,16 +239,11 @@ async def retrieve_knowledge(
     for r in results:
         citation = r.get("citation") or {}
         citation["grade"] = grade
-        # Hybrid chunks already carry provenance "verified" (see
-        # hybrid_retrieval.make_citation); never overwrite it here.
-        citation.setdefault("provenance", "verified")
         r["citation"] = citation
-    graph_expansion = await graph_expansion_for_query(db, user.id, q)
     return {"query": q, "used_query": used_query, "method": "hybrid",
             "grade": grade, "top_score": round(top_score, 4),
             "fallback_used": fallback_used,
-            "results": results, "web_results": web_results,
-            "graph_expansion": graph_expansion}
+            "results": results, "web_results": web_results}
 
 
 @router.post("/knowledge/ingest-url")

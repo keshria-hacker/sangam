@@ -398,12 +398,6 @@ function renderDetail(bodyEl) {
     .map(([k, v]) => `<div class="insp-row"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v).slice(0, 80))}</strong></div>`)
     .join('');
 
-  // A3: backlinks visibility — the graph endpoint now returns a
-  // backlinks reverse index; show "linked from" alongside "related".
-  const backlinkIds = ((graphData.backlinks || {})[nd.id] || []);
-  const backlinks = backlinkIds
-    .map((id) => (graphData.nodes || []).find((n) => n.id === id))
-    .filter((n) => n);
   panel.innerHTML = `
     <div class="kn-detail-head">
       <span class="kn-chip" style="--chip-color:${TYPE_COLORS[nd.type] || '#888'}">
@@ -413,13 +407,6 @@ function renderDetail(bodyEl) {
     </div>
     <h4>${escapeHtml(nd.label || nd.id)}</h4>
     ${metaRows ? `<div class="kn-meta">${metaRows}</div>` : ''}
-    ${backlinks.length ? `<h5>Linked from (${backlinks.length})</h5>
-      <ul class="kn-related">${backlinks.slice(0, 12).map((r) => `
-        <li><button class="kn-related-btn" data-id="${escapeHtml(r.id)}">
-          <i class="fa-solid fa-circle" style="color:${TYPE_COLORS[r.type] || '#888'}"></i>
-          ${escapeHtml((r.label || r.id).slice(0, 40))}
-          <small>backlink</small>
-        </button></li>`).join('')}</ul>` : ''}
     ${related.length ? `<h5>Related (${related.length})</h5>
       <ul class="kn-related">${related.slice(0, 12).map((r) => `
         <li><button class="kn-related-btn" data-id="${escapeHtml(r.id)}">
