@@ -140,6 +140,22 @@ def relation_out(row: MemoryRelation) -> dict:
     }
 
 
+def decayed_confidence(confidence: float, age_days: float,
+                       half_life_days: float = 90.0) -> float:
+    """Batch 9 (graphify/shannon narrow gap): edge confidence decay.
+    A relation's confidence halves every ``half_life_days`` of age
+    (exponential decay, floored at 0.05 so old edges fade but never
+    vanish silently). Pure function — callers decide whether the
+    decayed or the stored value is displayed; nothing here rewrites
+    stored rows."""
+    import math
+
+    base = max(0.0, min(1.0, float(confidence)))
+    if age_days <= 0 or half_life_days <= 0:
+        return base
+    return max(0.05, base * (0.5 ** (age_days / half_life_days)))
+
+
 def _check_interval(valid_from: datetime | None, valid_to: datetime | None) -> None:
     """Inverted-interval guard: a window that ends before it starts
     can never be true under half-open semantics, so reject it

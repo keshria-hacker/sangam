@@ -143,6 +143,47 @@ export async function renderKnowledgeTab(bodyEl) {
         </div>
         <div id="memv2UpdateStatus" class="settings-hint"></div>
       </section>
+      <section class="kn-section">
+        <h3><i class="fa-solid fa-flask"></i> Memory &amp; Research</h3>
+        <p class="settings-hint">Consolidated beliefs backed by evidence, deep-research jobs with cited reports, workspace packs, and a catalogue of MCP servers and LLM patterns. Nothing here installs or runs remote code on its own.</p>
+        <h4>Observations</h4>
+        <p class="settings-hint">A belief Sangam holds with its evidence attached. Supporting evidence strengthens it; contradicting evidence weakens it without erasing history.</p>
+        <div class="kn-mem-controls">
+          <input type="text" id="mrObsClaim" class="provider-key-input" placeholder="A belief, e.g. I prefer concise answers" aria-label="Observation claim" style="flex:1">
+          <select id="mrObsKind" class="provider-key-input" aria-label="Observation kind">
+            <option value="fact">Fact</option>
+            <option value="decision">Decision</option>
+            <option value="preference">Preference</option>
+            <option value="correction">Correction</option>
+          </select>
+          <button class="btn-secondary" id="mrObsAddBtn">Save observation</button>
+        </div>
+        <div id="mrObsList" class="kn-mem-list"></div>
+        <h4>Deep research</h4>
+        <p class="settings-hint">Ask a question; Sangam searches, curates sources, and writes a report. A report only includes claims that cite a source actually retrieved.</p>
+        <div class="kn-mem-controls">
+          <input type="text" id="mrResearchQ" class="provider-key-input" placeholder="What should Sangam research?" aria-label="Research question" style="flex:1">
+          <button class="btn-secondary" id="mrResearchBtn">Start research</button>
+        </div>
+        <div id="mrResearchStatus" class="kn-mem-list"></div>
+        <h4>Catalogue</h4>
+        <p class="settings-hint">Documented MCP servers and LLM app patterns, with risk notes and the Sangam feature that already covers each pattern. Entries are reference only — they never install themselves.</p>
+        <div class="kn-mem-controls">
+          <input type="text" id="mrCatQ" class="provider-key-input" placeholder="Search the catalogue…" aria-label="Catalogue search" style="flex:1">
+          <button class="btn-secondary" id="mrCatBtn">Search</button>
+        </div>
+        <div id="mrCatList" class="kn-mem-list"></div>
+        <h4>Workspace pack</h4>
+        <p class="settings-hint">Bundle a folder inside your workspace into one LLM-ready text pack (file tree + contents, token estimate). Files that look like credentials are left out and listed, never included.</p>
+        <div class="kn-mem-controls">
+          <input type="text" id="mrPackPath" class="provider-key-input" placeholder="Folder inside the workspace (blank = whole workspace)" aria-label="Pack path" style="flex:1">
+          <button class="btn-secondary" id="mrPackBtn">Build pack</button>
+        </div>
+        <div id="mrPackStatus" class="kn-mem-list"></div>
+        <h4>Memory notes</h4>
+        <p class="settings-hint">Dated, typed Markdown notes in one browsable folder — memory you can read and correct by hand.</p>
+        <div id="mrNotesList" class="kn-mem-list"></div>
+      </section>
     </div>`;
 
   // Batch 1: Study section (Learn) + section activator for palette/aliases.
@@ -192,6 +233,9 @@ export async function renderKnowledgeTab(bodyEl) {
   bodyEl.querySelector('#knZoomIn').addEventListener('click', () => { zoom = Math.min(zoom * 1.2, 4); applyZoom(bodyEl); });
   bodyEl.querySelector('#knZoomOut').addEventListener('click', () => { zoom = Math.max(zoom / 1.2, 0.4); applyZoom(bodyEl); });
   bodyEl.querySelector('#knZoomReset').addEventListener('click', () => { zoom = 1; applyZoom(bodyEl); });
+
+  // Batch 9: Memory & Research section.
+  initMemoryResearch(bodyEl);
 
   // Wire memory browser
   bodyEl.querySelector('#knMemKind').addEventListener('change', () => loadMemories(bodyEl));
@@ -766,5 +810,119 @@ async function ingestPage(bodyEl) {
     loadGraph(bodyEl);
   } catch (err) {
     status.textContent = `Ingest failed: ${err?.message || String(err)}`;
+  }
+}
+
+// --- Batch 9: Memory & Research ------------------------------------------
+
+function initMemoryResearch(bodyEl) {
+  const obsBtn = bodyEl.querySelector('#mrObsAddBtn');
+  if (!obsBtn) return;
+  obsBtn.addEventListener('click', async () => {
+    const claim = bodyEl.querySelector('#mrObsClaim').value.trim();
+    if (!claim) return;
+    try {
+      const res = await apiFetch('/memory/observations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: bodyEl.querySelector('#mrObsKind').value, claim, evidence: [] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+      showToast({ type: 'success', title: data.created ? 'Observation saved' : 'Observation strengthened' });
+      loadObservations(bodyEl);
+    } catch (err) {
+      showToast({ type: 'error', title: `Could not save observation: ${err?.message || String(err)}` });
+    }
+  });
+  bodyEl.querySelector('#mrResearchBtn').addEventListener('click', async () => {
+    const q = bodyEl.querySelector('#mrResearchQ').value.trim();
+    const box = bodyEl.querySelector('#mrResearchStatus');
+    if (!q) return;
+    box.innerHTML = '<p class="settings-hint">Starting research…</p>';
+    try {
+      const job = await (await apiFetch('/research/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q }),
+      })).json();
+      box.innerHTML = '<p class="settings-hint">Searching and curating sources…</p>';
+      const done = await (await apiFetch(`/research/jobs/${job.id}/run`, { method: 'POST' })).json();
+      const sources = (done.sources || []).map((s) => `<li>${escapeHtml(s.title || s.url || s.source_id)} (score ${s.curator_score ?? ''})</li>`).join('');
+      box.innerHTML = done.status === 'done'
+        ? `<p class="settings-hint">Done — ${done.sources.length} sources curated. Write a cited report from the API, or read sources below.</p><ul>${sources}</ul>`
+        : `<p class="settings-hint">Research failed: ${escapeHtml(done.error || 'unknown error')}</p>`;
+    } catch {
+      box.innerHTML = '<p class="settings-hint">Research could not start.</p>';
+    }
+  });
+  bodyEl.querySelector('#mrCatBtn').addEventListener('click', () => loadCatalogue(bodyEl));
+  bodyEl.querySelector('#mrPackBtn').addEventListener('click', async () => {
+    const box = bodyEl.querySelector('#mrPackStatus');
+    box.innerHTML = '<p class="settings-hint">Packing…</p>';
+    try {
+      const res = await apiFetch('/knowledge/packs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: bodyEl.querySelector('#mrPackPath').value.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+      box.innerHTML = `<p class="settings-hint">Packed ${data.files.length} files, about ${data.total_tokens_estimate} tokens (estimate) in ${data.chunk_count} chunk(s). ${data.filtered.length} file(s) left out for safety.</p>`;
+    } catch (err) {
+      box.innerHTML = `<p class="settings-hint">Pack failed: ${escapeHtml(err?.message || String(err))}</p>`;
+    }
+  });
+  loadObservations(bodyEl);
+  loadCatalogue(bodyEl);
+  loadMemoryNotes(bodyEl);
+}
+
+async function loadObservations(bodyEl) {
+  const box = bodyEl.querySelector('#mrObsList');
+  box.innerHTML = '<p class="settings-hint">Loading…</p>';
+  try {
+    const data = await (await apiFetch('/memory/observations?limit=20')).json();
+    const items = data.observations || [];
+    if (!items.length) {
+      box.innerHTML = '<p class="settings-hint">No observations yet. Save a belief above with its evidence, and it will appear here with a proof count.</p>';
+      return;
+    }
+    box.innerHTML = items.map((o) => `<div class="kn-mem-row"><span class="kn-chip">${escapeHtml(o.kind)}</span><span class="kn-mem-content">${escapeHtml(o.claim)}<br>Proof: ${o.proof_count} evidence item(s) · strength ${o.strength}</span></div>`).join('');
+  } catch {
+    box.innerHTML = '<p class="settings-hint">Could not load observations.</p>';
+  }
+}
+
+async function loadCatalogue(bodyEl) {
+  const box = bodyEl.querySelector('#mrCatList');
+  const q = bodyEl.querySelector('#mrCatQ').value.trim();
+  box.innerHTML = '<p class="settings-hint">Loading…</p>';
+  try {
+    const data = await (await apiFetch(`/knowledge/catalogue?q=${encodeURIComponent(q)}`)).json();
+    const items = data.entries || [];
+    if (!items.length) {
+      box.innerHTML = `<p class="settings-hint">${escapeHtml(data.empty_state || 'No catalogue entries match.')}</p>`;
+      return;
+    }
+    box.innerHTML = items.map((e) => `<div class="kn-mem-row"><span class="kn-chip">${escapeHtml(e.kind)}</span><span class="kn-mem-content"><strong>${escapeHtml(e.name)}</strong> — ${escapeHtml(e.description)}<br>Risk: ${escapeHtml(e.risk)}${e.sangam_equivalent ? `<br>Sangam equivalent: ${escapeHtml(e.sangam_equivalent)}` : ''}</span></div>`).join('');
+  } catch {
+    box.innerHTML = '<p class="settings-hint">Could not load the catalogue.</p>';
+  }
+}
+
+async function loadMemoryNotes(bodyEl) {
+  const box = bodyEl.querySelector('#mrNotesList');
+  box.innerHTML = '<p class="settings-hint">Loading…</p>';
+  try {
+    const data = await (await apiFetch('/memory/notes')).json();
+    const items = data.notes || [];
+    if (!items.length) {
+      box.innerHTML = `<p class="settings-hint">${escapeHtml(data.empty_state || 'No memory notes yet.')}</p>`;
+      return;
+    }
+    box.innerHTML = items.map((n) => `<div class="kn-mem-row"><span class="kn-chip">${escapeHtml(n.type)}</span><span class="kn-mem-content"><strong>${escapeHtml(n.title)}</strong> (${escapeHtml(n.created || '')})<br>${escapeHtml(n.preview || '')}</span></div>`).join('');
+  } catch {
+    box.innerHTML = '<p class="settings-hint">Could not load memory notes.</p>';
   }
 }

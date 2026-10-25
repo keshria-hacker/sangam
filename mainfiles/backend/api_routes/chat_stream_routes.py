@@ -382,6 +382,26 @@ async def chat_stream(  # noqa: PLR0912
         except Exception as exc:  # noqa: BLE001 — memory must never break chat
             logger.warning("Memory retrieval failed: %s", exc)
 
+    # --- Batch 9: observation recall (evidence-backed beliefs) ---
+    # Strongest open observations go in ahead of raw memories in the
+    # message list (inserted at 0 after the memory block, so they are
+    # read first). Best-effort like all memory paths: any failure is
+    # a no-op, never a chat failure. Provenance marks each used id.
+    if not payload.regenerate:
+        try:
+            from ..memory.observations import observation_context_block
+
+            obs_block, obs_ids = await observation_context_block(
+                db, str(current_user.id), limit=3)
+            if obs_block:
+                messages.insert(0, {"role": "system", "content": obs_block})
+                prov = get_current_provenance()
+                for obs_id in obs_ids:
+                    prov.mark_used(obs_id, "observation", obs_block[:80],
+                                   reason="Observation recalled into context")
+        except Exception as exc:  # noqa: BLE001 — memory must never break chat
+            logger.warning("Observation retrieval failed: %s", exc)
+
     # --- Deep-memory: ADHD prompt style (opt-in) ---
     # When the user's adhdFriendly setting is on, prepend the ADHD
     # style block as a system message so the model writes in that

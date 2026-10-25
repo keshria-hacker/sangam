@@ -149,3 +149,41 @@ The current branch has moved beyond the Phase 8 sidebar layout described above:
 - Backend: imports cleanly
 - Smoke: 3/3 (still valid; not re-run this session)
 - Deletions: ~1,800 lines + 7 settings + 7 categories + 12 integration-program design docs (Phase 0-8 program complete, nothing references them)
+
+---
+
+## Batch 9 — Unified Memory + Research (2026-10-26, branch `integration/full-program`)
+
+Deep-read batch for 15 repos (memory-research brief) + the iwe
+memory-as-markdown note from the agents-skills brief §4. All landed
+inside the existing Knowledge destination (plus chat recall and the
+Runs centre) — no new destination, no perfect-flow/tabs-on-top
+restoration. Tests: `tests/test_batch9_memory_research.py` (14 tests).
+
+| # | Repo | Status | Evidence |
+|---|------|--------|----------|
+| 1 | mem0ai/mem0 | Partial→deeper | mem0-style ADD/UPDATE/DELETE/NONE op loop (`backend/memory/ops.py`, preview never writes, apply needs `confirm=true` + known ids only); additive extraction + small-int remap already existed |
+| 2 | MemPalace/mempalace | Partial→deeper | Rooms/drawers browsing already existed; this batch adds the browsable Memory-notes + Observations surfaces in Knowledge and graph-edge confidence decay (`memory/graph.py:decayed_confidence`, 90-day half-life, 0.05 floor) |
+| 3 | DeusData/codebase-memory-mcp | Partial→deeper | `backend/research/code_memory.py`: refresh-if-stale (fingerprint diff, rebuild only on change), `change_impact` (callers + tests + layers), no watcher daemon (single-user, on-demand) |
+| 4 | Graphify-Labs/graphify | Partial→deeper | `detect_hubs` (god-nodes by incoming calls) + `surprising_links` (cross-layer call edges, both endpoints cited) over the existing code graph; full cross-source unified graph NOT built (knowledge_graph owned by another batch) |
+| 5 | vectorize-io/hindsight | Partial→deeper | Observation ledger (`backend/memory/observations.py`): claim + verbatim quote evidence + proof count + strengthen/weaken refinement history + expiry/supersede; chat recall injects top observations ahead of raw memories; mental-model standing pages NOT built (scoped out — observations are the import) |
+| 6 | lfnovo/open-notebook | Partial→deeper | Notebook source timeline (`GET /notebooks/{id}/timeline`) + notebook-scoped deep-research jobs; multi-speaker podcast NOT built (TTS composition only, no voice cloning) |
+| 7 | THU-MAIC/OpenMAIC | Narrow | Guarded slide/lesson outline transform (`POST /research/jobs/{id}/slides`) through a schema over the cited report — citations outside the report are dropped, never invented; no slide editor, no video |
+| 8 | assafelovic/gpt-researcher | Partial→deeper | Research job state machine (`backend/research/deep_research.py`): plan → breadth → depth recursion (capped, deduped) → curate → word-budget compress → cited report writer that 422s on uncited claims; planner is deterministic templates + keyword follow-ups, honestly labelled — no LLM in this path |
+| 9 | paperclipai/paperclip | Narrow | Research jobs mirrored into the Runs centre (`kind=research`) on completion — governance only; no task-board / multi-user shape |
+| 10 | reconurge/flowsint | Narrow, re-scoped | Source graph (`GET /research/jobs/{id}/source-graph`) over the job's OWN retrieved sources only (same-domain + mention edges); no person/IP/breach enrichers, no third-party targeting |
+| 11 | yamadashy/repomix | Done (Sangam-native) | `backend/research/pack.py` + `POST /knowledge/packs`: workspace-gated tree + contents + chars/4 token estimates + chunk splits; credential filenames and secret-like content are filtered (listed, never included); binary skipped |
+| 12 | Egonex-AI/Understand-Anything | Partial→deeper | Staleness surfaced as a `stale`/`rebuilt` flag on code-map refresh; embedding search over code symbols and job-specific explain/diff/domain/onboard modes NOT built |
+| 13 | KeygraphHQ/shannon | Principle only | "No evidence, no claim" adopted for research reports (422 on uncited claims); no recon/exploit/validation pipeline imported |
+| 14 | punkpeye/awesome-mcp-servers | Done (as data) | `GET /knowledge/catalogue`: 10 curated MCP server entries with official/community flag, install route (user/manual), risk note, Sangam equivalent; nothing auto-installs or executes |
+| 15 | Shubhamsaboo/awesome-llm-apps | Done (as data) | Same catalogue: 8 named LLM patterns (corrective RAG, hybrid search, graph RAG, agentic RAG, critique loop, deep research, observation ledger, Markdown memory) each mapped to its Sangam operation |
+| — | iwe-org/iwe (agents-skills §4) | Done | Memory-as-Markdown contract (`backend/memory/markdown_notes.py`): dated, typed frontmatter notes under one browsable directory (`<workspace>/sangam-memory-notes`, overridable via `SANGAM_MEMORY_NOTES_DIR`), `normalize` merges duplicates with a report; secret-bearing writes refused |
+| — | Retain-time defense (hindsight Memory Defense pattern) | Done | `backend/memory/defense.py`: block on private keys / token-like credentials, redact e-mails; applied to observation minting and note writes; findings never echo secret values |
+
+### Batch 9 honest limits
+- Research planner/follow-ups are deterministic (templates + keywords), not LLM-planned; curator scores are heuristic (retrieved text + URL + length).
+- Pack token counts are chars/4 estimates, not tokenizer counts.
+- Catalogue is a curated snapshot dated 2026-10-26, not a live index; install routes are documentation.
+- Chat observation injection is code-wired but NOT live-verified with a real model (no model configured in this environment); the identical context block is endpoint-tested via `GET /memory/observations-context`.
+- Knowledge frontend section is added and module-link-checked, not browser-verified here (subagent has no live browser); Playwright verification is left to the coordinator.
+- Unified cross-source graph merge (code + notes + memories + research into one graph) and mental-model standing pages were scoped out, not silently approximated.

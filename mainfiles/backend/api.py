@@ -256,6 +256,10 @@ from .api_routes import devices_routes  # noqa: F401
 from .api_routes import code_graph_routes  # noqa: F401
 from .api_routes import deep_routes  # noqa: F401
 from .api_routes import goals_routes  # noqa: F401
+# Batch 9 (memory/research): importing this module registers the
+# observation / research-job tables and all batch routes on the
+# shared router.
+from .api_routes import memory_research_routes  # noqa: F401
 # Doctor lives in its own module with its own router; include it on the
 # shared router so it is served (and authenticated) like /system/*.
 from .doctor import router as _doctor_router
