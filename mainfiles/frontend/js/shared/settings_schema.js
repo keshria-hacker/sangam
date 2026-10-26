@@ -96,7 +96,7 @@ export const SETTINGS_SCHEMA = [
     default: 'normal', category: 'voice_output' },
   { key: 'noSlop', label: 'No-slop cleanup', description: 'Removes named AI clichés (delve into, tapestry, crucial, furthermore…) from responses at save time. Edit only — use the Clean up AI clichés preview Detect mode to audit without rewriting.', type: 'boolean',
     default: false, category: 'voice_output' },
-  { key: 'adhdFriendly', label: 'ADHD-friendly formatting', description: 'Short sections, short lists, no throat-clearing openers.', type: 'boolean',
+  { key: 'adhdFriendly', label: 'ADHD-friendly formatting', description: 'Short sections, short lists (caps lists at 5), no throat-clearing openers.', type: 'boolean',
     default: false, category: 'voice_output' },
   { key: 'formality', label: 'Formality', description: 'How formal replies should read.', type: 'select',
     options: [{ v: 'casual', l: 'Casual' }, { v: 'neutral', l: 'Neutral' }, { v: 'formal', l: 'Formal' }],
