@@ -119,28 +119,37 @@ function renderSkills(wrap) {
             ${toggleSwitch(s)}
           </div>
           <div class="lib-skill-detail hidden" data-detail></div>
-        </div>`).join('') || '<p class="settings-hint">No skills registered.</p>'}
+        </div>`).join('') || '<p class="settings-hint">No skills registered.</p><p><button class="btn-secondary btn-sm" type="button" data-lib-scan>Check for skills on this page</button></p>'}
     </div>
     <div class="lib-section">
       <h4><i class="fa-solid fa-file-import"></i> Imported drafts</h4>
       <div id="libDrafts" class="lib-grid"></div>
     </div>
     <div class="lib-section" id="libSkillsV2">
-      <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Skills v2 — server scan, lockfile, checks, packs, recommendations</h4>
+      <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Skills — check for updates, saved sets, and suggestions</h4>
       <div id="libRecommend" class="lib-section"><p class="settings-hint">Loading recommendations…</p></div>
-      <div id="libPacksV2" class="lib-section"><p class="settings-hint">Loading packs…</p></div>
-      <div id="libIndividualSkills" class="lib-section"><p class="settings-hint">Loading skills…</p></div>
-      <div class="lib-section">
-        <h5>Install dry-run preview</h5>
-        <p class="settings-hint">Preview a local skill directory (server path) without writing anything.</p>
-        <input class="provider-key-input" id="libDryRunSource" placeholder="Server path to a skill directory" aria-label="Dry-run source path">
-        <button class="btn-secondary btn-sm" id="libDryRunBtn" type="button">Dry-run preview</button>
-        <div id="libDryRunResult"></div>
-      </div>
+      <details class="advanced-section" data-lib-advanced>
+        <summary>Advanced skill tools</summary>
+        <div id="libPacksV2" class="lib-section"><p class="settings-hint">Loading packs…</p></div>
+        <div id="libIndividualSkills" class="lib-section"><p class="settings-hint">Loading skills…</p></div>
+        <div class="lib-section">
+          <h5>Install dry-run preview</h5>
+          <p class="settings-hint">Preview a local skill directory (server path) without writing anything.</p>
+          <input class="provider-key-input" id="libDryRunSource" placeholder="Server path to a skill directory" aria-label="Dry-run source path">
+          <button class="btn-secondary btn-sm" id="libDryRunBtn" type="button">Dry-run preview</button>
+          <div id="libDryRunResult"></div>
+        </div>
+      </details>
     </div>`;
   wireToggles(wrap);
   renderDrafts(wrap);
   loadSkillsV2(wrap);
+  // Guided empty state: the one link goes to the scan tools on this page.
+  wrap.querySelector('[data-lib-scan]')?.addEventListener('click', () => {
+    const advanced = wrap.querySelector('[data-lib-advanced]');
+    if (advanced) advanced.open = true;
+    wrap.querySelector('#libSkillsV2')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   // Phase 7: SKILL.md preview + risk scan + version pin
   wrap.querySelectorAll('[data-preview]').forEach((btn) => {
     btn.addEventListener('click', () => previewSkill(wrap, btn));
@@ -233,6 +242,18 @@ function scanSkillRisks(content) {
   return risks;
 }
 
+/** Guided empty states: the one link goes to Knowledge → Study → Import
+ * skill (cross-link only; knowledge files untouched). */
+function openStudyImport() {
+  import('../tabs/tabs.js').then((m) => m.showToolSection('knowledge', 'study')).catch(() => {});
+}
+
+function wireImportLinks(el) {
+  el?.querySelectorAll('[data-lib-import]').forEach((btn) => {
+    btn.addEventListener('click', openStudyImport);
+  });
+}
+
 /** Batch 5: server-side scan findings, lockfile status, per-skill checks,
  * pack pins, stack-aware recommendations, and a dry-run install preview.
  * The client-side risk scan in previewSkill is kept as-is. */
@@ -248,8 +269,9 @@ async function loadSkillsV2(wrap) {
       <h5>Stack-aware recommendations</h5>
       <p class="settings-hint">Detected stack: ${escapeHtml((rec.detected_stack || []).join(', ') || 'none')}</p>
       <ul class="lib-risks">
-        ${(rec.recommended || []).map((r) => `<li>${escapeHtml(r.name)} — ${r.installed ? 'installed' : 'not installed'}</li>`).join('') || '<li class="settings-hint">No recommendations.</li>'}
+        ${(rec.recommended || []).map((r) => `<li>${escapeHtml(r.name)} — ${r.installed ? 'installed' : 'not installed'}</li>`).join('') || '<li class="settings-hint">No recommendations.</li><li><button class="btn-secondary btn-sm" type="button" data-lib-import>Import a skill in Knowledge → Study</button></li>'}
       </ul>`;
+    wireImportLinks(recEl);
   } catch (err) {
     recEl.innerHTML = `<p class="settings-hint">Recommendations unavailable: ${escapeHtml(err?.message || String(err))}</p>`;
   }
@@ -275,8 +297,9 @@ async function loadSkillsV2(wrap) {
               <button class="btn-secondary btn-sm" data-pack-pin-save type="button">Pin</button>
               <button class="btn-secondary btn-sm" data-pack-unpin type="button">Unpin</button>
             </div>
-          </div>`).join('') || '<p class="settings-hint">No packs.</p>'}
+          </div>`).join('') || '<p class="settings-hint">No packs.</p><p><button class="btn-secondary btn-sm" type="button" data-lib-import>Import a skill in Knowledge → Study</button></p>'}
       </div>`;
+    wireImportLinks(packsEl);
     packsEl.querySelectorAll('[data-pack-pin-save]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const card = btn.closest('[data-pack]');
@@ -322,8 +345,9 @@ async function loadSkillsV2(wrap) {
               <button class="btn-secondary btn-sm" data-skill-checks type="button">Run checks</button>
             </div>
             <div class="lib-skill-detail hidden" data-ind-detail></div>
-          </div>`).join('') || '<p class="settings-hint">No individual skills.</p>'}
+          </div>`).join('') || '<p class="settings-hint">No individual skills.</p><p><button class="btn-secondary btn-sm" type="button" data-lib-import>Import a skill in Knowledge → Study</button></p>'}
       </div>`;
+    wireImportLinks(skillsEl);
     skillsEl.querySelectorAll('[data-skill-scan]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const card = btn.closest('[data-ind-skill]');
@@ -490,6 +514,8 @@ const PROMPT_TEMPLATES = [
 ];
 
 function renderTemplates(wrap) {
+  // UI-simplify: "Use in chat" reuses chat.js startNewChatWithText
+  // (new chat, composer prefilled, not sent); Copy stays as well.
   const card = (t) => `
     <div class="lib-card">
       <div class="lib-card-head">
@@ -501,6 +527,9 @@ function renderTemplates(wrap) {
         <button class="btn-secondary btn-sm" data-copy-tpl="${escapeHtml(t.name)}">
           <i class="fa-regular fa-copy"></i> Copy
         </button>
+        <button class="btn-secondary btn-sm" data-use-tpl="${escapeHtml(t.name)}">
+          <i class="fa-regular fa-comment"></i> Use in chat
+        </button>
       </div>
     </div>`;
   wrap.innerHTML = `
@@ -509,6 +538,20 @@ function renderTemplates(wrap) {
     <div class="lib-section"><h4>Prompt templates</h4>
       <div class="lib-grid">${PROMPT_TEMPLATES.map(card).join('')}</div></div>`;
   const all = [...ARTIFACT_TEMPLATES, ...PROMPT_TEMPLATES];
+  wrap.querySelectorAll('[data-use-tpl]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      const t = all.find((x) => x.name === b.dataset.useTpl);
+      if (!t) return;
+      try {
+        const tabs = await import('../tabs/tabs.js');
+        tabs.switchTab('main');
+        const chat = await import('../chat/chat.js');
+        await chat.startNewChatWithText(t.body);
+      } catch {
+        showToast({ type: 'error', title: 'Could not open chat' });
+      }
+    });
+  });
   wrap.querySelectorAll('[data-copy-tpl]').forEach((b) => {
     b.addEventListener('click', async () => {
       const t = all.find((x) => x.name === b.dataset.copyTpl);

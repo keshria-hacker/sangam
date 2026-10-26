@@ -44,7 +44,15 @@ function buildActions() {
     { id: 'copy', label: 'Copy last response', hint: 'Ctrl+Shift+C', run: () => copyLast() },
     { id: 'regen', label: 'Regenerate last response', hint: 'Ctrl+Shift+R', run: () => a.regenerate?.() },
   ];
-  // Phase 8 B7: merged pages — deep-link into sub-views.
+  // UI-simplify: every destination is palette-reachable. Chat is already
+  // covered by "New chat"; these land on the destination itself, not a
+  // section inside it. No existing action is removed.
+  actions.push(
+    { id: 'home', label: 'Open Home', run: () => import('../tabs/tabs.js').then((m) => m.showTool('home')) },
+    { id: 'work', label: 'Open Work', run: () => import('../tabs/tabs.js').then((m) => m.showTool('work')) },
+    { id: 'create', label: 'Open Create', run: () => import('../tabs/tabs.js').then((m) => m.showTool('create')) },
+    { id: 'knowledge', label: 'Open Knowledge', run: () => import('../tabs/tabs.js').then((m) => m.showTool('knowledge')) },
+  );
   actions.push({
     id: 'teams', label: 'Open Agent teams',
     run: () => import('../tabs/tabs.js').then((m) => m.showToolSub('agents', 'data-agentsub', 'teams')),
@@ -107,8 +115,15 @@ function toggleTheme() {
   });
 }
 
-function toggleWebSearch() {
-  document.getElementById('webSearchToggle')?.click();
+async function toggleWebSearch() {
+  // UI-simplify fix: the old code clicked #webSearchToggle, which does
+  // not exist, so the action silently did nothing. Use the same
+  // setToolEnabled('web_search', …) path as the app.js Alt+W handler,
+  // which also persists the setting and fires sangam:tools-changed.
+  const { isToolEnabled, setToolEnabled } = await import('../composer/popovers.js');
+  const on = !isToolEnabled('web_search');
+  setToolEnabled('web_search', on);
+  app().showToast?.({ type: 'info', title: on ? 'Web search on' : 'Web search off' });
 }
 
 function copyLast() {

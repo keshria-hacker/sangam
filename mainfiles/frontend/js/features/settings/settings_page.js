@@ -281,6 +281,28 @@ export function renderSettingsPage(bodyEl) {
     for (const def of defs) {
       listEl.appendChild(settingRow(def, { showCategory: !!query }));
     }
+    // UI-simplify: the raw JSON rows for routing are an advanced escape
+    // hatch, not the way to edit routes — the Routes UI below is the
+    // human version. Collapse them behind a labelled toggle in rendering
+    // only; the schema keys, values and search results are unchanged.
+    if (!query && activeCategory === 'models') {
+      const jsonKeys = new Set(['routingRules', 'modelCombos']);
+      const jsonRows = [...listEl.querySelectorAll('.sp-setting-row')]
+        .filter((row) => jsonKeys.has(row.dataset.key));
+      if (jsonRows.length) {
+        const details = document.createElement('details');
+        details.className = 'advanced-section';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Advanced: edit as JSON';
+        details.appendChild(summary);
+        const hint = document.createElement('p');
+        hint.className = 'settings-hint';
+        hint.textContent = 'Only edit these directly if you know the JSON format. Otherwise use the Routing rules and Combos sections below.';
+        details.appendChild(hint);
+        jsonRows.forEach((row) => details.appendChild(row));
+        listEl.appendChild(details);
+      }
+    }
     // Phase 8 B2: custom sections migrated from the legacy modal.
     if (!query) renderCustomSections(listEl, activeCategory);
   }
@@ -360,13 +382,38 @@ export function renderSettingsPage(bodyEl) {
   });
 
   // --- Reset all (with confirm) ---
-  bodyEl.querySelector('#spResetAll').addEventListener('click', () => {
-    if (!window.confirm('Reset ALL settings to their defaults? This cannot be undone.')) return;
-    resetAllSettings();
-    renderCats();
-    renderList();
-    showToast({ type: 'info', title: 'Settings reset', message: 'All settings restored to defaults.' });
-  });
+  // UI-simplify: same confirm-overlay markup pattern as index.html
+  // (confirm-overlay / confirm-dialog / confirm-actions), built here
+  // instead of window.confirm. A fresh element per open, so it never
+  // fights the sidebar's singleton chat-delete dialog for its buttons.
+  function showResetAllConfirm() {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="spConfirmTitle">
+        <h3 id="spConfirmTitle">Reset all settings?</h3>
+        <p>All settings return to their defaults. This cannot be undone.</p>
+        <div class="confirm-actions">
+          <button class="btn-secondary" type="button" data-sp-cancel>Cancel</button>
+          <button class="btn-danger" type="button" data-sp-confirm>Reset all</button>
+        </div>
+      </div>`;
+    const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-sp-cancel]').addEventListener('click', close);
+    overlay.querySelector('[data-sp-confirm]').addEventListener('click', () => {
+      close();
+      resetAllSettings();
+      renderCats();
+      renderList();
+      showToast({ type: 'info', title: 'Settings reset', message: 'All settings restored to defaults.' });
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    overlay.querySelector('[data-sp-cancel]').focus();
+  }
+  bodyEl.querySelector('#spResetAll').addEventListener('click', showResetAllConfirm);
 
   // --- Export JSON ---
   bodyEl.querySelector('#spExport').addEventListener('click', () => {

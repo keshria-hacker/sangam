@@ -82,8 +82,9 @@ export async function renderRoutesTab(bodyEl) {
       </section>
 
       <section class="routes-section">
-        <h4>Quota</h4>
+        <h4>Usage</h4>
         <div id="quotaView"><p class="settings-hint">Loading…</p></div>
+        <button class="btn-secondary btn-sm" id="quotaOpen" type="button">Open full usage in Settings → Usage</button>
       </section>
     </div>`;
 
@@ -93,6 +94,11 @@ export async function renderRoutesTab(bodyEl) {
 
   bodyEl.querySelector('#routeAdd')?.addEventListener('click', () => showRouteForm(bodyEl));
   bodyEl.querySelector('#comboAdd')?.addEventListener('click', () => showComboForm(bodyEl));
+  // UI-simplify: Quota was a second, smaller copy of Settings → Usage.
+  // The numbers stay here on the card; the full view lives in Settings.
+  bodyEl.querySelector('#quotaOpen')?.addEventListener('click', () => {
+    import('../tabs/tabs.js').then((m) => m.showToolSection('settings', 'usage')).catch(() => {});
+  });
 }
 
 function renderRouteList(bodyEl) {
@@ -121,17 +127,48 @@ function renderRouteList(bodyEl) {
   }));
 }
 
+/** Model picker for the inline forms: a dropdown from the /models list
+ * (no memorised ids), falling back to a free-text input when no models
+ * are available yet. */
+function modelPickerHtml(models, attrs) {
+  if (!models.length) {
+    return `<input class="provider-key-input" ${attrs} placeholder="Model id (no models found yet)" aria-label="Model id">`;
+  }
+  return `<select class="provider-key-input" ${attrs} aria-label="Model">
+    <option value="">Choose a model…</option>
+    ${models.map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('')}
+  </select>`;
+}
+
 async function showRouteForm(bodyEl) {
+  const existing = bodyEl.querySelector('[data-route-form]');
+  if (existing) { existing.querySelector('input, select')?.focus(); return; }
   const models = await fetchModels();
-  const keywords = prompt('Keywords (comma-separated):');
-  if (!keywords) return;
-  const model_id = prompt(`Model ID (available: ${models.slice(0, 5).join(', ')}…):`);
-  if (!model_id) return;
-  const rules = getRoutes();
-  rules.push({ keywords, model_id, enabled: true });
-  setRoutes(rules);
-  renderRouteList(bodyEl);
-  showToast({ type: 'success', title: 'Route added' });
+  const list = bodyEl.querySelector('#routeList');
+  const form = document.createElement('div');
+  form.className = 'route-row';
+  form.dataset.routeForm = '';
+  form.innerHTML = `
+    <input class="provider-key-input" data-route-kw placeholder="Keywords, comma-separated (e.g. code, debug)" aria-label="Keywords" style="flex:2;min-width:160px">
+    ${modelPickerHtml(models, 'data-route-model')}
+    <button class="btn-primary btn-sm" type="button" data-route-save>Save</button>
+    <button class="btn-secondary btn-sm" type="button" data-route-cancel>Cancel</button>`;
+  list.before(form);
+  const kwInput = form.querySelector('[data-route-kw]');
+  kwInput.focus();
+  form.querySelector('[data-route-cancel]').addEventListener('click', () => form.remove());
+  form.querySelector('[data-route-save]').addEventListener('click', () => {
+    const keywords = kwInput.value.trim();
+    const model_id = form.querySelector('[data-route-model]').value.trim();
+    if (!keywords) { showToast({ type: 'info', message: 'Enter at least one keyword.' }); kwInput.focus(); return; }
+    if (!model_id) { showToast({ type: 'info', message: 'Choose a model.' }); return; }
+    const rules = getRoutes();
+    rules.push({ keywords, model_id, enabled: true });
+    setRoutes(rules);
+    form.remove();
+    renderRouteList(bodyEl);
+    showToast({ type: 'success', title: 'Route added' });
+  });
 }
 
 async function fetchModels() {
@@ -159,15 +196,43 @@ function renderComboList(bodyEl) {
 }
 
 async function showComboForm(bodyEl) {
-  const name = prompt('Combo name:');
-  if (!name) return;
-  const steps = prompt('Model IDs in order (comma-separated):');
-  if (!steps) return;
-  const combos = getCombos();
-  combos.push({ name, steps: steps.split(',').map((s) => s.trim()).filter(Boolean) });
-  setSetting('modelCombos', JSON.stringify(combos));
-  renderComboList(bodyEl);
-  showToast({ type: 'success', title: 'Combo added' });
+  const existing = bodyEl.querySelector('[data-combo-form]');
+  if (existing) { existing.querySelector('input')?.focus(); return; }
+  const models = await fetchModels();
+  const list = bodyEl.querySelector('#comboList');
+  const form = document.createElement('div');
+  form.className = 'route-row';
+  form.dataset.comboForm = '';
+  form.style.flexWrap = 'wrap';
+  form.innerHTML = `
+    <input class="provider-key-input" data-combo-name placeholder="Combo name (e.g. Fast draft)" aria-label="Combo name" style="flex:1;min-width:160px">
+    <div data-combo-steps style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      ${modelPickerHtml(models, 'data-combo-step')}
+    </div>
+    <button class="btn-secondary btn-sm" type="button" data-combo-add-step>+ Add step</button>
+    <button class="btn-primary btn-sm" type="button" data-combo-save>Save</button>
+    <button class="btn-secondary btn-sm" type="button" data-combo-cancel>Cancel</button>`;
+  list.before(form);
+  const nameInput = form.querySelector('[data-combo-name]');
+  nameInput.focus();
+  form.querySelector('[data-combo-add-step]').addEventListener('click', () => {
+    const stepWrap = document.createElement('span');
+    stepWrap.innerHTML = modelPickerHtml(models, 'data-combo-step');
+    form.querySelector('[data-combo-steps]').appendChild(stepWrap);
+  });
+  form.querySelector('[data-combo-cancel]').addEventListener('click', () => form.remove());
+  form.querySelector('[data-combo-save]').addEventListener('click', () => {
+    const name = nameInput.value.trim();
+    const steps = [...form.querySelectorAll('[data-combo-step]')].map((el) => el.value.trim()).filter(Boolean);
+    if (!name) { showToast({ type: 'info', message: 'Enter a combo name.' }); nameInput.focus(); return; }
+    if (!steps.length) { showToast({ type: 'info', message: 'Choose at least one model step.' }); return; }
+    const combos = getCombos();
+    combos.push({ name, steps });
+    setSetting('modelCombos', JSON.stringify(combos));
+    form.remove();
+    renderComboList(bodyEl);
+    showToast({ type: 'success', title: 'Combo added' });
+  });
 }
 
 async function loadQuota(bodyEl) {

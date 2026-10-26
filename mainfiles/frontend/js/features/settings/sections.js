@@ -234,9 +234,9 @@ export function renderOmnirouteSection(container) {
   const wrap = document.createElement('div');
   wrap.className = 'sp-custom-section';
   wrap.innerHTML = `
-    <h3 class="sp-section-title"><i class="fa-solid fa-cloud"></i> OmniRoute gateway</h3>
+    <h3 class="sp-section-title"><i class="fa-solid fa-cloud"></i> Smart model gateway (OmniRoute)</h3>
     <div class="sp-section-body">
-      <p class="settings-hint">Point Sangam at an OpenAI-compatible gateway to auto-discover models.</p>
+      <p class="settings-hint">One gateway account that reaches many providers' models — Sangam auto-discovers them.</p>
       <div class="omniroute-presets" style="display:flex;gap:8px;margin-bottom:8px">
         <button class="btn-secondary btn-sm" type="button" data-endpoint="http://localhost:8080/v1">Local</button>
         <button class="btn-secondary btn-sm" type="button" data-endpoint="https://api.openai.com/v1">OpenAI</button>
@@ -386,9 +386,29 @@ export async function renderFeatureTogglesSection(container) {
 export function renderMemorySection(container) {
   const wrap = document.createElement('div');
   wrap.className = 'sp-custom-section';
+  // UI-simplify: Knowledge → Memories is the one visible home for the
+  // memory browser; this Settings copy is a link there plus a collapsed
+  // "Browse here" for anyone who wants it without leaving Settings.
+  // The underlying browser (memory-ui.js) is unchanged, just collapsed.
   wrap.innerHTML = `<h3 class="sp-section-title"><i class="fa-solid fa-brain"></i> Memory</h3>
-    <div class="sp-section-body" data-mem-body><p class="settings-hint">Loading…</p></div>`;
+    <div class="sp-section-body">
+      <p class="settings-hint">Your saved memories live in Knowledge → Memories.</p>
+      <button class="btn-secondary btn-sm" type="button" data-mem-open>Open Memories in Knowledge</button>
+      <details class="advanced-section">
+        <summary>Browse here</summary>
+        <div data-mem-body><p class="settings-hint">Loading…</p></div>
+      </details>
+    </div>`;
   container.appendChild(wrap);
+  wrap.querySelector('[data-mem-open]').addEventListener('click', () => {
+    import('../tabs/tabs.js').then((m) => {
+      m.showTool('knowledge');
+      // Memories is an in-page section of Knowledge; land on it.
+      setTimeout(() => {
+        document.querySelector('#knMemories')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }).catch(() => {});
+  });
   import('./memory-ui.js').then((m) => {
     const body = wrap.querySelector('[data-mem-body]');
     body.innerHTML = '';
@@ -413,7 +433,7 @@ export function renderVoiceSection(container) {
     const body = wrap.querySelector('[data-voice-body]');
     body.innerHTML = '';
     if (m.isVoiceEnabled()) m.renderVoiceSettings(body);
-    else body.innerHTML = '<p class="settings-hint">Enable the Voice feature (Workspace → Features) to configure voice.</p>';
+    else body.innerHTML = '<p class="settings-hint">Enable the Voice feature (Agents & Safety → Features) to configure voice.</p>';
   }).catch(() => {
     wrap.querySelector('[data-voice-body]').innerHTML =
       '<p class="settings-hint">Voice settings unavailable.</p>';
@@ -447,6 +467,7 @@ export function renderDoctorSection(container) {
   const wrap = document.createElement('div');
   wrap.className = 'sp-custom-section';
   wrap.innerHTML = `<h3 class="sp-section-title"><i class="fa-solid fa-stethoscope"></i> Doctor</h3>
+    <p class="settings-hint">Checks your setup and shows fixes.</p>
     <div class="sp-section-body" data-doctor-body><p class="settings-hint">Loading…</p></div>`;
   container.appendChild(wrap);
   import('../home/home.js').then((m) => {
@@ -502,7 +523,7 @@ export function renderQualityPreview(container) {
   const wrap = document.createElement('div');
   wrap.className = 'sp-custom-section';
   wrap.innerHTML = `
-    <h3 class="sp-section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> De-slop preview</h3>
+    <h3 class="sp-section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Clean up AI clichés — preview</h3>
     <p class="settings-hint">Paste text to see what the no-slop cleanup would change — before it ever touches your chats.</p>
     <div class="sp-section-body">
       <textarea class="provider-key-input" data-qp-input rows="5" style="width:100%;box-sizing:border-box"
