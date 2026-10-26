@@ -867,6 +867,17 @@ export function stopGeneration() {
 }
 
 /**
+ * Start a new chat with the composer prefilled (UI-simplify: Library
+ * "Use in chat" reuses this instead of copy-paste). Does not send.
+ */
+export async function startNewChatWithText(text) {
+  await startNewChat();
+  elements.messageInput.value = text || '';
+  autoResizeTextarea();
+  elements.messageInput?.focus();
+}
+
+/**
  * Start a new chat.
  */
 export async function startNewChat() {

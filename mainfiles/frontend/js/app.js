@@ -9,7 +9,7 @@ import { initElements as initModelsElements, loadProvidersAndModels, renderModel
 import { openSettings } from './features/settings/open.js';
 import { applyAppearance, initAppearance } from './features/settings/appearance.js';
 import { initElements as initAuthElements, initializeAuth, setStartApplicationCallback, initAuth, logout } from './features/auth/auth.js';
-import { initTabs, openToolTab, showTool, showToolSection, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
+import { initTabs, openToolTab, showTool, showToolSub, registerTabRenderer } from './features/tabs/tabs.js';
 import { trapFocus } from './shared/focus_trap.js';
 import { setLang } from './shared/i18n.js';
 import { getSetting } from './shared/settings_store.js';

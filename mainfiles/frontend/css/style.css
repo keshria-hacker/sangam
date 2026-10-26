@@ -2697,8 +2697,7 @@ body[data-animations="off"] *{animation:none !important; transition:none !import
 .home-recent { display: flex; flex-direction: column; gap: 6px; }
 .home-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--surface-raised); border: 1px solid var(--border-soft); border-radius: var(--radius-sm, 8px); padding: 10px 14px; cursor: pointer; font-size: 13px; color: var(--text-primary); }
 .home-row:hover { border-color: var(--accent); }
-.home-row-static { cursor: default; }
-.home-row-static:hover { border-color: var(--border-soft); }
+
 .home-row > i { color: var(--text-secondary); width: 18px; text-align: center; }
 .home-row-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-row-meta { color: var(--text-tertiary); font-size: 11px; white-space: nowrap; }
