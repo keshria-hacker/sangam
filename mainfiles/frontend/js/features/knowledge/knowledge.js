@@ -5,7 +5,7 @@
  *   1. Header: search (debounced), stats chips, "Include code" toggle
  *   2. Graph: SVG with simple force simulation (no external libs)
  *   3. Detail panel: node metadata + related nodes
- *   4. MCP tools manager
+ *   4. MCP tools link (enable/disable lives in Library)
  *   5. Memory browser
  */
 import { apiFetch } from '../../shared/http.js';
@@ -33,7 +33,7 @@ export async function renderKnowledgeTab(bodyEl) {
       <div class="kn-header">
         <div class="kn-search-wrap">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="knSearch" placeholder="Search memories, documents, chats…" autocomplete="off">
+          <input type="text" id="knSearch" placeholder="Search memories, documents, chats…" autocomplete="off" aria-label="Search memories, documents, chats">
           <div class="kn-search-results hidden" id="knSearchResults"></div>
         </div>
         <div class="kn-stats" id="knStats"></div>
@@ -56,6 +56,7 @@ export async function renderKnowledgeTab(bodyEl) {
       <div id="knGraphEmpty"></div>
       <section class="kn-section">
         <h3><i class="fa-solid fa-plug"></i> MCP tools</h3>
+        <p class="settings-hint">MCP servers connect outside tools to Sangam. Manage them in Library → MCP Servers.</p>
         <div id="knMcp"></div>
       </section>
       <section class="kn-section">
@@ -63,22 +64,22 @@ export async function renderKnowledgeTab(bodyEl) {
         <div class="kn-mem-controls">
           <select id="knMemView" class="provider-key-input" aria-label="Memory view">
             <option value="list">List</option>
-            <option value="rooms">Rooms</option>
+            <option value="rooms">Groups</option>
           </select>
-          <select id="knMemKind" class="provider-key-input">
+          <select id="knMemKind" class="provider-key-input" aria-label="Memory kind">
             <option value="">All kinds</option>
-            <option value="episodic">Episodic</option>
-            <option value="semantic">Semantic</option>
-            <option value="procedural">Procedural</option>
+            <option value="episodic">Events</option>
+            <option value="semantic">Facts</option>
+            <option value="procedural">How-tos</option>
           </select>
-          <button class="btn-secondary" id="knTidy"><i class="fa-solid fa-broom"></i> Tidy</button>
+          <button class="btn-secondary" id="knTidy"><i class="fa-solid fa-broom"></i> Clean up old memories</button>
           <button class="btn-secondary" id="knExport"><i class="fa-solid fa-download"></i> Export</button>
         </div>
         <div id="knMemories" class="kn-mem-list"></div>
       </section>
       <section class="kn-section">
         <h3><i class="fa-solid fa-magnifying-glass"></i> Retrieve documents</h3>
-        <p class="settings-hint">Hybrid search (vector + keyword) over your uploaded documents, with citations.</p>
+        <p class="settings-hint">Searches your documents by meaning and by exact words, with citations.</p>
         <div class="kn-mem-controls">
           <input type="text" id="knRetrieveQ" class="provider-key-input" placeholder="Ask about your documents…" aria-label="Retrieve documents query" style="flex:1">
           <button class="btn-secondary" id="knRetrieveBtn">Retrieve</button>
@@ -112,7 +113,9 @@ export async function renderKnowledgeTab(bodyEl) {
       </section>
       <section class="kn-section">
         <h3><i class="fa-solid fa-brain"></i> Memory tools</h3>
-        <p class="settings-hint">On-demand LLM extraction, reflection over recalled memories, entity timelines, verbatim transcripts, and memory updates. LLM tools need a configured model.</p>
+        <p class="settings-hint">On-demand AI fact-finding, reflection over recalled memories, entity timelines, verbatim transcripts, and memory updates. AI tools need a configured model.</p>
+        <details class="advanced-section" id="knMemToolsAdvanced">
+          <summary>Advanced memory tools</summary>
         <div class="kn-mem-controls">
           <textarea id="memv2ExtractText" class="provider-key-input" placeholder="Paste text to extract durable facts from…" aria-label="Text to extract facts from" style="flex:1"></textarea>
           <button class="btn-secondary" id="memv2ExtractBtn">Extract facts</button>
@@ -137,15 +140,16 @@ export async function renderKnowledgeTab(bodyEl) {
           <input type="text" id="memv2UpdateId" class="provider-key-input" placeholder="Memory id" aria-label="Memory id to update">
           <input type="text" id="memv2UpdateContent" class="provider-key-input" placeholder="New content (blank = keep)" aria-label="New memory content" style="flex:1">
           <input type="text" id="memv2UpdateImportance" class="provider-key-input" placeholder="Importance 0–1" aria-label="New importance">
-          <input type="text" id="memv2UpdateRoom" class="provider-key-input" placeholder="Room" aria-label="New room">
-          <input type="text" id="memv2UpdateDrawer" class="provider-key-input" placeholder="Drawer" aria-label="New drawer">
+          <input type="text" id="memv2UpdateRoom" class="provider-key-input" placeholder="Group" aria-label="New group">
+          <input type="text" id="memv2UpdateDrawer" class="provider-key-input" placeholder="Folder" aria-label="New folder">
           <button class="btn-secondary" id="memv2UpdateBtn">Update memory</button>
         </div>
         <div id="memv2UpdateStatus" class="settings-hint"></div>
+        </details>
       </section>
       <section class="kn-section">
         <h3><i class="fa-solid fa-flask"></i> Memory &amp; Research</h3>
-        <p class="settings-hint">Consolidated beliefs backed by evidence, deep-research jobs with cited reports, workspace packs, and a catalogue of MCP servers and LLM patterns. Nothing here installs or runs remote code on its own.</p>
+        <p class="settings-hint">Consolidated beliefs backed by evidence, deep-research jobs with cited reports, workspace packs, and a catalogue of MCP servers and AI app patterns. Nothing here installs or runs remote code on its own.</p>
         <h4>Observations</h4>
         <p class="settings-hint">A belief Sangam holds with its evidence attached. Supporting evidence strengthens it; contradicting evidence weakens it without erasing history.</p>
         <div class="kn-mem-controls">
@@ -166,15 +170,17 @@ export async function renderKnowledgeTab(bodyEl) {
           <button class="btn-secondary" id="mrResearchBtn">Start research</button>
         </div>
         <div id="mrResearchStatus" class="kn-mem-list"></div>
-        <h4>Catalogue</h4>
-        <p class="settings-hint">Documented MCP servers and LLM app patterns, with risk notes and the Sangam feature that already covers each pattern. Entries are reference only — they never install themselves.</p>
+        <details class="advanced-section">
+          <summary>Reference catalogue</summary>
+        <p class="settings-hint">Documented MCP servers and AI app patterns, with risk notes and the Sangam feature that already covers each pattern. Entries are reference only — they never install themselves.</p>
         <div class="kn-mem-controls">
           <input type="text" id="mrCatQ" class="provider-key-input" placeholder="Search the catalogue…" aria-label="Catalogue search" style="flex:1">
           <button class="btn-secondary" id="mrCatBtn">Search</button>
         </div>
         <div id="mrCatList" class="kn-mem-list"></div>
+        </details>
         <h4>Workspace pack</h4>
-        <p class="settings-hint">Bundle a folder inside your workspace into one LLM-ready text pack (file tree + contents, token estimate). Files that look like credentials are left out and listed, never included.</p>
+        <p class="settings-hint">Bundle a folder inside your workspace into one AI-ready text pack (file tree + contents, token estimate). Files that look like credentials are left out and listed, never included.</p>
         <div class="kn-mem-controls">
           <input type="text" id="mrPackPath" class="provider-key-input" placeholder="Folder inside the workspace (blank = whole workspace)" aria-label="Pack path" style="flex:1">
           <button class="btn-secondary" id="mrPackBtn">Build pack</button>
@@ -550,43 +556,51 @@ async function openSearchResult(type, id, bodyEl) {
 }
 
 // --- MCP tools ---------------------------------------------------------------
+// Knowledge no longer duplicates Library's enable/disable list: Library →
+// MCP Servers is the single home for that. This section is only a link there.
 
-async function loadMcp(bodyEl) {
+function loadMcp(bodyEl) {
   const box = bodyEl.querySelector('#knMcp');
-  box.innerHTML = '<p class="settings-hint">Loading…</p>';
-  try {
-    const data = await (await apiFetch('/extensions')).json();
-    const servers = (data.extensions || []).filter((e) => e.kind === 'mcp_server');
-    if (!servers.length) {
-      box.innerHTML = `<p class="settings-hint">No MCP servers configured. Add one in Library → Extensions.</p>`;
-      return;
-    }
-    box.innerHTML = servers.map((s) => `
-      <div class="kn-mcp-server">
-        <span class="kn-mcp-name"><i class="fa-solid fa-plug"></i> ${escapeHtml(s.name)}</span>
-        <span class="kn-mcp-desc">${escapeHtml(s.description || '')}</span>
-        <span class="kn-mcp-status ${s.enabled ? 'on' : ''}">${s.enabled ? 'Connected' : 'Off'}</span>
-        <button class="btn-secondary btn-sm" data-name="${escapeHtml(s.name)}" data-action="${s.enabled ? 'disable' : 'enable'}">
-          ${s.enabled ? 'Disconnect' : 'Connect'}
-        </button>
-      </div>`).join('');
-    box.querySelectorAll('button[data-name]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        try {
-          await apiFetch(`/extensions/${encodeURIComponent(btn.dataset.name)}/${btn.dataset.action}`, { method: 'POST' });
-          showToast({ type: 'success', title: `MCP server ${btn.dataset.action}d` });
-          loadMcp(bodyEl);
-        } catch {
-          showToast({ type: 'error', title: 'Action failed' });
-        }
-      });
-    });
-  } catch {
-    box.innerHTML = '<p class="settings-hint">Could not load MCP servers.</p>';
-  }
+  if (!box) return;
+  box.innerHTML = `<button class="btn-secondary" id="knMcpOpenLibrary" type="button">
+    <i class="fa-solid fa-plug"></i> Open MCP Servers in Library
+  </button>`;
+  box.querySelector('#knMcpOpenLibrary').addEventListener('click', () => {
+    import('../tabs/tabs.js').then((m) => m.showToolSection('library', 'mcp')).catch(() => {});
+  });
 }
 
 // --- Memory browser ------------------------------------------------------------
+
+/** Display labels for memory kinds (backend keys / option values unchanged). */
+const KIND_LABELS = { episodic: 'Events', semantic: 'Facts', procedural: 'How-tos' };
+function kindLabel(kind) { return KIND_LABELS[kind] || kind || ''; }
+
+/** "Start a chat" button for the "No memories yet" empty states: back to Chat. */
+function wireEmptyChatButton(box) {
+  box.querySelector('.kn-empty-chat')?.addEventListener('click', () => {
+    import('../tabs/tabs.js').then((m) => m.switchTab('main')).catch(() => {});
+  });
+}
+
+/**
+ * Prefill the Update-memory form (inside "Advanced memory tools") from a
+ * memory row, so the user never has to type a memory id from elsewhere.
+ * Form fields and the backend call in updateMemory() are unchanged.
+ */
+function prefillUpdateForm(bodyEl, m) {
+  const advanced = bodyEl.querySelector('#knMemToolsAdvanced');
+  if (advanced) advanced.open = true;
+  const set = (id, val) => { const el = bodyEl.querySelector(`#${id}`); if (el) el.value = val ?? ''; };
+  set('memv2UpdateId', m.id || '');
+  set('memv2UpdateContent', m.content || '');
+  set('memv2UpdateImportance', m.importance != null ? String(m.importance) : '');
+  set('memv2UpdateRoom', m.room || '');
+  set('memv2UpdateDrawer', m.drawer || '');
+  const contentEl = bodyEl.querySelector('#memv2UpdateContent');
+  contentEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  contentEl?.focus();
+}
 
 async function loadMemories(bodyEl) {
   const box = bodyEl.querySelector('#knMemories');
@@ -601,18 +615,23 @@ async function loadMemories(bodyEl) {
     const url = kind ? `/memory?kind=${kind}&limit=50` : '/memory?limit=50';
     const items = await (await apiFetch(url)).json();
     if (!items.length) {
-      box.innerHTML = '<p class="settings-hint">No memories yet.</p>';
+      box.innerHTML = '<p class="settings-hint">No memories yet.</p><button type="button" class="btn-secondary btn-sm kn-empty-chat">Start a chat</button>';
+      wireEmptyChatButton(box);
       return;
     }
     box.innerHTML = items.map((m) => `
       <div class="kn-mem" data-id="${escapeHtml(m.id)}">
-        <span class="kn-chip" style="--chip-color:${TYPE_COLORS.memory}">${escapeHtml(m.kind || '')}</span>
+        <span class="kn-chip" style="--chip-color:${TYPE_COLORS.memory}">${escapeHtml(kindLabel(m.kind))}</span>
         <span class="kn-mem-content">${escapeHtml((m.content || '').slice(0, 160))}</span>
-        ${m.room && m.room !== 'default' ? `<span class="kn-mem-room" title="Room / drawer">${escapeHtml(m.room)}/${escapeHtml(m.drawer || 'general')}</span>` : ''}
+        ${m.room && m.room !== 'default' ? `<span class="kn-mem-room" title="Group / folder">${escapeHtml(m.room)}/${escapeHtml(m.drawer || 'general')}</span>` : ''}
         ${m.importance != null ? `<span class="kn-mem-imp" title="Importance">${Number(m.importance).toFixed(2)}</span>` : ''}
-        <button class="icon-btn kn-mem-move" title="Move to room/drawer" aria-label="Move memory"><i class="fa-solid fa-folder-open"></i></button>
+        <button class="icon-btn kn-mem-edit" title="Edit" aria-label="Edit memory"><i class="fa-solid fa-pen"></i></button>
+        <button class="icon-btn kn-mem-move" title="Move to group/folder" aria-label="Move memory"><i class="fa-solid fa-folder-open"></i></button>
         <button class="icon-btn kn-mem-del" title="Forget"><i class="fa-solid fa-trash"></i></button>
       </div>`).join('');
+    box.querySelectorAll('.kn-mem-edit').forEach((btn, i) => {
+      btn.addEventListener('click', () => prefillUpdateForm(bodyEl, items[i]));
+    });
     box.querySelectorAll('.kn-mem-move').forEach((btn) => {
       btn.addEventListener('click', () => openMoveMemory(bodyEl, btn.closest('.kn-mem')));
     });
@@ -645,9 +664,9 @@ async function openMoveMemory(bodyEl, rowEl) {
     const data = await (await apiFetch('/memory/rooms')).json();
     rooms = (data.rooms || []).map((r) => r.name);
   } catch { /* ignore */ }
-  const room = prompt(`Move memory to room (existing: ${rooms.join(', ') || 'none yet'}):`, 'default');
+  const room = prompt(`Move memory to group (existing: ${rooms.join(', ') || 'none yet'}):`, 'default');
   if (room == null) return;
-  const drawer = prompt('Drawer:', 'general');
+  const drawer = prompt('Folder:', 'general');
   if (drawer == null) return;
   try {
     const res = await apiFetch(`/memory/${encodeURIComponent(id)}/move`, {
@@ -669,7 +688,8 @@ async function loadMemoryRooms(bodyEl, box) {
     const data = await (await apiFetch('/memory/rooms')).json();
     const rooms = data.rooms || [];
     if (!rooms.length) {
-      box.innerHTML = '<p class="settings-hint">No memories yet.</p>';
+      box.innerHTML = '<p class="settings-hint">No memories yet.</p><button type="button" class="btn-secondary btn-sm kn-empty-chat">Start a chat</button>';
+      wireEmptyChatButton(box);
       return;
     }
     box.innerHTML = rooms.map((room) => `
@@ -708,15 +728,23 @@ async function loadMemoryRooms(bodyEl, box) {
             `/memory/rooms/${encodeURIComponent(room)}/${encodeURIComponent(drawer)}`
           )).json();
           if (!items.length) {
-            memsEl.innerHTML = '<p class="settings-hint">Empty.</p>';
+            memsEl.innerHTML = '<p class="settings-hint">No memories in this folder yet.</p>';
             return;
           }
           memsEl.innerHTML = items.map((m) => `
             <div class="kn-mem" data-id="${escapeHtml(m.id)}">
-              <span class="kn-chip" style="--chip-color:${TYPE_COLORS.memory}">${escapeHtml(m.kind || '')}</span>
+              <span class="kn-chip" style="--chip-color:${TYPE_COLORS.memory}">${escapeHtml(kindLabel(m.kind))}</span>
               <span class="kn-mem-content">${escapeHtml((m.content || '').slice(0, 120))}</span>
+              <button class="icon-btn kn-mem-edit" title="Edit" aria-label="Edit memory"><i class="fa-solid fa-pen"></i></button>
               <button class="icon-btn kn-mem-del" title="Forget"><i class="fa-solid fa-trash"></i></button>
             </div>`).join('');
+          memsEl.querySelectorAll('.kn-mem-edit').forEach((btn, i) => {
+            btn.addEventListener('click', () => prefillUpdateForm(bodyEl, {
+              ...items[i],
+              room: items[i].room || room,
+              drawer: items[i].drawer || drawer,
+            }));
+          });
           memsEl.querySelectorAll('.kn-mem-del').forEach((btn) => {
             btn.addEventListener('click', async () => {
               const id = btn.closest('.kn-mem').dataset.id;
@@ -739,14 +767,14 @@ async function loadMemoryRooms(bodyEl, box) {
 }
 
 async function tidyMemories(bodyEl) {
-  if (!confirm('Consolidate memories? This decays stale ones and prunes dead entries.')) return;
+  if (!confirm('Clean up old memories? This decays stale ones and prunes dead entries.')) return;
   try {
     const data = await (await apiFetch('/memory/consolidate', { method: 'POST' })).json();
-    showToast({ type: 'success', title: 'Memories tidied', message: JSON.stringify(data).slice(0, 120) });
+    showToast({ type: 'success', title: 'Memories cleaned up', message: JSON.stringify(data).slice(0, 120) });
     loadMemories(bodyEl);
     loadGraph(bodyEl);
   } catch {
-    showToast({ type: 'error', title: 'Consolidation failed' });
+    showToast({ type: 'error', title: 'Clean-up failed' });
   }
 }
 

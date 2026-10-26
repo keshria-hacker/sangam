@@ -138,11 +138,14 @@ async function openNotebook(bodyEl, nbId) {
           <input type="text" id="nbNoteContent" class="provider-key-input" placeholder="Note content — use [[Other title]] to link" aria-label="Note content" style="flex:1">
           <button class="btn-secondary" id="nbNoteBtn">Add note</button>
         </div>
-        <div class="kn-mem-controls">
-          <input type="text" id="nbFromChatId" class="provider-key-input" placeholder="Chat id" aria-label="Chat id for note">
-          <input type="text" id="nbFromChatMsg" class="provider-key-input" placeholder="Message id (optional — latest used)" aria-label="Message id">
-          <button class="btn-secondary" id="nbFromChatBtn">Save chat message as note</button>
-        </div>
+        <details class="advanced-section">
+          <summary>Advanced: import from a chat</summary>
+          <div class="kn-mem-controls">
+            <input type="text" id="nbFromChatId" class="provider-key-input" placeholder="Chat id" aria-label="Chat id for note">
+            <input type="text" id="nbFromChatMsg" class="provider-key-input" placeholder="Message id (optional — latest used)" aria-label="Message id">
+            <button class="btn-secondary" id="nbFromChatBtn">Save chat message as note</button>
+          </div>
+        </details>
         <div id="nbNotes" class="kn-mem-list"></div>
         <div id="nbNoteDetail"></div>
       </section>
@@ -379,7 +382,7 @@ async function runExtract(bodyEl) {
       body: JSON.stringify({ text }),
     })).json();
     if (!data.model_used) {
-      box.innerHTML = '<p class="settings-hint">No model is configured, so LLM extraction is unavailable. Facts already stored by the chat loop still show in Memories above.</p>';
+      box.innerHTML = '<p class="settings-hint">No model is configured, so AI fact-finding is unavailable. Facts already stored by the chat loop still show in Memories above.</p>';
       return;
     }
     const facts = data.facts || [];
@@ -435,7 +438,7 @@ async function loadTranscripts(bodyEl) {
     const rows = data.transcripts || [];
     box.innerHTML = rows.length
       ? rows.map((t) => `<p><strong>${escapeHtml(t.role)}:</strong> ${escapeHtml((t.text || '').slice(0, 300))}</p>`).join('')
-      : '<p class="settings-hint">No transcripts found.</p>';
+      : '<p class="settings-hint">No transcripts yet — transcripts appear after chats that save memories.</p>';
   } catch {
     box.innerHTML = '<p class="settings-hint">Could not load transcripts.</p>';
   }
