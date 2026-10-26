@@ -88,11 +88,13 @@ export async function renderDiagramsSection(bodyEl) {
         only basic shapes and connectors convert; the rest becomes warnings, never invented nodes.
         <span data-diag-brand-form></span>
       </div>
+      <details class="advanced-section"><summary>Advanced: brand style</summary>
       <div class="diagrams-brand-row">
         <input type="text" class="provider-key-input" data-diag-brand-name placeholder="Brand name" aria-label="Brand name">
         <input type="text" class="provider-key-input" data-diag-brand-accent placeholder="#3A7BD5" aria-label="Brand accent color">
         <button class="btn-secondary btn-sm" type="button" data-diag-brand-create>Create your brand</button>
       </div>
+      </details>
       <div class="diagrams-picker" data-diag-picker><p class="settings-hint">Loading catalogue…</p></div>
       <div class="diagrams-editor-row">
         <textarea class="provider-key-input" data-diag-editor rows="12" style="width:100%;box-sizing:border-box;font-family:monospace" placeholder="Pick a diagram type to load its template…" aria-label="Diagram source"></textarea>

@@ -37,9 +37,9 @@ export function renderDesignTab(bodyEl) {
         <div class="ds-preview-bar">
           <span><i class="fa-solid fa-eye"></i> Preview</span>
           <div>
-            <button class="icon-btn" id="dsRefresh" title="Refresh preview"><i class="fa-solid fa-rotate"></i></button>
-            <button class="icon-btn" id="dsOpen" title="Open in new window"><i class="fa-solid fa-up-right-from-square"></i></button>
-            <button class="icon-btn" id="dsDownload" title="Download HTML"><i class="fa-solid fa-download"></i></button>
+            <button class="icon-btn" id="dsRefresh" title="Refresh preview" aria-label="Refresh preview"><i class="fa-solid fa-rotate"></i></button>
+            <button class="icon-btn" id="dsOpen" title="Open in new window" aria-label="Open in new window"><i class="fa-solid fa-up-right-from-square"></i></button>
+            <button class="icon-btn" id="dsDownload" title="Download HTML" aria-label="Download HTML"><i class="fa-solid fa-download"></i></button>
           </div>
         </div>
         <iframe id="dsFrame" class="ds-frame" sandbox="allow-scripts" title="Design preview"></iframe>

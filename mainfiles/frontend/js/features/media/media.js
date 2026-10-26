@@ -10,6 +10,7 @@
 import { apiFetch } from '../../shared/http.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { showToast } from '../../shared/toast.js';
+import { showToolSection } from '../tabs/tabs.js';
 
 console.log('[Module] media.js loaded');
 
@@ -23,7 +24,7 @@ export async function renderMediaTab(bodyEl) {
         <div class="kn-mem-controls">
           <select id="mjKind" class="provider-key-input" aria-label="Media job kind">
             <option value="tts">Text to speech</option>
-            <option value="dub">Voice a script (not dubbing — true dubbing is in Voice)</option>
+            <option value="dub">Voice a script (subtitles are in Studio)</option>
             <option value="transcribe">Transcribe audio</option>
             <option value="image">Generate image</option>
           </select>
@@ -34,9 +35,14 @@ export async function renderMediaTab(bodyEl) {
       </section>
       <section>
         <h3>Jobs</h3>
+        <p class="settings-hint"><button class="btn-secondary btn-sm" type="button" id="mjActivityLink">Track all jobs in Work → Activity</button> Creation stays here; tracking lives in Activity.</p>
         <div id="mjList" class="kn-mem-list"></div>
       </section>
     </div>`;
+
+  bodyEl.querySelector('#mjActivityLink').addEventListener('click', () => {
+    showToolSection('work', 'activity');
+  });
 
   bodyEl.querySelector('#mjCreateBtn').addEventListener('click', async () => {
     const kind = bodyEl.querySelector('#mjKind').value;

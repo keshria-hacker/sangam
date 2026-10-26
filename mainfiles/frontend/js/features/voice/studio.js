@@ -14,7 +14,7 @@ export async function renderVoiceStudio(bodyEl) {
       <h3><i class="fa-solid fa-microphone"></i> Voice Studio</h3>
 
       <section class="vs-section">
-        <h4>Text to Speech</h4>
+        <h4>Read text aloud</h4>
         <textarea id="vsTtsText" rows="4" placeholder="Enter text to synthesize…"></textarea>
         <div class="vs-controls">
           <select id="vsVoice" class="provider-key-input" aria-label="Voice"></select>
@@ -25,7 +25,7 @@ export async function renderVoiceStudio(bodyEl) {
       </section>
 
       <section class="vs-section">
-        <h4>Speech to Text</h4>
+        <h4>Turn speech into text</h4>
         <div class="vs-controls">
           <button class="btn-secondary" id="vsRecord" type="button">
             <i class="fa-solid fa-circle-dot"></i> Record

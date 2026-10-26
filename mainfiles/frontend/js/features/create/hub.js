@@ -14,7 +14,7 @@ console.log('[Module] create/hub.js loaded');
 const TYPE_META = {
   doc:     { label: 'Document',    icon: 'fa-file-lines',     placeholder: 'Untitled document' },
   diagram: { label: 'Diagram',     icon: 'fa-diagram-project', placeholder: 'Untitled diagram' },
-  code:    { label: 'Code snippet', icon: 'fa-code',           placeholder: 'Untitled snippet' },
+  code:    { label: 'Code file', icon: 'fa-code',           placeholder: 'Untitled code file' },
   html:    { label: 'HTML page',   icon: 'fa-globe',           placeholder: 'Untitled page' },
   design:  { label: 'Design system', icon: 'fa-palette',       placeholder: 'Untitled design system' },
 };
@@ -137,15 +137,25 @@ function renderTemplates() {
   const wrap = root.querySelector('#createTemplates');
   wrap.innerHTML = TEMPLATES.map((t, i) => {
     const label = escapeHtml(TYPE_META[t.type].label);
+    // Diagram starter is a link to the Diagrams tab, not a document:
+    // its template content is kept in TEMPLATES (above) but no artifact
+    // is created from this card.
+    const isDiagramStarter = t.name === 'Diagram starter';
     return `
     <button type="button" class="hub-card create-tpl" data-tpl="${i}">
       <div class="hub-card-head"><i class="fa-solid ${t.icon}"></i><strong>${escapeHtml(t.name)}</strong></div>
-      <span class="settings-hint">${label}</span>
+      <span class="settings-hint">${label}${isDiagramStarter ? ' · Opens the Diagrams tab' : ''}</span>
     </button>`;
   }).join('');
   wrap.querySelectorAll('[data-tpl]').forEach((b) => {
     b.addEventListener('click', () => {
       const t = TEMPLATES[Number(b.dataset.tpl)];
+      if (t.name === 'Diagram starter') {
+        // Navigate to the Diagrams subview on this same Create page;
+        // fall back to creating the starter artifact if that tab is absent.
+        const diagramsTab = document.querySelector('[data-createsub="diagrams"]');
+        if (diagramsTab) { diagramsTab.click(); return; }
+      }
       createArtifact(t.type, t.title, t.content);
     });
   });

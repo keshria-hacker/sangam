@@ -35,7 +35,6 @@ export async function initImage() {
   }
   if (!imageGenEnabled) return false;
   window.__sangamImageGen = true;
-  btn?.classList.remove('hidden');
   studioBtn?.classList.remove('hidden');
   return true;
 }
@@ -55,95 +54,9 @@ function openImageDialog() {
   // Composer image button now opens the Image Studio tab (no popup).
   import('../tabs/tabs.js').then(({ openToolTab }) => openToolTab('images'));
   return;
-  const existing = document.getElementById('imageGenOverlay');
-  if (existing) {
-    existing.classList.remove('hidden');
-    setTimeout(() => existing.querySelector('#imageGenPrompt')?.focus(), 0);
-    return;
-  }
-  const overlay = document.createElement('div');
-  overlay.id = 'imageGenOverlay';
-  overlay.className = 'modal-overlay hidden';
-  overlay.innerHTML = `
-    <div class="modal image-gen-modal" role="dialog" aria-modal="true" aria-labelledby="imageGenTitle">
-      <div class="modal-header">
-        <h2 id="imageGenTitle"><i class="fa-solid fa-image"></i> Generate image</h2>
-        <button class="icon-btn ghost" id="imageGenCancel" aria-label="Close image generator"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="image-gen-body">
-        <textarea id="imageGenPrompt" rows="3" placeholder="Describe the image…" aria-label="Image prompt"></textarea>
-        <div class="image-gen-row">
-          <select id="imageGenStyle" class="provider-key-input" aria-label="Style"><option value="none">Loading styles…</option></select>
-          <select id="imageGenSize" class="provider-key-input" aria-label="Size">
-            <option value="1024x1024">Square 1024</option>
-            <option value="1792x1024">Wide 1792×1024</option>
-            <option value="1024x1792">Tall 1024×1792</option>
-          </select>
-        </div>
-        <div class="image-gen-actions">
-          <button class="btn-primary" id="imageGenGo" type="button">Generate</button>
-        </div>
-        <div class="image-gen-status hidden" id="imageGenStatus">Generating… this can take a minute.</div>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-
-  const close = () => overlay.classList.add('hidden');
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  overlay.querySelector('#imageGenCancel').addEventListener('click', close);
-  const promptEl = overlay.querySelector('#imageGenPrompt');
-  const styleEl = overlay.querySelector('#imageGenStyle');
-  const sizeEl = overlay.querySelector('#imageGenSize');
-  const goBtn = overlay.querySelector('#imageGenGo');
-  const statusEl = overlay.querySelector('#imageGenStatus');
-
-  loadStyles().then((styles) => {
-    styleEl.innerHTML = styles.length
-      ? styles.map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')
-      : '<option value="none">No style</option>';
-  });
-  setTimeout(() => promptEl.focus(), 0);
-
-  goBtn.addEventListener('click', async () => {
-    const prompt = promptEl.value.trim();
-    if (!prompt) {
-      showToast({ type: 'info', title: 'Describe the image first' });
-      return;
-    }
-    goBtn.disabled = true;
-    statusEl.classList.remove('hidden');
-    try {
-      const res = await (await apiPost('/image/generate', {
-        prompt,
-        style: styleEl.value || 'none',
-        size: sizeEl.value || '1024x1024',
-        n: 1,
-      })).json();
-      const images = (res && res.images) || [];
-      if (!images.length) throw new Error('No images returned');
-      const files = getAttachedFiles();
-      images.forEach((img, i) => {
-        files.push({
-          localId: `img-${img.id}-${Date.now()}-${i}`,
-          name: img.filename || 'generated.png',
-          size: img.size_bytes || 0,
-          ext: 'png',
-          mediaId: img.id,
-          imageUrl: img.url,
-        });
-      });
-      setAttachedFiles([...files]);
-      renderFileChips();
-      showToast({ type: 'success', title: 'Image ready', message: 'Attached to your next message.' });
-      close();
-      document.getElementById('messageInput')?.focus();
-    } catch (err) {
-      showToast({ type: 'error', title: 'Generation failed', message: err?.message || String(err) });
-    } finally {
-      goBtn.disabled = false;
-      statusEl.classList.add('hidden');
-    }
-  });
+  // Legacy modal image generator removed (Batch C, UI simplification):
+  // it sat after an unconditional `return` above, so it could never run —
+  // openImageDialog now only opens the Image Studio tab.
 }
 
 /* ============ Image Studio tab ============ */
@@ -170,8 +83,8 @@ function renderGallery(bodyEl) {
     <div class="gallery-item" data-idx="${i}">
       <img src="${escapeHtml(img.url)}" alt="${escapeHtml(img.prompt || 'Generated image')}" loading="lazy">
       <div class="gallery-item-actions">
-        <button class="icon-btn" data-act="attach" title="Attach to chat"><i class="fa-solid fa-paperclip"></i></button>
-        <button class="icon-btn" data-act="download" title="Download"><i class="fa-solid fa-download"></i></button>
+        <button class="icon-btn" data-act="attach" title="Attach to chat" aria-label="Attach to chat"><i class="fa-solid fa-paperclip"></i></button>
+        <button class="icon-btn" data-act="download" title="Download" aria-label="Download"><i class="fa-solid fa-download"></i></button>
       </div>
     </div>`).join('');
   grid.querySelectorAll('.gallery-item').forEach((el) => {
@@ -209,6 +122,7 @@ export async function renderImageTab(bodyEl) {
         </div>
         <div class="image-gen-status hidden" id="studioStatus">Generating… this can take a minute.</div>
       </div>
+      <details class="advanced-section"><summary>Advanced: edit an image</summary>
       <div class="image-ops">
         <h3 class="gallery-title">Image operations</h3>
         <p class="settings-hint">Pick a source image file, then run an operation. If the configured engine does not support an operation, you get a plain capability message — never a fake image. Upscale without an engine that supports it is a local Pillow resize, not AI upscaling.</p>
@@ -240,6 +154,7 @@ export async function renderImageTab(bodyEl) {
         <div class="image-gen-status hidden" id="opsStatus"></div>
         <div id="opsDescribeOut"></div>
       </div>
+      </details>
       <h3 class="gallery-title">Gallery</h3>
       <div class="image-gallery" id="imageGallery"></div>
     </div>`;

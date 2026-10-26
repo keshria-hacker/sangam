@@ -17,10 +17,11 @@ console.log('[Module] media/studio.js loaded');
 export async function renderStudioSection(container) {
   container.innerHTML = `
     <div class="studio-panel">
-      <h4 class="hub-section-title">Studio — one pipeline for image, audio, diagrams &amp; design</h4>
-      <p class="settings-hint">Build a staged job: stages run in order, and a stage marked
-        "checkpoint" pauses for your approval before the next stage runs. Nothing here clones
+      <h4 class="hub-section-title">Advanced: multi-step jobs</h4>
+      <p class="settings-hint">Build a staged job: stages run in order, and a stage set to
+        pause waits for your approval before the next stage runs. Nothing here clones
         a voice, makes video, or uses face identity — those requests are refused.</p>
+      <details class="advanced-section"><summary>Advanced: combine steps</summary>
       <div class="studio-form">
         <label class="settings-hint">Job kind
           <select id="studioKind" class="provider-key-input">
@@ -32,9 +33,10 @@ export async function renderStudioSection(container) {
         <textarea id="studioText" class="create-ed-input" rows="4"
           placeholder="Text to voice, image prompt, or audiobook text…"></textarea>
         <label class="settings-hint"><input type="checkbox" id="studioCheckpoint">
-          Pause for approval after the first stage (checkpoint)</label>
+          Pause for my approval between steps</label>
         <button class="btn-primary btn-sm" id="studioCreate">Create pipeline job</button>
       </div>
+      </details>
       <div id="studioJobs"><p class="settings-hint">No pipeline jobs yet — create one above.</p></div>
       <h4 class="hub-section-title">Diagram check</h4>
       <p class="settings-hint">Paste a typed diagram (architecture, ERD, sequence, workflow,
@@ -45,10 +47,10 @@ export async function renderStudioSection(container) {
         <button class="btn-secondary btn-sm" id="studioValidate">Validate diagram</button>
         <pre id="studioValidateOut" class="settings-hint"></pre>
       </div>
-      <h4 class="hub-section-title">True dubbing</h4>
-      <p class="settings-hint">True dubbing fits a script onto timed subtitle segments and
+      <h4 class="hub-section-title">Subtitles for video</h4>
+      <p class="settings-hint">Subtitles for video fits a script onto timed subtitle segments and
         exports SRT, VTT and word-level ASS. It needs timed segments — timings are never
-        invented. The media-jobs "dub" kind only voices a script; this is the real thing.</p>
+        invented. The Media jobs "dub" kind only voices a script; this section builds the timed subtitles.</p>
       <div class="studio-form">
         <textarea id="studioDub" class="create-ed-input" rows="3"
           placeholder='{"segments": [{"start": 0, "end": 2.5, "text": "Hello"}], "script": "Hello"}'></textarea>
