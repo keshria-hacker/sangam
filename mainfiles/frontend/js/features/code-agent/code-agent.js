@@ -25,7 +25,7 @@ async function renderCodeAgentView(bodyEl) {
               <option value="20">20</option>
             </select>
           </label>
-          <label class="ca-tdd"><input type="checkbox" id="caTdd"> TDD mode</label>
+          <label class="ca-tdd"><input type="checkbox" id="caTdd"> Write the test first <span class="settings-hint">TDD</span></label>
           <button class="btn-primary" id="caRun" type="button"><i class="fa-solid fa-play"></i> Run agent</button>
           <button class="btn-secondary hidden" id="caStop" type="button"><i class="fa-solid fa-stop"></i> Stop</button>
         </div>
@@ -34,7 +34,7 @@ async function renderCodeAgentView(bodyEl) {
         <div class="no-results">The agent will inspect your workspace, edit files, and run commands here. Nothing runs until you press Run.</div>
       </div>
       <details class="ca-explore">
-        <summary><i class="fa-solid fa-diagram-project"></i> Explore code map</summary>
+        <summary><i class="fa-solid fa-diagram-project"></i> Find code</summary>
         <div class="ca-explore-row">
           <select id="caMapQuery" class="provider-key-input">
             <option value="explain">What calls / uses…</option>

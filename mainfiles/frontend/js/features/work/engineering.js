@@ -40,6 +40,7 @@ export async function renderEngineeringPage(bodyEl) {
             <strong>${escapeHtml(p.title)}</strong>
             <span class="settings-hint">${escapeHtml(p.current_stage || 'not started')} → ${escapeHtml(p.next_stage || 'done')}</span>
           </div>
+          <p class="settings-hint">Progress: ${(p.stages || []).length} stage(s) recorded — now: ${escapeHtml(p.current_stage || 'not started')}, next: ${escapeHtml(p.next_stage || 'done')}.</p>
           <p class="lib-desc">${escapeHtml(p.goal || '')}</p>
           <div class="eng-stages">
             ${(p.stages || []).map((s) => `

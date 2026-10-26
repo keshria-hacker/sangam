@@ -42,7 +42,7 @@ export async function renderWorkflowsTab(bodyEl) {
       </section>
       <section>
         <h3>Canvas</h3>
-        <div id="wfCanvas"><p class="settings-hint">Open a workflow's canvas from its row above to drag nodes, connect them, and edit configs — cycles are rejected on save, and the latest run colours each node by its result.</p></div>
+        <div id="wfCanvas"><details class="advanced-section"><summary>How workflows work</summary><p class="settings-hint">Open a workflow's canvas from its row above to drag nodes, connect them, and edit configs — cycles are rejected on save, and the latest run colours each node by its result.</p></details></div>
       </section>
       <section>
         <h3>Workflow runs</h3>
@@ -87,7 +87,10 @@ async function loadWorkflows(bodyEl) {
     const data = await (await apiFetch('/workflows')).json();
     const items = data.workflows || [];
     if (!items.length) {
-      box.innerHTML = '<p class="settings-hint">No workflows yet. Create one above.</p>';
+      box.innerHTML = '<p class="settings-hint">No workflows yet. Start from a ready-made template, or create one above.</p><button class="btn-primary btn-sm" id="wfStartTemplate" type="button">Start from a template</button>';
+      box.querySelector('#wfStartTemplate')?.addEventListener('click', () => {
+        import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'devqa'));
+      });
       return;
     }
     box.innerHTML = items.map((w) => `

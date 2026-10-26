@@ -4,7 +4,8 @@
  *  - workflow starter templates + node catalogue (langflow/dify depth)
  *  - writing lint, now with a/an, double-comparative and typo rules
  *    (harper depth, same /quality/lint route — suggest only, never rewrite)
- *  - security scope check + checklist + excluded-category guard
+ *  - link to the Security home (the scope check itself lives there now,
+ *    so this page does not duplicate the security surface)
  *  - service health + notification inbox (platform depth)
  *  - prompt templates + chat folders + model presets (chat parity)
  *
@@ -42,13 +43,9 @@ export async function renderDevQaPage(bodyEl) {
       <section>
         <h3>Security scope check</h3>
         <p class="settings-hint">Security tools only ever run against systems you own, with
-        per-run approval. Check a target against a scope file first.</p>
-        <div class="kn-mem-controls">
-          <input type="text" id="dqScopeTarget" class="provider-key-input" placeholder="Target host, e.g. example.com" aria-label="Target host" style="flex:1">
-          <input type="text" id="dqScopeDomains" class="provider-key-input" placeholder="In-scope domains, comma-separated" aria-label="In-scope domains" style="flex:1">
-          <button class="btn-secondary" id="dqScopeBtn">Check scope</button>
-        </div>
-        <div id="dqScopeOut" class="kn-mem-list">${EMPTY('No scope checked yet.')}</div>
+        per-run approval. The scope check lives with the real security runs
+        in Work &gt; Security.</p>
+        <button class="btn-primary btn-sm" id="dqGoSecurity" type="button">Open Security</button>
       </section>
       <section>
         <h3>Service health</h3>
@@ -86,6 +83,10 @@ export async function renderDevQaPage(bodyEl) {
       : EMPTY('No starter templates are available right now.'));
   } catch { show('#dqTemplates', EMPTY('Could not load starter templates.')); }
 
+  bodyEl.querySelector('#dqGoSecurity')?.addEventListener('click', () => {
+    import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'security'));
+  });
+
   bodyEl.querySelector('#dqLintBtn')?.addEventListener('click', async () => {
     const text = bodyEl.querySelector('#dqLintText').value || '';
     try {
@@ -96,18 +97,6 @@ export async function renderDevQaPage(bodyEl) {
         ${i.suggestion ? `<p class="settings-hint">${escapeHtml(i.suggestion)}</p>` : ''}</div>`).join('')
         : EMPTY('No issues found in this text.'));
     } catch { show('#dqLintOut', EMPTY('Writing check failed.')); }
-  });
-
-  bodyEl.querySelector('#dqScopeBtn')?.addEventListener('click', async () => {
-    const target = bodyEl.querySelector('#dqScopeTarget').value.trim();
-    const domains = bodyEl.querySelector('#dqScopeDomains').value.split(',').map((s) => s.trim()).filter(Boolean);
-    if (!target || !domains.length) { show('#dqScopeOut', EMPTY('Enter a target host and at least one in-scope domain.')); return; }
-    try {
-      const data = await (await apiFetch('/devqa/security/scope/check', { method: 'POST', body: JSON.stringify({ target, scope: { domains } }) })).json();
-      show('#dqScopeOut', data.allowed
-        ? `<p class="settings-hint">In scope: ${escapeHtml(target)} matches the scope file. A run still needs its own per-run approval.</p>`
-        : `<p class="settings-hint">OUT OF SCOPE: ${escapeHtml(target)} does not match the scope file. A run against it would be rejected, not warned about.</p>`);
-    } catch (e) { show('#dqScopeOut', EMPTY(`Scope check failed: ${e?.message || 'unknown error'}`)); }
   });
 
   const loadServices = async () => {

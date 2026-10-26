@@ -27,6 +27,7 @@ export async function renderSecurityPage(bodyEl) {
   bodyEl.innerHTML = `
     <section class="library" aria-labelledby="securityTitle">
       <h2 id="securityTitle">Security</h2>
+      <p class="settings-hint" aria-label="Security steps">1 Allow &rarr; 2 Create &rarr; 3 Approve &rarr; 4 Report</p>
       <p class="settings-hint">Test only systems you own: add the target to the allowlist, create a run (it stays pending), then approve it. High-risk catalog tools are disabled by default and are data only — Sangam does not install or run them for you.</p>
       <h3>Allowlist</h3>
       <form id="secAllowForm">
@@ -35,6 +36,15 @@ export async function renderSecurityPage(bodyEl) {
         <button type="submit" class="btn" aria-label="Add allowlist target">Add target</button>
       </form>
       <div id="secAllowList" role="region" aria-label="Allowlist targets"><p class="settings-hint">Loading…</p></div>
+      <h3>Scope check</h3>
+      <p class="settings-hint">Check a target against a scope file first. In scope still
+      needs its own per-run approval; out of scope is rejected, not warned about.</p>
+      <div class="kn-mem-controls">
+        <input type="text" id="secScopeTarget" class="provider-key-input" placeholder="Target host, e.g. example.com" aria-label="Target host" style="flex:1">
+        <input type="text" id="secScopeDomains" class="provider-key-input" placeholder="In-scope domains, comma-separated" aria-label="In-scope domains" style="flex:1">
+        <button type="button" class="btn-secondary" id="secScopeBtn">Check scope</button>
+      </div>
+      <div id="secScopeOut" class="kn-mem-list"><p class="settings-hint">No scope checked yet.</p></div>
       <h3>Tool catalog (data only)</h3>
       <div id="secCatalog" role="region" aria-label="Security tool catalog"><p class="settings-hint">Loading…</p></div>
       <h3>New run</h3>
@@ -141,6 +151,21 @@ export async function renderSecurityPage(bodyEl) {
       }));
     } catch (err) { runsEl.innerHTML = `<p class="settings-hint">${escapeHtml(errText(err))}</p>`; }
   }
+
+  // Scope check, moved here from Dev & QA so Security is the single home
+  // for security work (same endpoint, same wording, same approval note).
+  bodyEl.querySelector('#secScopeBtn').addEventListener('click', async () => {
+    const out = bodyEl.querySelector('#secScopeOut');
+    const target = bodyEl.querySelector('#secScopeTarget').value.trim();
+    const domains = bodyEl.querySelector('#secScopeDomains').value.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!target || !domains.length) { out.innerHTML = '<p class="settings-hint">Enter a target host and at least one in-scope domain.</p>'; return; }
+    try {
+      const data = await (await apiPost('/devqa/security/scope/check', { target, scope: { domains } })).json();
+      out.innerHTML = data.allowed
+        ? `<p class="settings-hint">In scope: ${escapeHtml(target)} matches the scope file. A run still needs its own per-run approval.</p>`
+        : `<p class="settings-hint">OUT OF SCOPE: ${escapeHtml(target)} does not match the scope file. A run against it would be rejected, not warned about.</p>`;
+    } catch (e) { out.innerHTML = `<p class="settings-hint">Scope check failed: ${escapeHtml(e?.message || 'unknown error')}</p>`; }
+  });
 
   bodyEl.querySelector('#secAllowForm').addEventListener('submit', async (e) => {
     e.preventDefault();

@@ -17,7 +17,7 @@ console.log('[Module] work.js loaded');
 const SECTIONS = [
   { id: 'agents',    label: 'Agents',    desc: 'Run agents and teams, compare models, schedule automations.' },
   { id: 'code',      label: 'Code',      desc: 'The code agent: describe a task, review the diff.' },
-  { id: 'workflows', label: 'Workflows', desc: 'Build and run DAG workflows; replay and inspect nodes.' },
+  { id: 'workflows', label: 'Workflows', desc: 'Build and run step-by-step workflows; replay and inspect nodes.' },
   { id: 'activity',  label: 'Activity',  desc: 'Live runs, run history, media jobs, workflow runs, artifacts.' },
   { id: 'security',  label: 'Security',  desc: 'Own-systems-only security testing: allowlist, runs, findings, reports.' },
   { id: 'engineering', label: 'Engineering', desc: 'Enforced grill → design → plan → subagent → two-stage review → finish pipelines.' },

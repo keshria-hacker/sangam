@@ -45,17 +45,20 @@ export async function renderAgentHub(bodyEl) {
         <button class="btn-primary btn-sm" id="hubNew"><i class="fa-solid fa-plus"></i> New agent</button>
       </div>
       <div class="sp-custom-section" id="hubRuntime">
+        <p class="settings-hint" id="hubRunShapeNote">Run shape: Single agent. Open Advanced below to change how a run is shaped.</p>
+        <details class="advanced-section">
+          <summary>Advanced: run shape</summary>
         <h3 class="sp-section-title"><i class="fa-solid fa-diagram-project"></i> Run mode &amp; task plan</h3>
         <p class="settings-hint">Pick how a run is shaped before you start it: a single agent,
           one fresh agent per task (tasks run in order, each reviewed before the next),
-          a hive run that drains its inbox first, or a ticket flow with blocking edges.
+          a team inbox run that drains its inbox first, or a step-by-step run with blocking edges.
           Previewing a plan below runs no agent and changes nothing — it only shows the order.</p>
         <label class="settings-hint">Run mode
           <select id="hubRunMode" class="provider-key-input">
             <option value="single">Single agent</option>
-            <option value="subagent-per-task">Subagent per task (fresh context per task, review per task)</option>
-            <option value="hive">Hive (drain inbox first, escalate only critical items)</option>
-            <option value="flow">Ticket flow (blocking edges, ready-frontier order)</option>
+            <option value="subagent-per-task">One helper per task (fresh context per task, review per task)</option>
+            <option value="hive">Team inbox (drain inbox first, escalate only critical items)</option>
+            <option value="flow">Step-by-step (blocking edges, ready-frontier order)</option>
           </select>
         </label>
         <label class="settings-hint">Tasks (one per line, use "A &gt; B" to mean B waits for A)
@@ -63,6 +66,7 @@ export async function renderAgentHub(bodyEl) {
         </label>
         <button class="btn-secondary btn-sm" id="hubFlowPreview"><i class="fa-solid fa-list-check"></i> Preview plan</button>
         <div id="hubFlowResult"><p class="settings-hint">No plan previewed yet. Enter tasks and preview to see the run order.</p></div>
+        </details>
       </div>
       <div id="hubFormWrap"></div>
       <h4 class="hub-section-title">Built-in agents</h4>
@@ -89,6 +93,12 @@ export async function renderAgentHub(bodyEl) {
   });
 
   bodyEl.querySelector('#hubNew')?.addEventListener('click', () => openForm(bodyEl, null));
+  // Keep the visible "Run shape" note in sync with the Advanced selection.
+  bodyEl.querySelector('#hubRunMode')?.addEventListener('change', (e) => {
+    const note = bodyEl.querySelector('#hubRunShapeNote');
+    const label = e.target.selectedOptions?.[0]?.textContent || 'Single agent';
+    if (note) note.textContent = `Run shape: ${label}. Open Advanced below to change how a run is shaped.`;
+  });
   bodyEl.querySelector('#hubFlowPreview')?.addEventListener('click', async () => {
     const result = bodyEl.querySelector('#hubFlowResult');
     const mode = bodyEl.querySelector('#hubRunMode')?.value || 'single';
@@ -123,7 +133,7 @@ export async function renderAgentHub(bodyEl) {
         const t = tasks.find((x) => x.id === id);
         return t ? t.title : id;
       });
-      result.innerHTML = `<p class="settings-hint">Mode: <strong>${escapeHtml(mode)}</strong> — run order:</p>
+      result.innerHTML = `<p class="settings-hint">Mode: <strong>${escapeHtml({ single: 'Single agent', 'subagent-per-task': 'One helper per task', hive: 'Team inbox', flow: 'Step-by-step' }[mode] || mode)}</strong> — run order:</p>
         <ol>${order.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ol>
         <p class="settings-hint">Ready first: ${(data.frontier || []).map((id) => {
           const t = tasks.find((x) => x.id === id);
@@ -333,8 +343,8 @@ function openRunPanel(bodyEl, target) {
 // Merged Agents page (Phase 8 B7 + D2).
 //
 // Sub-views: Agents (hub) | Teams | Compare | Runs | Approvals.
-// Teams and Compare were separate tabs; Runs (run history, D2) is new;
-// Approvals shows the approval policy (approvals happen inline in runs).
+// Teams and Compare were separate tabs; Runs is now only a link to the
+// Activity runs centre (no duplicate list); Approvals shows the policy.
 // ---------------------------------------------------------------------------
 
 const AGENT_SUBVIEWS = [
@@ -398,36 +408,15 @@ async function renderAgentSubview(container, id) {
   }
 }
 
-/** D2: run history from GET /runs. */
-async function renderRunsHistory(container) {
-  let runs = [];
-  try {
-    const data = await (await apiFetch('/runs?limit=50')).json();
-    runs = data.runs || [];
-  } catch (err) {
-    container.innerHTML = `<p class="settings-hint">Could not load runs: ${escapeHtml(err?.message || String(err))}</p>`;
-    return;
-  }
-  if (!runs.length) {
-    container.innerHTML = '<p class="settings-hint">No agent runs yet. Runs from the Agents, Teams, and Code pages are recorded here.</p>';
-    return;
-  }
-  const statusIcon = (s) => ({
-    done: 'fa-circle-check', running: 'fa-circle-play', failed: 'fa-circle-exclamation',
-  }[s] || 'fa-circle');
+/** Runs sub-view: no duplicate list — Activity (Work > Activity) is the
+ *  single runs centre, so this is just a link there. */
+function renderRunsHistory(container) {
   container.innerHTML = `
-    <div class="runs-list">
-      ${runs.map((r) => `
-        <div class="run-row">
-          <i class="fa-solid ${statusIcon(r.status)}"></i>
-          <div class="run-main">
-            <strong>${escapeHtml(r.title || r.kind || 'Run')}</strong>
-            <span class="settings-hint">${escapeHtml(r.kind || '')} · ${escapeHtml(r.model || '')} · ${r.tokens ? `${r.tokens} tok` : ''}${r.cost_usd ? ` · $${Number(r.cost_usd).toFixed(3)}` : ''}</span>
-          </div>
-          <span class="settings-hint">${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</span>
-          ${r.error ? `<span class="run-error" title="${escapeHtml(r.error)}"><i class="fa-solid fa-triangle-exclamation"></i></span>` : ''}
-        </div>`).join('')}
-    </div>`;
+    <p class="settings-hint">All runs — agents, teams, code, media jobs, and workflow runs — live in one place: Activity.</p>
+    <button type="button" class="btn-primary btn-sm" id="hubSeeAllRuns">See all runs in Activity</button>`;
+  container.querySelector('#hubSeeAllRuns')?.addEventListener('click', () => {
+    import('../tabs/tabs.js').then((m) => m.showToolSection('work', 'activity'));
+  });
 }
 
 /** Approvals: policy overview + the async "Needs you" tray (Batch 10).
