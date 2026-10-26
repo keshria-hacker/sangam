@@ -22,7 +22,7 @@ export const MODES = [
   { id: 'research', label: 'Research', icon: 'fa-magnifying-glass',   desc: 'Web research with citations' },
   { id: 'code',     label: 'Code',     icon: 'fa-code',               desc: 'Code agent with file tools' },
   { id: 'image',    label: 'Image',    icon: 'fa-image',              desc: 'Generate images' },
-  { id: 'council',  label: 'Council',  icon: 'fa-users',              desc: 'Panel debate: tally, minority report, ledger entry' },
+  { id: 'council',  label: 'Council',  icon: 'fa-users',              desc: 'Several AI helpers discuss your question and vote — you get the agreed answer plus any disagreements' },
 ];
 
 let currentMode = 'chat';
@@ -151,19 +151,19 @@ export function initPopovers() {
     closeAllPopovers();
     if (wasHidden) {
       tunePop.innerHTML = `
-        <div class="tune-row"><label>Reasoning effort</label>
+        <div class="tune-row"><label>Thinking depth (reasoning effort)</label>
           <select id="tuneEffort">
             <option value="none">Auto</option><option value="low">Low</option>
             <option value="medium">Medium</option><option value="high">High</option>
             <option value="extra_high">Extra High</option>
           </select></div>
-        <div class="tune-row"><label>Max tokens</label>
+        <div class="tune-row"><label>Longest reply (max tokens)</label>
           <select id="tuneTokens">
             <option value="auto">Auto</option><option value="512">512</option>
             <option value="1024">1,024</option><option value="2048">2,048</option>
             <option value="4096">4,096</option><option value="8192">8,192</option>
           </select></div>
-        <div class="tune-row"><label>Temperature</label>
+        <div class="tune-row"><label>Creativity (temperature)</label>
           <span class="tune-temp"><span id="tuneTempVal"></span><input type="range" id="tuneTemp" min="0" max="2" step="0.1"></span></div>
         <div class="tune-row"><label>Output style</label>
           <select id="tuneStyle">

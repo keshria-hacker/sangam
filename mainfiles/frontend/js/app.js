@@ -116,9 +116,6 @@ function initDOM() {
     authResetSubmit: $('#authResetSubmit'),
     authForgotBack: $('#authForgotBack'),
     authResetBack: $('#authResetBack'),
-    skillsBtn: $('#skillsBtn'),
-    codeBtn: $('#codeBtn'),
-    designBtn: $('#designBtn'),
     shortcutsOverlay: $('#shortcutsOverlay'),
     closeShortcuts: $('#closeShortcuts'),
     backendUrlInput: $('#backendUrlInput'),
@@ -275,12 +272,9 @@ function initGlobalListeners() {
   });
   elements.closeShortcuts?.addEventListener('click', closeShortcutsModal);
 
-  // Batch 1: the old standalone Skills/Design/Code "tabs" are sections now.
-  // These buttons used to call showTool() with ids that no longer exist in
-  // TOOL_DEFS, so they silently did nothing. They now open the real views.
-  elements.skillsBtn?.addEventListener('click', () => showToolSub('library', 'data-libtab', 'skills'));
-  elements.codeBtn?.addEventListener('click', () => showToolSection('work', 'code'));
-  elements.designBtn?.addEventListener('click', () => showToolSub('create', 'data-createsub', 'design'));
+  // UI-simplify Batch A: the old standalone Skills/Design/Code buttons do
+  // not exist in index.html, so there is nothing to wire here. Those
+  // destinations stay reachable via the sidebar rail and the palette.
 
   // New chat buttons, sidebar controls, and search are handled by initSidebar()
 

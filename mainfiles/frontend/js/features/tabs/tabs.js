@@ -268,7 +268,15 @@ export function showTool(requested) {
   $('#chatView')?.classList.add('hidden');
   $('#toolView')?.classList.remove('hidden');
   const titleEl = $('#toolViewTitle');
-  if (titleEl) titleEl.innerHTML = `<i class="fa-solid ${def.icon}"></i> ${def.title}`;
+  if (titleEl) {
+    titleEl.innerHTML = `<i class="fa-solid ${def.icon}"></i> ${def.title}`;
+    // UI-simplify: landing via picker/palette must land keyboard focus on
+    // the destination title, not leave it stranded on the picker button.
+    // (Rail clicks already do this via markRailActive; showTool is the
+    // shared path for every other navigation, so focus here covers all.)
+    if (!titleEl.hasAttribute('tabindex')) titleEl.setAttribute('tabindex', '-1');
+    titleEl.focus({ preventScroll: true });
+  }
   renderTabStrip();
   if (section) activateSection(tool, section);
 }

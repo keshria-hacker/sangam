@@ -10,7 +10,7 @@ import { apiFetch } from '../../shared/http.js';
 import { showToast } from '../../shared/toast.js';
 import { escapeHtml } from '../../shared/utils.js';
 import { getJobs } from '../../core/jobs.js';
-import { showTool, showToolSub } from '../tabs/tabs.js';
+import { showTool, showToolSection, showToolSub } from '../tabs/tabs.js';
 
 console.log('[Module] home.js loaded');
 
@@ -29,7 +29,7 @@ const SUGGESTED_STARTS = [
     desc: 'Create images from text prompts.', feature: 'image_gen' },
   { id: 'teams', tool: 'agents', sub: ['data-agentsub', 'teams'], icon: 'fa-users', title: 'Agent teams',
     desc: 'Run parallel specialist agents on a task.', feature: 'multi_agent' },
-  { id: 'learn', tool: 'settings', icon: 'fa-graduation-cap', title: 'Learn',
+  { id: 'learn', tool: 'knowledge', section: 'study', icon: 'fa-graduation-cap', title: 'Learn',
     desc: 'Interactive lessons with an AI tutor.', feature: 'learning' },
 ];
 
@@ -83,7 +83,8 @@ export async function renderHome(bodyEl) {
       const def = SUGGESTED_STARTS.find((s) => s.id === btn.dataset.start);
       if (!def) return;
       if (def.tool) {
-        if (def.sub) showToolSub(def.tool, def.sub[0], def.sub[1]);
+        if (def.section) showToolSection(def.tool, def.section);
+        else if (def.sub) showToolSub(def.tool, def.sub[0], def.sub[1]);
         else showTool(def.tool);
       }
       else import('../chat/chat.js').then((m) => m.startNewChat()).catch(() => {});
@@ -106,11 +107,11 @@ export async function renderHome(bodyEl) {
       <span class="home-row-meta">${c.updated_at ? timeAgo(new Date(c.updated_at).getTime()) : ''}</span>
     </button>`).join('');
   const jobRows = jobs.map((j) => `
-    <div class="home-row home-row-static">
+    <button type="button" class="home-row" data-job="activity" aria-label="Open Work activity">
       <i class="fa-solid ${jobStatusIcon(j.status)}"></i>
       <span class="home-row-title">${escapeHtml(j.title || j.kind || 'Job')}</span>
       <span class="home-row-meta">${escapeHtml(j.status)} · ${timeAgo(j.startedAt)}</span>
-    </div>`).join('');
+    </button>`).join('');
 
   recentEl.innerHTML = (chatRows || jobRows)
     ? `${chatRows}${jobRows}`
@@ -121,6 +122,9 @@ export async function renderHome(bodyEl) {
         .then((m) => m.openChat?.(btn.dataset.chat))
         .catch(() => showToast({ type: 'warning', message: 'Could not open chat.' }));
     });
+  });
+  recentEl.querySelectorAll('[data-job]').forEach((btn) => {
+    btn.addEventListener('click', () => showToolSection('work', 'activity'));
   });
 
   // --- Setup status: provider check ---

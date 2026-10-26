@@ -85,7 +85,7 @@ export function renderRail(container, features = {}) {
     btn.dataset.nav = item.id;
     btn.title = off ? `${item.label} — enable in Settings → Features` : item.label;
     btn.setAttribute('aria-label', item.label);
-    btn.innerHTML = `<i class="fa-solid ${item.icon}"></i><span>${item.label}</span>`
+    btn.innerHTML = `<i class="fa-solid ${item.icon}"></i><span class="rail-label">${item.label}</span>`
       + (off ? '<span class="rail-turnon">Turn on</span>' : '')
       + `<span class="rail-badge hidden"></span>`;
     btn.addEventListener('click', () => {

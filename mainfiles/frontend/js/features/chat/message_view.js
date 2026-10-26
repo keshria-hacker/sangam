@@ -465,6 +465,8 @@ export function buildMessageNode(msg) {
         <button class="msg-action-btn copy-msg-btn" aria-label="Copy message"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy</button>
         <button class="msg-action-btn regenerate-btn" aria-label="Regenerate response"><i class="fa-solid fa-arrow-rotate-right" aria-hidden="true"></i> Regenerate</button>
         <button class="msg-action-btn save-msg-btn" aria-label="Save answer as a file"><i class="fa-regular fa-bookmark" aria-hidden="true"></i> Save</button>
+        <button class="msg-action-btn msg-more-btn" type="button" aria-label="More message actions" aria-expanded="false" aria-haspopup="true"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i> More</button>
+        <div class="msg-more-menu hidden" role="group" aria-label="More message actions">
         <button class="msg-action-btn workflow-msg-btn" aria-label="Turn this chat into a workflow"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Workflow</button>
         <button class="msg-action-btn inspect-msg-btn" aria-label="Inspect this message's evidence"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Inspect</button>
         <button class="msg-action-btn quality-msg-btn" aria-label="Check this message's writing quality"><i class="fa-solid fa-spell-check" aria-hidden="true"></i> Check writing</button>
@@ -472,8 +474,30 @@ export function buildMessageNode(msg) {
         ${window.__sangamVoice ? '<button class="msg-action-btn speak-msg-btn" aria-label="Read aloud"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Speak</button>' : ''}
         <button class="msg-action-btn feedback-btn${msg.feedback === 'up' ? ' feedback-active' : ''}" aria-label="Thumbs up" data-value="up"${msg.feedback === 'up' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-up" aria-hidden="true"></i></button>
         <button class="msg-action-btn feedback-btn${msg.feedback === 'down' ? ' feedback-active' : ''}" aria-label="Thumbs down" data-value="down"${msg.feedback === 'down' ? ' aria-pressed="true"' : ''}><i class="fa-regular fa-thumbs-down" aria-hidden="true"></i></button>
+        </div>
       </div>
     </div>`; // Copy button
+  // "More" menu (UI-simplify): only Copy / Regenerate / Save show by
+  // default; the rest live in this menu. Buttons keep their original
+  // classes, so every handler below still finds them unchanged.
+  const moreBtn = node.querySelector('.msg-more-btn');
+  const moreMenu = node.querySelector('.msg-more-menu');
+  const closeMoreMenu = () => {
+    moreMenu?.classList.add('hidden');
+    moreBtn?.setAttribute('aria-expanded', 'false');
+  };
+  moreBtn?.addEventListener('click', () => {
+    const willOpen = moreMenu?.classList.contains('hidden');
+    closeMoreMenu();
+    if (willOpen) {
+      moreMenu.classList.remove('hidden');
+      moreBtn.setAttribute('aria-expanded', 'true');
+    }
+  });
+  // Choosing an action closes the menu (this bubble-phase listener runs
+  // after the action button's own handler); Escape closes it too.
+  moreMenu?.addEventListener('click', closeMoreMenu);
+  moreMenu?.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMoreMenu(); });
   const copyBtn = node.querySelector('.copy-msg-btn');
   copyBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(msg.content || '').then(() => {
@@ -492,10 +516,8 @@ export function buildMessageNode(msg) {
 
   // Save button (UX-refine wave): one click saves the answer as a .md
   // file via the existing POST /files upload endpoint (md is an allowed
-  // extension and uploads are indexed for retrieval). It lands in
-  // Knowledge's file store — Library holds skills/templates, not user
-  // files, so there is no Library save endpoint to call; the toast says
-  // exactly where the file went instead of pretending otherwise.
+  // extension and uploads are indexed for retrieval). Saved files surface
+  // under Create → Documents, so the toast says exactly that.
   const saveBtn = node.querySelector('.save-msg-btn');
   saveBtn?.addEventListener('click', async () => {
     if (saveBtn.disabled) return;
@@ -507,7 +529,7 @@ export function buildMessageNode(msg) {
       const res = await apiFetch('/files', { method: 'POST', body: form });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `Save failed (${res.status})`);
       saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Saved';
-      showToast({ type: 'success', title: 'Answer saved', message: 'Saved as a file — find it in Knowledge.' });
+      showToast({ type: 'success', title: 'Answer saved', message: 'Saved as a file — find it in Create → Documents.' });
     } catch (err) {
       saveBtn.disabled = false;
       showToast({ type: 'error', title: 'Save failed', message: err?.message || String(err) });

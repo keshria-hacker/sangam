@@ -23,7 +23,7 @@ const COMMANDS = [
   { cmd: 'code', label: 'Code', desc: 'Code agent mode with file tools', run: () => setMode('code') },
   { cmd: 'research', label: 'Research', desc: 'Web research with citations', run: () => setMode('research') },
   { cmd: 'image', label: 'Image', desc: 'Generate images', run: () => setMode('image') },
-  { cmd: 'council', label: 'Council', desc: 'Panel debate with tally + minority report (sends as a council verdict, not a normal reply)', run: () => setMode('council') },
+  { cmd: 'council', label: 'Council', desc: 'Several AI helpers discuss and vote on your question (panel debate) — sends the agreed answer, not a normal reply', run: () => setMode('council') },
   { cmd: 'search', label: 'Search the web', desc: 'Turn on web search + Research mode', run: async () => { const { setToolEnabled } = await import('./popovers.js'); setToolEnabled('web_search', true); setMode('research'); } },
   { cmd: 'runs', label: 'Open Runs', desc: 'Live runs, history, and artifacts (Work → Activity)', run: () => openSection('work', 'activity') },
   { cmd: 'workflows', label: 'Open Workflows', desc: 'Build and run automations (Work → Workflows)', run: () => openSection('work', 'workflows') },
