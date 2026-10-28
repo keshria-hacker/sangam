@@ -40,5 +40,5 @@ re-audit that work; it carries forward only its documented follow-ups.
 
 ## Completed in this run
 
-- T1, T2, T3 (2026-10-28, single commit on `integration/full-program`;
-  hash filled at push time) — see `docs/audit/IMPLEMENTATION_LOG.md`.
+- T1, T2, T3 (2026-10-28, commit `c828653` on `integration/full-program`,
+  pushed, 0 ahead/behind) — see `docs/audit/IMPLEMENTATION_LOG.md`.
