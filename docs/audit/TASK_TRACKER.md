@@ -43,5 +43,5 @@ re-audit that work; it carries forward only its documented follow-ups.
 
 - T1, T2, T3 (2026-10-28, commit `c828653` on `integration/full-program`,
   pushed, 0 ahead/behind) — see `docs/audit/IMPLEMENTATION_LOG.md`.
-- T4 / F4 (2026-10-28, commit filled at push time) — workflows canvas
-  mobile handling, see log.
+- T4 / F4 (2026-10-28, commit `7a0cf96` on `integration/full-program`,
+  pushed, 0 ahead/behind) — workflows canvas mobile handling, see log.
