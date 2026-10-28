@@ -224,7 +224,7 @@ async function openCanvas(bodyEl, workflowId) {
   function render() {
     box.innerHTML = `
       <div class="wf-canvas-head">
-        <strong>${escapeHtml(wf.name)}</strong> <span class="settings-hint">v${wf.version || 1} · drag nodes to move them; click one to edit it.</span>
+        <strong>${escapeHtml(wf.name)}</strong> <span class="settings-hint">v${wf.version || 1} · drag nodes to move them; click one to edit it. On a small screen, scroll inside the canvas to reach nodes off to the side.</span>
         <div class="kn-mem-controls">
           <select id="wfCanvasAddType" class="provider-key-input" aria-label="Node type to add">
             ${Object.keys(CANVAS_NODE_TYPES).map((t) => `<option value="${t}">${t}</option>`).join('')}
@@ -258,7 +258,16 @@ async function openCanvas(bodyEl, workflowId) {
     const area = scope.querySelector('#wfCanvasArea');
     const w = area.clientWidth || 700;
     const h = area.clientHeight || 420;
-    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    // Size the edge layer to the full node extent, not just the visible
+    // viewport: with overflow:hidden the old code clipped edges to nodes
+    // off-screen on a phone, and the nodes themselves were unreachable.
+    // With overflow:auto on .wf-canvas, the layer + nodes now define the
+    // scrollable area, so scrolling reveals both.
+    const contentW = Math.max(w, ...def.nodes.map((n) => (n.x || 0) + 160));
+    const contentH = Math.max(h, ...def.nodes.map((n) => (n.y || 0) + 80));
+    svg.style.width = `${contentW}px`;
+    svg.style.height = `${contentH}px`;
+    svg.setAttribute('viewBox', `0 0 ${contentW} ${contentH}`);
     svg.innerHTML = def.edges.map((e) => {
       const a = def.nodes.find((n) => n.id === e.from);
       const b = def.nodes.find((n) => n.id === e.to);
@@ -373,6 +382,17 @@ async function openCanvas(bodyEl, workflowId) {
     });
     scope.querySelectorAll('[data-node]').forEach((el) => {
       el.addEventListener('click', () => { setSelected(el.dataset.node); render(); });
+      // Nodes are divs with role=button + tabindex, so keyboard users
+      // need an explicit Enter/Space activation; focus is restored to
+      // the re-rendered node because render() replaces the DOM.
+      el.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        const id = el.dataset.node;
+        setSelected(id);
+        render();
+        scope.querySelector(`[data-node="${CSS.escape(id)}"]`)?.focus();
+      });
       el.addEventListener('pointerdown', (e) => {
         const node = defObj.nodes.find((n) => n.id === el.dataset.node);
         if (!node) return;

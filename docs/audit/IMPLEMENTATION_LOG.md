@@ -64,3 +64,34 @@ refer to `docs/audit/TASK_TRACKER.md`.
 - Verification: `node --check palette.js` OK; frontend modules 65/65
   after the change. Live Tab cycling was not click-checked here.
   The palette's mousemove re-render is unchanged (pre-existing, minor).
+
+## 2026-10-28 — T4 / F4: workflows canvas mobile handling (P2)
+
+- Problem (code evidence): `.wf-canvas` used `overflow: hidden` with
+  140px absolute nodes laid out 220px apart, so the 3rd+ columns were
+  clipped and unreachable on a phone; the edge SVG was sized to the
+  visible viewport only, so edges to those nodes were clipped too;
+  nodes had no `touch-action` control, so a touch drag could be
+  hijacked by page scrolling; nodes are divs with `role=button` but
+  had no keyboard activation.
+- Change: `mainfiles/frontend/css/style.css` — canvas `overflow: auto`,
+  nodes `touch-action: none`; `workflows.js` — `drawEdges()` sizes the
+  SVG to the full node extent (max viewport vs. max node x+160 /
+  y+80), canvas header notes scrolling on small screens, nodes gain
+  Enter/Space activation with focus restored to the re-rendered node.
+  No backend, node model, or drag math change (drag is delta-based,
+  so it stays correct under scroll).
+- Verification: `node --check` OK, frontend modules 65/65. Live
+  Playwright check at 390px (temporary spec, deleted after the run):
+  a 5-node workflow with the 5th node at x=900 — scrollWidth exceeds
+  clientWidth, the edge layer covers x>=900, node touch-action is
+  `none`, the far node becomes visible after scrolling, Enter on n1
+  selects it with focus restored — 1/1 passed. Two earlier failures
+  of that temporary spec were navigation errors in the spec itself
+  (workflows is a section inside Work, not a picker tool; re-opening
+  Work creates a duplicate tab whose hidden copy breaks the section
+  locator), not canvas code; the spec was reordered to create the
+  workflow before opening Workflows once.
+- Not done: a full canvas rebuild (pinch-zoom, minimap, touch
+  multi-select) — out of scope for this fix; desktop drag behaviour
+  is unchanged.
