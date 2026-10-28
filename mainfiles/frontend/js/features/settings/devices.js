@@ -90,6 +90,35 @@ function clearDevicesTimers() {
   window.__sangamDevicesTimers = {};
 }
 
+function showDevicesConfirm({ title, message, confirmLabel, onConfirm }) {
+  // Same confirm-overlay pattern as Settings Reset-all (settings_page.js):
+  // a fresh element per open, Escape/backdrop/Cancel dismiss, focus on
+  // Cancel. Replaces the native window.confirm calls this file used to
+  // make, so destructive device actions get the same in-app dialog.
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = `
+      <div class="confirm-dialog" role="alertdialog" aria-modal="true">
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(message)}</p>
+        <div class="confirm-actions">
+          <button class="btn-secondary" type="button" data-devices-cancel>Cancel</button>
+          <button class="btn-danger" type="button" data-devices-confirm>${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector('[data-devices-cancel]').addEventListener('click', close);
+  overlay.querySelector('[data-devices-confirm]').addEventListener('click', () => {
+    close();
+    onConfirm();
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-devices-cancel]').focus();
+}
+
 async function fetchJson(path) {
   // Returns { ok, status, data } without throwing on HTTP errors.
   // Network failures still throw (caller maps them to the unreachable panel).
@@ -305,18 +334,24 @@ export async function renderDevicesSection(container) {
     });
     const revokeAll = pairedList.querySelector('[data-revoke-all]');
     if (revokeAll) {
-      revokeAll.addEventListener('click', async () => {
-        if (!window.confirm('Revoke ALL paired devices? Every phone must pair again.')) return;
-        try {
-          const resp = await apiPost('/devices/revoke-all', {}, false);
-          const data = await resp.json();
-          if (!resp.ok) throw new Error(data.detail || `Revoke all failed (${resp.status})`);
-          showToast({ type: 'success', message: `Revoked ${data.revoked || 0} device(s).` });
-          const r = await fetchJson('/devices');
-          if (r.ok) renderPaired(r.data.devices || []);
-        } catch (e) {
-          showToast({ type: 'error', message: `Couldn't revoke devices: ${e.message || e}` });
-        }
+      revokeAll.addEventListener('click', () => {
+        showDevicesConfirm({
+          title: 'Revoke all devices?',
+          message: 'Every phone must pair again.',
+          confirmLabel: 'Revoke all',
+          onConfirm: async () => {
+            try {
+              const resp = await apiPost('/devices/revoke-all', {}, false);
+              const data = await resp.json();
+              if (!resp.ok) throw new Error(data.detail || `Revoke all failed (${resp.status})`);
+              showToast({ type: 'success', message: `Revoked ${data.revoked || 0} device(s).` });
+              const r = await fetchJson('/devices');
+              if (r.ok) renderPaired(r.data.devices || []);
+            } catch (e) {
+              showToast({ type: 'error', message: `Couldn't revoke devices: ${e.message || e}` });
+            }
+          },
+        });
       });
     }
   }
@@ -337,20 +372,26 @@ export async function renderDevicesSection(container) {
     btn.type = 'button';
     btn.className = 'btn-secondary btn-sm';
     btn.textContent = info && info.exists ? 'Regenerate certificate' : 'Generate certificate';
-    btn.addEventListener('click', async () => {
-      if (!window.confirm('Regenerating the certificate invalidates ALL pairings: every device must pair again. Continue?')) return;
-      try {
-        const resp = await apiPost('/devices/cert/regenerate', {}, false);
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || `Regenerate failed (${resp.status})`);
-        showToast({ type: 'success', message: data.warning || 'Certificate regenerated.' });
-        renderCert(data);
-        const r = await fetchJson('/devices');
-        if (r.ok) renderPaired(r.data.devices || []);
-        await refreshPairings();
-      } catch (e) {
-        showToast({ type: 'error', message: `Couldn't regenerate certificate: ${e.message || e}` });
-      }
+    btn.addEventListener('click', () => {
+      showDevicesConfirm({
+        title: 'Regenerate certificate?',
+        message: 'This invalidates ALL pairings: every device must pair again.',
+        confirmLabel: 'Regenerate',
+        onConfirm: async () => {
+          try {
+            const resp = await apiPost('/devices/cert/regenerate', {}, false);
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || `Regenerate failed (${resp.status})`);
+            showToast({ type: 'success', message: data.warning || 'Certificate regenerated.' });
+            renderCert(data);
+            const r = await fetchJson('/devices');
+            if (r.ok) renderPaired(r.data.devices || []);
+            await refreshPairings();
+          } catch (e) {
+            showToast({ type: 'error', message: `Couldn't regenerate certificate: ${e.message || e}` });
+          }
+        },
+      });
     });
     certBlock.appendChild(btn);
   }

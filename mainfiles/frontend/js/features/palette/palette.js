@@ -15,6 +15,7 @@ let flags = {};
 let paletteEl = null;
 let selectedIndex = 0;
 let visibleActions = [];
+let focusBeforePalette = null;
 
 function app() {
   return window.sangamApp || {};
@@ -158,7 +159,26 @@ function ensurePalette() {
     else if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1); }
     else if (e.key === 'Enter') { e.preventDefault(); runSelected(); }
   });
-  paletteEl.addEventListener('click', (e) => { if (e.target === paletteEl) closePalette(); });
+  paletteEl.addEventListener('click', (e) => { if (e.target === paletteEl) closePalette(true); });
+  // Focus trap: Tab/Shift+Tab cycle only within the palette while it is
+  // open (input + currently rendered action buttons, queried live because
+  // the list re-renders on filter/mousemove). Without this, Tab walked
+  // out into the page behind the modal.
+  paletteEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const focusable = Array.from(paletteEl.querySelectorAll(
+      'input:not([disabled]), button:not([disabled])')).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
   return paletteEl;
 }
 
@@ -214,6 +234,7 @@ function runSelected() {
 export async function openPalette() {
   ensurePalette();
   await loadFlags();
+  focusBeforePalette = document.activeElement;
   paletteEl.classList.remove('hidden');
   selectedIndex = 0;
   const input = paletteEl.querySelector('#paletteInput');
@@ -222,8 +243,15 @@ export async function openPalette() {
   setTimeout(() => input.focus(), 0);
 }
 
-export function closePalette() {
+export function closePalette(restoreFocus = false) {
   paletteEl?.classList.add('hidden');
+  // Return focus to where it was before the palette opened, but only for
+  // dismissals (Escape/backdrop). Running an action keeps its own focus
+  // target, so runSelected() closes without restoring.
+  if (restoreFocus && focusBeforePalette && focusBeforePalette.isConnected) {
+    focusBeforePalette.focus();
+  }
+  focusBeforePalette = null;
 }
 
 export function isPaletteOpen() {
@@ -237,7 +265,7 @@ export async function initPalette() {
       e.preventDefault();
       isPaletteOpen() ? closePalette() : openPalette();
     } else if (e.key === 'Escape' && isPaletteOpen()) {
-      closePalette();
+      closePalette(true);
     }
   });
   // Phase 8 B5: the topbar terminal button is removed (redundant with Ctrl+P).

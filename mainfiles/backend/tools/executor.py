@@ -3,9 +3,12 @@
 Pi-style hook layer (see ``hooks.py``): every call passes
 ``before_tool_call`` (may block with a reason — a blocked call never
 executes) and ``after_tool_call`` (may rewrite/redact the result).
-Hooks are opt-in on the shared ``executor`` instance so existing
-callers (e.g. the provider tool path) keep their current behaviour;
-the agent loop builds its own executor with the ECC guard hooks.
+The shared ``executor`` instance carries the ECC guard hooks, so the
+chat provider tool path gets the same destructive-bash and
+config-protection blocks as the agent loop (which builds its own
+guarded executor). A caller that constructs its own ``ToolExecutor``
+without hooks keeps the legacy unguarded behaviour and must opt in
+explicitly.
 
 Same-file mutations are serialized per resolved path argument (pi's
 file-mutation-queue semantics, via one ``asyncio.Lock`` per path), so
@@ -242,4 +245,20 @@ class ToolExecutor:
         self._active_tasks.clear()
 
 
-executor = ToolExecutor()
+def _guarded_shared_executor() -> ToolExecutor:
+    """Build the shared executor with the ECC guard hooks attached.
+
+    Imported lazily (at the bottom of this module, once the class is
+    defined) so ``hooks`` — which itself pulls in the database model
+    for durable approvals — does not participate in the class
+    definition above. This is the instance the chat provider tool path
+    uses, so a model-driven tool call can no longer bypass the
+    destructive-bash / config-protection rules that the agent loop
+    already enforced.
+    """
+    from ..hooks import default_guard_registry
+
+    return ToolExecutor(hooks=default_guard_registry())
+
+
+executor = _guarded_shared_executor()
