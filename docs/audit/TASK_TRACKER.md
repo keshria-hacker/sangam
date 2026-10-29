@@ -51,5 +51,6 @@ re-audit that work; it carries forward only its documented follow-ups.
 - T5 / F5 + T6 / F6 (2026-10-29, commit `f2d8a04`, pushed 2026-10-29
   after an independent full-suite rerun went green — see log) —
   diagram PNG hardening + Knowledge Export expansion, see log.
-- T7 / F3 (2026-10-29, commit filled at push time) — palette
-  mousemove no longer rebuilds the list DOM, see log.
+- T7 / F3 (2026-10-29, commit `cf7943c` on `integration/full-program`,
+  pushed, 0 ahead/behind) — palette mousemove no longer rebuilds the
+  list DOM, see log.
