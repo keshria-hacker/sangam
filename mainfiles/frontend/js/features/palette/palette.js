@@ -162,7 +162,7 @@ function ensurePalette() {
   paletteEl.addEventListener('click', (e) => { if (e.target === paletteEl) closePalette(true); });
   // Focus trap: Tab/Shift+Tab cycle only within the palette while it is
   // open (input + currently rendered action buttons, queried live because
-  // the list re-renders on filter/mousemove). Without this, Tab walked
+  // the list re-renders on filter). Without this, Tab walked
   // out into the page behind the modal.
   paletteEl.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab') return;
@@ -203,10 +203,19 @@ function renderList(query = '') {
     </button>`).join('');
   list.querySelectorAll('.palette-item').forEach((btn) => {
     btn.addEventListener('click', () => { selectedIndex = Number(btn.dataset.idx); runSelected(); });
+    // Hover selection used to call renderList(), rebuilding the whole
+    // list DOM on every item crossed: the hovered button was destroyed
+    // mid-hover, causing flicker and wasted re-renders. Update only the
+    // selected class / aria-selected in place instead; the list contents
+    // themselves have not changed.
     btn.addEventListener('mousemove', () => {
-      if (selectedIndex !== Number(btn.dataset.idx)) {
-        selectedIndex = Number(btn.dataset.idx);
-        renderList(paletteEl.querySelector('#paletteInput').value);
+      const idx = Number(btn.dataset.idx);
+      if (selectedIndex !== idx) {
+        selectedIndex = idx;
+        list.querySelectorAll('.palette-item').forEach((b, i) => {
+          b.classList.toggle('selected', i === idx);
+          b.setAttribute('aria-selected', String(i === idx));
+        });
       }
     });
   });

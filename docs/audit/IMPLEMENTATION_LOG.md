@@ -154,3 +154,37 @@ refer to `docs/audit/TASK_TRACKER.md`.
 - Not done: server-side raster renderer; fixing the 3 pre-existing
   suite failures; fixing the conftest auth fixture; palette mousemove
   re-render (F3 minor, still open).
+
+## 2026-10-29 — Push-blocker resolution + T7 / F3: palette mousemove (P2 minor)
+
+- Push blocker, resolved by evidence, not by waiving it: the 3
+  failures from the F5/F6 full-suite run (crawl x2, omniroute
+  fake-server) were re-run independently — 3/3 in isolation, 18/18
+  with their two files together — then a clean full-suite rerun
+  (proxy vars including NO_PROXY/no_proxy unset, TMPDIR on the main
+  disk, repo `.venv`) gave **1631 passed, 101 skipped, 0 failed**
+  in 24m40s (1628 + 3 new F6 tests = 1631, exact). The earlier 3
+  failures were therefore full-suite flake / load interaction in
+  this sandbox, not F5/F6 regressions. Commit `f2d8a04` was pushed
+  on that green rerun; the earlier "push held" note is superseded.
+- F3 change (`palette.js` only): the mousemove handler used to call
+  `renderList()`, rebuilding the whole list DOM on every item
+  crossed — the hovered button was destroyed mid-hover. It now
+  updates only the selected class / aria-selected in place; the
+  focus-trap comment was corrected (list re-renders on filter only).
+  A grep for other mousemove/mouseenter handlers found no sibling
+  re-render pattern (knowledge.js mouseenter only shows a tooltip).
+- Verification: `node --check` OK, frontend modules 65/65. A live
+  hover check was attempted with a temporary spec but never got
+  past opening the palette in this harness (real Ctrl+P is
+  swallowed by headless Chromium's print handling, and a
+  dispatched keydown also did not open it in that run — the
+  opening step, not the hover code, is what failed; the diagnostic
+  run confirmed palette.js itself loads). The spec was deleted and
+  the live check is recorded as NOT done, not claimed. The
+  conftest `auth_headers` fixture gap was deliberately left alone:
+  fixing it means changing how the app fixture runs lifespan/table
+  creation, a test-infra refactor with regression risk for a
+  fixture no existing test uses.
+- Not done: server-side raster renderer; live palette hover check;
+  conftest fixture refactor.
