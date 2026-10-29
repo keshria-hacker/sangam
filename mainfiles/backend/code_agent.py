@@ -260,8 +260,12 @@ class CostMeter:
     cost is reported as unknown, not fabricated from a made-up rate.
     """
 
-    def __init__(self, price_per_1k_usd: float | None = None):
+    def __init__(self, price_per_1k_usd: float | None = None,
+                 input_price_per_token: float | None = None,
+                 output_price_per_token: float | None = None):
         self.price_per_1k_usd = price_per_1k_usd
+        self.input_price_per_token = input_price_per_token
+        self.output_price_per_token = output_price_per_token
         self.prompt_tokens = 0
         self.completion_tokens = 0
         self.total_tokens = 0
@@ -288,6 +292,13 @@ class CostMeter:
 
     @property
     def cost_usd(self) -> float | None:
+        # Per-token input/output prices (from the provider price table)
+        # take precedence: they price prompt and completion tokens
+        # separately, which a single flat rate cannot.
+        if (self.input_price_per_token is not None
+                and self.output_price_per_token is not None):
+            return (self.prompt_tokens * self.input_price_per_token
+                    + self.completion_tokens * self.output_price_per_token)
         if self.price_per_1k_usd is None:
             return None
         return self.total_tokens * self.price_per_1k_usd / 1000.0
@@ -310,6 +321,8 @@ class CostMeter:
             "usage_known": self.usage_known,
             "cost_usd": self.cost_usd,
             "cost_known": self.cost_usd is not None,
+            "input_cost_per_token": self.input_price_per_token,
+            "output_cost_per_token": self.output_price_per_token,
         }
 
 
@@ -463,7 +476,24 @@ async def run_agent(task: str, model_id: str, db: Any,
                 str(_skill_field(s, "name", "?")) for s in fired_skills))
 
     tools_executed = 0
-    meter = CostMeter(price_per_1k_usd=price_per_1k_usd)
+    # Price the run from the provider price table when no explicit
+    # flat rate was given. Before this, no production caller passed a
+    # price, so every saved agent cost_budget was unenforceable and
+    # every run reported cost_known False. A failed lookup leaves the
+    # meter unpriced (unknown, never fabricated), exactly as before.
+    _input_price = _output_price = None
+    if price_per_1k_usd is None:
+        try:
+            from .providers import _resolve_model
+            from .providers.pricing import model_prices
+            _prices = model_prices(_resolve_model(model_id)[1])
+            if _prices is not None:
+                _input_price, _output_price = _prices
+        except Exception:  # noqa: BLE001 — pricing is best-effort
+            _input_price = _output_price = None
+    meter = CostMeter(price_per_1k_usd=price_per_1k_usd,
+                      input_price_per_token=_input_price,
+                      output_price_per_token=_output_price)
     loop_detector = LoopDetector()
     touched_files: list[str] = []
     budget_warned = False

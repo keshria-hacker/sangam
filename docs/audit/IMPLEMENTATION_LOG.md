@@ -188,3 +188,42 @@ refer to `docs/audit/TASK_TRACKER.md`.
   fixture no existing test uses.
 - Not done: server-side raster renderer; live palette hover check;
   conftest fixture refactor.
+
+## 2026-10-29 — T8: agent CostMeter pricing (P2 correctness)
+
+- Problem (code evidence): `run_agent` accepted `price_per_1k_usd`
+  and `max_cost_usd`, but no production caller passed a price
+  (`run_custom_agent` passes the saved `cost_budget` only), so the
+  budget check always hit the `budget_exceeded is None` branch —
+  logged as unenforceable, never enforced — and every run reported
+  `cost_known: False` despite real token usage being recorded.
+- Change: new `backend/providers/pricing.py` — `model_prices()` reads
+  LiteLLM's bundled `model_cost` table offline (728 entries in the
+  installed version), trying the id as given then with a provider
+  prefix stripped (`openai/gpt-4o-mini` -> `gpt-4o-mini`); any
+  failure returns None, never a made-up rate. `CostMeter` gained
+  optional per-token input/output prices (precedence over the legacy
+  flat rate, which still works unchanged when explicitly given) and
+  reports them in its snapshot. `run_agent` resolves the run's model
+  via the existing `_resolve_model` and prices the meter when no
+  explicit flat rate was given; a failed lookup leaves the meter
+  unpriced, exactly as before. No new dependency, no UI change, no
+  route change — so the saved agent budget becomes enforceable and
+  `on_usage_detail` snapshots now carry a real cost for priced
+  models, while unpriced models keep reporting unknown.
+- Verification: new `tests/test_cost_meter_pricing.py` 8/8
+  (lookup + prefix strip, unknown-model never fabricates, per-token
+  math 1000/1000 -> $0.00075, legacy flat rate unchanged,
+  per-token precedence, run_agent snapshot cost $0.00045 for
+  1000/500 tokens on gpt-4o-mini, budget $0.01 stops a run after a
+  $0.015 first iteration, unknown model stays unknown).
+  `test_deep_agent_core.py` + `test_agents.py` with the new tests:
+  38/38. Drift 1/1. Frontend 65/65 (unchanged).
+  Two test-authoring mistakes corrected during the run, not code:
+  a single-shot answer returns before any second budget check
+  (the loop's existing per-iteration semantics), and `_execute_tool`
+  is async, so the fake must be async too.
+- Not done: surfacing the cost snapshot in the agent SSE stream /
+  UI (routes do not forward `on_usage_detail` today) and a
+  per-model price override in agent config — both follow-ups, not
+  part of making the existing budget enforceable.
