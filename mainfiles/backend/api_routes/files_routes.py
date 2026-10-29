@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import Depends, HTTPException, Request, UploadFile
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -115,5 +116,29 @@ async def upload_file(request: Request, file: UploadFile, db: AsyncSession = Dep
         size_bytes=record.size_bytes,
         preview=truncate_preview(extracted) if extracted else None,
     )
+
+
+@router.get("/files")
+async def list_files(db: AsyncSession = Depends(get_db)):
+    """List uploaded documents (references only, for Knowledge Export).
+
+    Returns id/filename/extension/size/created_at — never stored_path
+    (a server-local path) or extracted_text (full document content).
+    Single-user app: uploads carry no user_id, so this lists all uploads,
+    newest first, like the rest of the local-first store.
+    """
+    rows = (await db.execute(
+        select(UploadedFile).order_by(desc(UploadedFile.created_at), desc(UploadedFile.id))
+    )).scalars().all()
+    return {"files": [
+        {
+            "id": r.id,
+            "filename": r.filename,
+            "extension": r.extension,
+            "size_bytes": r.size_bytes,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]}
 
 

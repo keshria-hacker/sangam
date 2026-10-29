@@ -95,3 +95,62 @@ refer to `docs/audit/TASK_TRACKER.md`.
 - Not done: a full canvas rebuild (pinch-zoom, minimap, touch
   multi-select) — out of scope for this fix; desktop drag behaviour
   is unchanged.
+
+## 2026-10-29 — T5 / F5: diagram PNG export hardening + T6 / F6: Knowledge Export (P3)
+
+- F5 problem (code evidence): Create → Diagrams Export PNG drew the SVG
+  onto a canvas sized from `img.naturalWidth || 800` (rasterised SVGs
+  often report no natural size), on a transparent canvas, and a null
+  `toBlob` result silently produced no download and no error.
+- F5 change (`mainfiles/frontend/js/features/create/diagrams.js` only):
+  explicit canvas dimensions (decoded size → SVG viewBox → width/height
+  attrs → 800x600), opaque white background before drawImage, distinct
+  error toasts for toBlob-null ("could not encode image"),
+  canvas-unavailable, and image-load failure. SVG export untouched.
+  No server raster renderer added (headless browser/cairosvg stays a
+  follow-up if client rastering ever fails — it did not fail here).
+- F6 problem (code evidence): Knowledge tab Export downloaded only
+  GET /memory/export as sangam-memories.json; GET /code-graph/export
+  existed but was never surfaced, and uploaded documents had no list
+  endpoint at all (only POST /files).
+- F6 change: Knowledge Export button now downloads
+  sangam-knowledge-export.json bundling memories + code-graph dump +
+  notebook references + uploaded-document references; each section is
+  fetched independently, so one failing/unavailable section degrades to
+  a note in the toast instead of failing the export. New backend
+  GET /api/files (`files_routes.py`) returns references only
+  (id/filename/extension/size_bytes/created_at — never stored_path or
+  extracted_text); ARCHITECTURE.md §13.2 gained the matching row so
+  the drift test stays green. New `tests/test_knowledge_export_files.py`
+  (auth-gated, empty shape, upload-then-list, no-leak assertions).
+- Test-infra note: the conftest async `auth_headers` fixture never
+  creates tables ("no such table: users") and no existing test uses
+  it; the new test follows the established TestClient + create_app
+  pattern instead. That fixture gap is pre-existing, not fixed here.
+- Verification actually exercised: frontend module check 65/65 parse+link
+  (with `--experimental-vm-modules`; bare `node` fails every module
+  on vm.SourceTextModule, a flag issue, not a code issue). Targeted
+  tests 4/4 (3 new + drift). Permanent smoke gate 3/3 live. Live
+  Playwright checks (temporary spec, deleted after the run) 2/2: PNG
+  download is a real PNG with IHDR 400x300 (the stub SVG's size),
+  and the Knowledge export download parses as JSON with
+  memories/code_graph/notebooks/documents/exported_at keys.
+- Honest limits: the real Mermaid CDN script does not load in this
+  sandbox (the app itself renders "Mermaid is not loaded yet (CDN)"),
+  so the live PNG check used a stubbed `window.mermaid` returning a
+  real SVG — the export handler code (dimensions, background, toBlob,
+  download) is what was exercised, not Mermaid itself. The CDN-load
+  gap is pre-existing and out of this batch's scope.
+- Full suite (29:00 run): 1628 passed, 101 skipped, 3 failed —
+  test_crawl_bfs_fixture_site, test_crawl_endpoint_approval_and_pages
+  (0 pages fetched, expected >= 24), test_fetch_models_from_provider_
+  against_fake_server (fake server disconnects, ids == []). All three
+  fail identically on the clean baseline tree (changes stashed,
+  a47d06c) and have zero code-path overlap with this batch; they
+  are test-harness network failures in this sandbox, not regressions.
+  Per the batch rule (no push unless verification is green) the
+  commit is local-only and NOT pushed; the push decision on these
+  3 pre-existing failures is left to the parent.
+- Not done: server-side raster renderer; fixing the 3 pre-existing
+  suite failures; fixing the conftest auth fixture; palette mousemove
+  re-render (F3 minor, still open).

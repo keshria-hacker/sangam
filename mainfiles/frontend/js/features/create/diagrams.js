@@ -212,14 +212,38 @@ export async function renderDiagramsSection(bodyEl) {
     const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml;charset=utf-8' }));
     const img = new Image();
     img.onload = () => {
+      // Explicit dimensions: rasterised SVGs often report no natural size,
+      // and the old code silently produced a 0x0 (or default) canvas.
+      // Prefer the decoded image size, then the SVG viewBox, then the
+      // width/height attributes, then a sane default.
+      const vb = (lastSvg.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number);
+      const vbW = vb.length === 4 && Number.isFinite(vb[2]) && vb[2] > 0 ? vb[2] : 0;
+      const vbH = vb.length === 4 && Number.isFinite(vb[3]) && vb[3] > 0 ? vb[3] : 0;
+      const attrW = Number.parseFloat(lastSvg.getAttribute('width') || '');
+      const attrH = Number.parseFloat(lastSvg.getAttribute('height') || '');
+      const w = Math.max(1, Math.round(img.naturalWidth || vbW || (Number.isFinite(attrW) && attrW > 0 ? attrW : 0) || 800));
+      const h = Math.max(1, Math.round(img.naturalHeight || vbH || (Number.isFinite(attrH) && attrH > 0 ? attrH : 0) || 600));
       const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || 800;
-      canvas.height = img.naturalHeight || 600;
-      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        showToast({ type: 'error', title: 'PNG export failed: canvas unavailable' });
+        return;
+      }
+      // Opaque background: Mermaid SVGs are transparent, and a transparent
+      // PNG renders as a black box on dark backgrounds.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => { if (blob) download('diagram.png', blob); });
+      canvas.toBlob((blob) => {
+        if (blob) { download('diagram.png', blob); }
+        else { showToast({ type: 'error', title: 'PNG export failed: could not encode image' }); }
+      }, 'image/png');
     };
-    img.onerror = () => { URL.revokeObjectURL(url); showToast({ type: 'error', title: 'PNG export failed' }); };
+    img.onerror = () => { URL.revokeObjectURL(url); showToast({ type: 'error', title: 'PNG export failed: could not load diagram image' }); };
     img.src = url;
   });
 }

@@ -1102,6 +1102,7 @@ WEB_SEARCH_MAX_RESULTS=5
 | POST | `/api/chats/{id}/messages` | Yes | Append message (used by Agent mode) |
 | POST | `/api/messages/{id}/feedback` | Yes | Message quality feedback (up/down + note) |
 | POST | `/api/files` | Yes | Upload document |
+| GET | `/api/files` | Yes | List uploaded documents (references only) |
 | POST | `/api/media/upload` | Yes | Upload image/audio, returns attachment |
 | GET | `/api/media/{media_id}` | Yes | Serve stored media file |
 | GET | `/api/user/settings` | Yes | Get all settings (Phase 2) |

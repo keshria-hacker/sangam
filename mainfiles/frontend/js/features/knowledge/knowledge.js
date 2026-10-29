@@ -247,7 +247,7 @@ export async function renderKnowledgeTab(bodyEl) {
   bodyEl.querySelector('#knMemKind').addEventListener('change', () => loadMemories(bodyEl));
   bodyEl.querySelector('#knMemView').addEventListener('change', () => loadMemories(bodyEl));
   bodyEl.querySelector('#knTidy').addEventListener('click', () => tidyMemories(bodyEl));
-  bodyEl.querySelector('#knExport').addEventListener('click', () => exportMemories());
+  bodyEl.querySelector('#knExport').addEventListener('click', () => exportKnowledge());
   bodyEl.querySelector('#knRetrieveBtn').addEventListener('click', () => retrieveDocuments(bodyEl));
   bodyEl.querySelector('#knRetrieveQ').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') retrieveDocuments(bodyEl);
@@ -778,17 +778,48 @@ async function tidyMemories(bodyEl) {
   }
 }
 
-/** Phase 2 remainder: download the user's memories as JSON. */
-async function exportMemories() {
+/** One-click Knowledge export: memories + code-graph dump + notebook and
+ *  uploaded-document references, in a single JSON file. Each section is
+ *  fetched independently so one failing section degrades to a note instead
+ *  of failing the whole export; a section that returns an {error} payload
+ *  (e.g. no code graph built yet) is recorded the same way. */
+async function exportKnowledge() {
+  const bundle = {
+    exported_at: new Date().toISOString(),
+    memories: [],
+    code_graph: null,
+    notebooks: [],
+    documents: [],
+  };
+  const failed = [];
+  const fetchSection = async (path, assign) => {
+    try {
+      const data = await (await apiFetch(path)).json();
+      if (data && typeof data === 'object' && typeof data.error === 'string') { failed.push(path); return; }
+      assign(data);
+    } catch { failed.push(path); }
+  };
+  await fetchSection('/memory/export', (d) => { bundle.memories = Array.isArray(d) ? d : []; });
+  await fetchSection('/code-graph/export?format=json', (d) => { bundle.code_graph = d; });
+  await fetchSection('/notebooks', (d) => { bundle.notebooks = Array.isArray(d?.notebooks) ? d.notebooks : []; });
+  await fetchSection('/files', (d) => { bundle.documents = Array.isArray(d?.files) ? d.files : []; });
   try {
-    const data = await (await apiFetch('/memory/export')).json();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'sangam-memories.json';
+    a.download = 'sangam-knowledge-export.json';
     a.click();
     URL.revokeObjectURL(a.href);
-    showToast({ type: 'success', title: `Exported ${data.length} memories` });
+    const parts = [
+      `${bundle.memories.length} memories`,
+      bundle.code_graph ? `${bundle.code_graph.nodes?.length ?? 0} code-graph nodes` : 'no code graph',
+      `${bundle.notebooks.length} notebooks`,
+      `${bundle.documents.length} documents`,
+    ];
+    showToast({
+      type: failed.length ? 'info' : 'success',
+      title: `Exported: ${parts.join(', ')}${failed.length ? ` (unavailable: ${failed.join(', ')})` : ''}`,
+    });
   } catch {
     showToast({ type: 'error', title: 'Export failed' });
   }
