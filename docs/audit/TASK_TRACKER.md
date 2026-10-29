@@ -55,5 +55,6 @@ re-audit that work; it carries forward only its documented follow-ups.
 - T7 / F3 (2026-10-29, commit `cf7943c` on `integration/full-program`,
   pushed, 0 ahead/behind) — palette mousemove no longer rebuilds the
   list DOM, see log.
-- T8 (2026-10-29, commit filled at push time) — agent CostMeter
-  pricing from LiteLLM's cost table, see log.
+- T8 (2026-10-29, commit `a92b191` on `integration/full-program`,
+  pushed, 0 ahead/behind) — agent CostMeter pricing from LiteLLM's
+  cost table, see log.
