@@ -59,5 +59,6 @@ re-audit that work; it carries forward only its documented follow-ups.
 - T8 (2026-10-29, commit `a92b191` on `integration/full-program`,
   pushed, 0 ahead/behind) — agent CostMeter pricing from LiteLLM's
   cost table, see log.
-- T9 (2026-10-30, commit filled at push time) — agent 'usage' SSE
-  event + RunLog rendering, see log.
+- T9 (2026-10-30, commit `3f057f6` on `integration/full-program`,
+  pushed, 0 ahead/behind) — agent 'usage' SSE event + RunLog
+  rendering, see log.
