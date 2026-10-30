@@ -382,6 +382,7 @@ a{color:var(--accent);}
 .rl-result.rl-error{border-color:var(--danger);}
 .rl-tool-name{font-family:var(--font-mono); color:var(--text-tertiary);}
 .rl-done{color:var(--success); font-weight:500;}
+.rl-usage{color:var(--text-secondary); font-size:12px;}
 .rl-error-msg{color:var(--danger);}
 .tool-tab-body{height:100%;}
 .tool-tab-body.hidden{display:none;}

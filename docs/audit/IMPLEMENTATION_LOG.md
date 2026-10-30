@@ -227,3 +227,36 @@ refer to `docs/audit/TASK_TRACKER.md`.
   UI (routes do not forward `on_usage_detail` today) and a
   per-model price override in agent config — both follow-ups, not
   part of making the existing budget enforceable.
+
+## 2026-10-30 — T9: agent 'usage' SSE event + RunLog rendering
+
+- Problem (code evidence): T8 made the CostMeter price runs, but
+  no route forwarded `on_usage_detail`, so the snapshot never left
+  the backend — the UI could show steps and answers but never a
+  run's tokens or cost.
+- Change: all three streaming agent routes (`/agents/{id}/run`,
+  `/code-agent/run`, `/agent/run`) capture the latest cumulative
+  snapshot via `on_usage_detail` and emit it as a final `usage`
+  event before `end`; when no model response happened, no `usage`
+  event is emitted (an absent event is honest, a zero-cost event
+  would not be). `run_code_agent` gained an `on_usage_detail`
+  parameter and forwards it to `run_agent`. Frontend: the shared
+  `RunLog.appendStep` (used by Agents hub, Code Agent, and chat
+  Agent mode, so all three surfaces get it from one change) renders
+  `usage` as a tokens line — prompt/completion/total — plus the
+  cost when `cost_known`, else the literal text "cost unknown
+  (unpriced model)"; a `.rl-usage` style was added. No change to
+  existing step kinds, so older clients ignore the new event.
+- Verification: new `tests/test_agent_usage_sse.py` 3/3 via
+  TestClient + create_app with the route's engine monkeypatched
+  (usage before end with the exact snapshot on `/agent/run`,
+  no usage event when the run fails before any response, usage on
+  `/code-agent/run`); pricing + drift with the new tests 12/12;
+  frontend modules 65/65. One test-authoring correction: the
+  routes are auth-gated (401 without a token), so the test
+  registers/logs in first, following the F6 pattern.
+  Live browser rendering of the usage line was not click-checked
+  here — the route tests prove the event, the module check proves
+  the render code parses, the visual line itself is code-reviewed.
+- Not done: per-model price override in agent config; lesson-player
+  TTS wiring.

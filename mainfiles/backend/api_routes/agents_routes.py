@@ -184,6 +184,11 @@ async def run_custom_agent(agent_id: str, payload: AgentRunIn,
         kwargs["require_approval"] = _policy_to_require_approval(
             agent.approval_policy, tool_names)
         kwargs["max_cost_usd"] = float(agent.cost_budget or 0.0)
+        # T9: the loop reports a cumulative cost snapshot after every
+        # model response; keep the latest and emit it as a final
+        # 'usage' event so the UI can show tokens/cost for the run.
+        latest_usage: dict = {}
+        kwargs["on_usage_detail"] = lambda snap: latest_usage.update(snap)
         async for step in run_agent(task, model_id, db,
                                     tool_names=tool_names,
                                     max_iterations=max_steps,
@@ -192,6 +197,8 @@ async def run_custom_agent(agent_id: str, payload: AgentRunIn,
             if step.tool_name:
                 data["tool"] = step.tool_name
             yield f"data: {json.dumps(data)}\n\n"
+        if latest_usage:
+            yield f"data: {json.dumps({'kind': 'usage', 'content': '', 'usage': latest_usage})}\n\n"
         yield "data: {\"kind\": \"end\"}\n\n"
 
     return StreamingResponse(_stream(), media_type="text/event-stream")

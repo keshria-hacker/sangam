@@ -40,13 +40,17 @@ async def code_agent_run(payload: CodeAgentIn, db: AsyncSession = Depends(get_db
     max_iter = max(1, min(int(payload.max_iterations or 12), 25))
 
     async def _stream():
+        latest_usage: dict = {}
         async for step in run_code_agent(task, model_id=model_id, db=db,
                                          max_iterations=max_iter,
-                                         tdd_mode=payload.tdd_mode):
+                                         tdd_mode=payload.tdd_mode,
+                                         on_usage_detail=lambda snap: latest_usage.update(snap)):
             data = {"kind": step.kind, "content": step.content}
             if step.tool_name:
                 data["tool"] = step.tool_name
             yield f"data: {json.dumps(data)}\n\n"
+        if latest_usage:
+            yield f"data: {json.dumps({'kind': 'usage', 'content': '', 'usage': latest_usage})}\n\n"
         yield "data: {\"kind\": \"end\"}\n\n"
 
     return StreamingResponse(_stream(), media_type="text/event-stream")
@@ -77,15 +81,19 @@ async def chat_agent_run(payload: ChatAgentIn, db: AsyncSession = Depends(get_db
     tool_names = [t for t in (payload.tools or CHAT_AGENT_TOOLS) if t in CHAT_AGENT_TOOLS]
 
     async def _stream():
+        latest_usage: dict = {}
         async for step in run_agent(message, model_id, db,
                                     tool_names=tool_names,
-                                    max_iterations=max_steps):
+                                    max_iterations=max_steps,
+                                    on_usage_detail=lambda snap: latest_usage.update(snap)):
             data = {"kind": step.kind, "content": step.content}
             if step.tool_name:
                 data["tool"] = step.tool_name
             if step.approval_id:
                 data["approval_id"] = step.approval_id
             yield f"data: {json.dumps(data)}\n\n"
+        if latest_usage:
+            yield f"data: {json.dumps({'kind': 'usage', 'content': '', 'usage': latest_usage})}\n\n"
         yield "data: {\"kind\": \"end\"}\n\n"
 
     return StreamingResponse(_stream(), media_type="text/event-stream")

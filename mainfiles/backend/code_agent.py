@@ -704,7 +704,8 @@ async def run_agent(task: str, model_id: str, db: Any,
 
 
 async def run_code_agent(task: str, model_id: str, db: Any,
-                         max_iterations: int = 12, tdd_mode: bool = False):
+                         max_iterations: int = 12, tdd_mode: bool = False,
+                         on_usage_detail: Any = None):
     """Code Agent loop (tab). Yields AgentStep events."""
     extra = ""
     if tdd_mode:
@@ -716,6 +717,7 @@ async def run_code_agent(task: str, model_id: str, db: Any,
         system_prompt=CODE_AGENT_SYSTEM,
         max_iterations=max_iterations,
         extra_system=extra,
+        on_usage_detail=on_usage_detail,
     ):
         # Map 'answer' to 'done' for the code-agent UI
         if step.kind == "answer":

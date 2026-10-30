@@ -28,6 +28,17 @@ export function appendStep(logEl, step) {
     div.innerHTML = `<details class="rl-result ${ok ? '' : 'rl-error'}">`
       + `<summary>${ok ? 'Result' : 'Error'} <span class="rl-tool-name">${escapeHtml(step.tool || '')}</span></summary>`
       + `<pre>${escapeHtml(text.slice(0, 3000))}</pre></details>`;
+  } else if (step.kind === 'usage') {
+    // T9: final usage event from the agent SSE stream. Tokens are
+    // shown always; cost only when the run's model is priced, never
+    // a fabricated number for an unpriced model.
+    const u = step.usage || {};
+    const cost = (u.cost_known && typeof u.cost_usd === 'number')
+      ? `$${String(Math.round(u.cost_usd * 1e6) / 1e6)}`
+      : 'cost unknown (unpriced model)';
+    div.innerHTML = `<div class="rl-usage"><i class="fa-solid fa-coins"></i> `
+      + `${u.total_tokens ?? 0} tokens`
+      + ` (${u.prompt_tokens ?? 0} in / ${u.completion_tokens ?? 0} out) · ${escapeHtml(cost)}</div>`;
   } else if (step.kind === 'done' || step.kind === 'answer') {
     div.innerHTML = `<div class="rl-done"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
   } else if (step.kind === 'error') {
