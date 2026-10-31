@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import logging
 import os
 import re
 import threading
@@ -680,6 +681,41 @@ async def lesson_from_outline(payload: LessonFromOutlineIn, user: Any = Depends(
 
 _LESSON_PLAYERS: dict[str, Any] = {}
 
+logger = logging.getLogger(__name__)
+
+# Lesson-player TTS wiring: voice.synthesize() returns raw bytes while
+# LessonPlayer.play_step() returns an audio REF, so narration is
+# stored via the media-file precedent (save_media_file + GET
+# /media/{id}) rather than a third serving mechanism. A TTS failure
+# returns None — the lesson continues on text, never breaks, and
+# never fabricates audio.
+_TTS_MIME_EXT = {
+    "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
+    "audio/mpeg": "mp3", "audio/mp3": "mp3",
+    "audio/ogg": "ogg", "audio/webm": "webm", "audio/mp4": "m4a",
+}
+
+
+def _lesson_narrate(player_id: str, text: str) -> dict | None:
+    """Speech text -> stored-audio ref {media_id, url, mime_type} or None.
+
+    Backed by the already-configured voice engine; no new engine,
+    no new dependency. Any failure (no engine, empty text, engine
+    error, empty bytes) degrades to None so the lesson plays on.
+    """
+    from ..voice import service as voice_service
+
+    from .media_routes import save_media_file
+
+    try:
+        audio_bytes, mime = voice_service.synthesize(text)
+        ext = _TTS_MIME_EXT.get(mime, "wav")
+        att = save_media_file(audio_bytes, f"lesson-{player_id}.{ext}", mime)
+    except Exception as exc:  # noqa: BLE001 - fail soft by design
+        logger.warning("Lesson %s TTS failed, continuing on text: %s", player_id, exc)
+        return None
+    return {"media_id": att.id, "url": att.url, "mime_type": att.mime_type}
+
 
 class LessonPlayerCreateIn(BaseModel):
     scenes: list[dict[str, Any]]
@@ -689,11 +725,13 @@ class LessonPlayerCreateIn(BaseModel):
 async def lesson_player_create(payload: LessonPlayerCreateIn, user: Any = Depends(get_current_user)):
     from ..lesson_player import LessonPlayer, LessonScene
 
+    pid = f"les-{uuid.uuid4().hex[:12]}"
     try:
-        player = LessonPlayer([LessonScene.from_dict(s) for s in payload.scenes])
+        player = LessonPlayer(
+            [LessonScene.from_dict(s) for s in payload.scenes],
+            narrate=lambda text: _lesson_narrate(pid, text))
     except (ValueError, KeyError, TypeError) as exc:
         raise HTTPException(422, str(exc))
-    pid = f"les-{uuid.uuid4().hex[:12]}"
     _LESSON_PLAYERS[pid] = player
     return {"player_id": pid, "snapshot": player.snapshot()}
 
