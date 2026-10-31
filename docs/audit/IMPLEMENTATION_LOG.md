@@ -260,3 +260,45 @@ refer to `docs/audit/TASK_TRACKER.md`.
   the render code parses, the visual line itself is code-reviewed.
 - Not done: per-model price override in agent config; lesson-player
   TTS wiring.
+
+## 2026-10-31 — T10: lesson-player TTS wiring
+
+- Problem (code evidence): `lesson_player_create` in
+  `mainfiles/backend/api_routes/deep_routes.py` constructed
+  `LessonPlayer` with no `narrate` argument, so the TTS hook was
+  never wired in production; `play_step` returned `audio: None`
+  for every speech step while still recording the text.
+- Design point, resolved first: `voice.synthesize` returns raw
+  bytes while `play_step` returns an audio ref, so the bytes are
+  stored via the media-job precedent — `save_media_file` +
+  `GET /media/{id}` — instead of a third serving mechanism.
+  No in-memory store, no new engine, no new dependency.
+- Change: player creation now passes
+  `narrate=lambda text: _lesson_narrate(pid, text)`. The helper
+  calls the already-configured voice engine, stores the bytes
+  (extension picked from the mime: wav/mp3/ogg/webm/m4a), and
+  returns `{media_id, url, mime_type}`. Any failure — no engine,
+  empty text, engine error, empty bytes — is caught, logged, and
+  degrades to `None`, so the lesson continues on text and audio
+  is never fabricated. `LessonPlayer` itself is untouched and
+  stays engine-agnostic.
+- Verification: new `tests/test_lesson_player_tts.py` 3/3 via
+  TestClient + create_app with `voice.synthesize` monkeypatched
+  (audio-backed speech step serves the exact stored bytes over
+  its media url; engine-failure step returns `audio: None` with
+  the lesson finishing on text; mp3 mime stored and served as
+  audio/mpeg). One test-authoring correction: `play_step`
+  reports `done: True` only when stepping an already-finished
+  lesson — the final action itself reports `done: False` with a
+  finished snapshot (`mode: idle`, `finished: True`), so the
+  fail-soft test asserts the snapshot, not `done`.
+  Deep-knowledge + voice + drift suites 26/26 with the new
+  tests; frontend modules 65/65; Playwright smoke 3/3 live
+  (register/rail/popovers/settings/chat/knowledge, mobile 390px).
+  No backend files beyond `deep_routes.py` changed, no frontend
+  files changed.
+- Not done: per-model price override in agent config (queued
+  after this batch). No frontend lesson-player UI exists yet —
+  nothing in `mainfiles/frontend/js/` calls the player routes —
+  so the audio ref is API-available but has no playback UI
+  consumer; that UI is a follow-up, not part of this wiring.
